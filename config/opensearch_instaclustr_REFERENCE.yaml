@@ -1,0 +1,195 @@
+# ============================================================================
+# Netapp Instaclustr OpenSearch Configuration - Reference Guide
+# ============================================================================
+# This file demonstrates both connection methods for Instaclustr OpenSearch
+# ============================================================================
+
+db_type: opensearch
+
+company_name: Instaclustr OpenSearch
+report_title: OpenSearch Health Check Report
+
+# ============================================================================
+# CONNECTION METHOD 1: Network Load Balancer (RECOMMENDED)
+# ============================================================================
+# The load balancer performs automatic healthchecks and ensures high availability.
+# No client-side sniffing required - the load balancer handles node failures.
+#
+# Advantages:
+#   - Simpler client configuration
+#   - Load balancer handles failover automatically
+#   - Stable single endpoint
+#   - Best for production use
+# ============================================================================
+
+hosts:
+  - "load-balancer.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+
+port: 9200
+use_ssl: true
+verify_certs: true
+
+# Sniffing disabled when using load balancer
+sniff_on_start: false
+sniff_on_connection_fail: false
+
+# ============================================================================
+# CONNECTION METHOD 2: Cluster Endpoint with Client Sniffing (ALTERNATIVE)
+# ============================================================================
+# This endpoint uses DNS to provide all data node IPs. The client performs
+# sniffing to discover nodes and ensure high availability.
+#
+# To use this method instead, replace the hosts section above with:
+#
+# hosts:
+#   - "search.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#
+# port: 9200
+# use_ssl: true
+# verify_certs: true
+#
+# # Enable client-side sniffing for HA
+# sniff_on_start: true
+# sniff_on_connection_fail: true
+# sniffer_timeout: 60
+# ============================================================================
+
+# ============================================================================
+# CONNECTION METHOD 3: VPC/Private IP with Cluster Endpoint (COST SAVINGS)
+# ============================================================================
+# Connect via private IPs to reduce data transfer costs. Requires VPC peering
+# or network connectivity to the private network.
+#
+# IMPORTANT: Contact Instaclustr Support FIRST to enable private IP sniffing
+# on your cluster before using this method.
+#
+# To use this method, replace the hosts section above with:
+#
+# hosts:
+#   - "private-search.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#
+# port: 9200
+# use_ssl: true
+# verify_certs: true
+#
+# # Enable sniffing (after Instaclustr enables it on cluster)
+# sniff_on_start: true
+# sniff_on_connection_fail: true
+# sniffer_timeout: 60
+#
+# Advantages:
+#   - Reduced data transfer costs (private IP routing)
+#   - Lower latency (direct VPC connectivity)
+#   - Enhanced security (traffic stays in private network)
+#   - Client-side node discovery and failover
+# ============================================================================
+
+# ============================================================================
+# CONNECTION METHOD 4: VPC/Private IP Individual Nodes (NOT RECOMMENDED)
+# ============================================================================
+# Private IP endpoints for individual nodes. Only use if your client doesn't
+# support sniffing. Requires VPC peering or private network connectivity.
+#
+# To use this method, replace the hosts section above with:
+#
+# hosts:
+#   - "ip-10-0-8-216.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-10-0-19-201.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-10-0-66-9.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-10-0-106-98.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-10-0-86-128.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-10-0-134-17.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-10-0-160-158.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#
+# port: 9200
+# use_ssl: true
+# verify_certs: true
+# sniff_on_start: false
+# sniff_on_connection_fail: false
+# ============================================================================
+
+# ============================================================================
+# CONNECTION METHOD 5: Public IP Individual Nodes (NOT RECOMMENDED)
+# ============================================================================
+# Public IP endpoints for individual nodes. Only use if your client doesn't
+# support sniffing AND you can't use the load balancer.
+# You must update this list when nodes are added/removed.
+#
+# To use this method, replace the hosts section above with:
+#
+# hosts:
+#   - "ip-44-196-77-24.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-52-21-193-180.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-100-25-30-53.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-54-224-177-134.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-100-25-249-234.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-34-235-90-202.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#   - "ip-54-83-23-61.106c234734b6493b91ac2cdd5d71bc20.cnodes.io"
+#
+# port: 9200
+# use_ssl: true
+# verify_certs: true
+# sniff_on_start: false
+# sniff_on_connection_fail: false
+# ============================================================================
+
+# Authentication
+user: "icopensearch"
+password: "33f7f7341ca9f6bbc......."
+
+# Connection settings
+timeout: 30
+
+# ============================================================================
+# ENVIRONMENT CONFIGURATION
+# ============================================================================
+
+# This is a managed service (Instaclustr), not AWS OpenSearch Service
+is_aws_opensearch: false
+
+# SSH is not available for managed Instaclustr clusters
+# OS-level disk checks will be skipped gracefully
+ssh_enabled: false
+
+# Note: For SSH-enabled self-hosted OpenSearch clusters, you would configure:
+# ssh_hosts:
+#   - "10.0.1.100"
+#   - "10.0.1.101"
+#   - "10.0.1.102"
+# ssh_user: "opensearch"
+# ssh_key_file: "/home/user/.ssh/id_rsa"
+# # OR: ssh_password: "your_password"
+# ssh_timeout: 10
+
+# ============================================================================
+# REPORT SETTINGS
+# ============================================================================
+
+output_format: asciidoc
+show_qry: true              # Show query details in reports
+row_limit: 10               # Limit table rows in reports
+
+# ============================================================================
+# AI ANALYSIS (OPTIONAL)
+# ============================================================================
+
+ai_analyze: false           # Set to true to enable AI-powered analysis
+
+# If enabling AI, configure these settings:
+# ai_provider: xAI          # or anthropic, openai, etc.
+# ai_endpoint: https://api.x.ai/
+# ai_api_key: your_api_key_here
+# ai_model: grok-4
+# ai_temperature: 0.1
+# ai_max_output_tokens: 20000
+
+# ============================================================================
+# CLUSTER DISCOVERED INFORMATION (from actual connection)
+# ============================================================================
+# Cluster Name: opensearch-test
+# Version: 3.2.0
+# Nodes: 7 (3 data nodes, 3 master-eligible, 1 dedicated ingest)
+# Indices: 3
+# Shards: 14 (5 primary, 9 replicas)
+# Status: GREEN
+# ============================================================================

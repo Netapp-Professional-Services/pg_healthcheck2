@@ -1,0 +1,27 @@
+{
+  "inactive_consumer_lag": {
+    "metric_keywords": ["down_members", "down_members", "total_lag", "members"],
+    "rules": [
+      {
+        "expression": "data.get('members', 0) == 0 and data.get('total_lag', 0) > 10000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Consumer group '{data.get('group_id', 'unknown')}' has no active members but CRITICAL lag of {data.get('total_lag', 0)} messages, indicating down consumers and potential data processing delays.",
+        "recommendations": [
+          "Immediately restart or deploy consumers for this group to resume processing.",
+          "Investigate why consumers crashed or failed to connect, checking logs and network issues."
+        ]
+      },
+      {
+        "expression": "data.get('members', 0) == 0 and data.get('total_lag', 0) > 1000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Consumer group '{data.get('group_id', 'unknown')}' has no active members but high lag of {data.get('total_lag', 0)} messages, suggesting stopped or failed consumers.",
+        "recommendations": [
+          "Check the status of consumer applications and restart if necessary.",
+          "Monitor for recurring issues that cause consumers to go down."
+        ]
+      }
+    ]
+  }
+}

@@ -12,27 +12,67 @@ def get_weight():
 
 
 def _parse_size(size_str):
-    """Parse size string like '1.23 GB' to bytes."""
-    if not size_str or size_str.lower() in ['0', 'n/a', '']:
+    """
+    Parse size string to bytes.
+
+    Handles multiple formats:
+    - Plain number: "12345" -> 12345 bytes
+    - With unit: "1.23 GB" -> bytes
+    - With unit (no space): "1.23GB" -> bytes
+
+    Args:
+        size_str: Size string or number
+
+    Returns:
+        float: Size in bytes
+    """
+    if not size_str or str(size_str).lower() in ['0', 'n/a', '', 'none']:
         return 0.0
+
+    size_str = str(size_str).strip()
+
     try:
+        # Try to parse as plain number (bytes)
+        if size_str.isdigit():
+            return float(size_str)
+
+        # Try to parse as float (bytes)
+        try:
+            return float(size_str)
+        except ValueError:
+            pass
+
         # Extract number and unit
         num_match = re.search(r'([\d.]+)', size_str)
-        unit_match = re.search(r'([a-z]+)', size_str.lower())
-        if not num_match or not unit_match:
+        if not num_match:
             return 0.0
+
         num = float(num_match.group(1))
-        unit = unit_match.group(1)
-        multipliers = {
-            'b': 1,
-            'kb': 1024,
-            'mb': 1024 ** 2,
-            'gb': 1024 ** 3,
-            'tb': 1024 ** 4
-        }
-        mult = multipliers.get(unit[0], 1)  # First letter
-        return num * mult
-    except (ValueError, IndexError):
+
+        # Try to find unit
+        unit_match = re.search(r'([a-z]+)', size_str.lower())
+        if not unit_match:
+            # No unit found, assume bytes
+            return num
+
+        unit = unit_match.group(1).lower()
+
+        # Map unit to multiplier
+        if unit.startswith('b') and len(unit) == 1:
+            # Just 'b' for bytes
+            return num
+        elif unit.startswith('k'):
+            return num * 1024
+        elif unit.startswith('m'):
+            return num * (1024 ** 2)
+        elif unit.startswith('g'):
+            return num * (1024 ** 3)
+        elif unit.startswith('t'):
+            return num * (1024 ** 4)
+        else:
+            # Unknown unit, assume bytes
+            return num
+    except (ValueError, IndexError, AttributeError):
         return 0.0
 
 

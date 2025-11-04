@@ -1,0 +1,113 @@
+{
+  "critical_disk_usage": {
+    "metric_keywords": ["disk_usage", "cassandra"],
+    "rules": [
+      {
+        "expression": "data.get('use_percent', 0) >= 95",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critically low disk space: {data.get('use_percent')}% used on {data.get('mount_point')} with only {data.get('available')} available.",
+        "recommendations": [
+          "IMMEDIATE ACTION: Manually delete old log segments or increase retention to free space",
+          "Add storage capacity immediately - data loss is imminent",
+          "Check for partition imbalance and redistribute if possible",
+          "Enable emergency log compaction to reclaim space"
+        ]
+      },
+      {
+        "expression": "data.get('use_percent', 0) >= 90",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical disk usage: {data.get('use_percent')}% used on {data.get('mount_point')}. Only {data.get('available')} remaining.",
+        "recommendations": [
+          "Take immediate action to free up disk space within 24 hours",
+          "Review and reduce retention settings for high-volume topics",
+          "Plan emergency storage expansion",
+          "Identify and archive or delete unnecessary data"
+        ]
+      },
+      {
+        "expression": "data.get('use_percent', 0) >= 85",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has high disk usage: {data.get('use_percent')}% used on {data.get('mount_point')}.",
+        "recommendations": [
+          "Review topic retention policies and adjust as needed",
+          "Monitor disk growth rate to predict when critical threshold will be reached",
+          "Plan for storage expansion within 1-2 weeks",
+          "Consider implementing log compaction for appropriate topics"
+        ]
+      },
+      {
+        "expression": "data.get('use_percent', 0) >= 75",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has elevated disk usage: {data.get('use_percent')}% used on {data.get('mount_point')}.",
+        "recommendations": [
+          "Review and optimize retention policies for large topics",
+          "Plan for storage capacity increase in the next month",
+          "Set up monitoring alerts for disk space trends",
+          "Evaluate if any data can be archived or moved to cold storage"
+        ]
+      }
+    ]
+  },
+  "broker_disk_health": {
+    "metric_keywords": ["disk_usage"],
+    "data_conditions": [
+      {"key": "broker_id", "exists": true},
+      {"key": "use_percent", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('exceeds_critical') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Critical disk threshold exceeded on broker {data.get('broker_id')}: {data.get('mount_point')} at {data.get('use_percent')}%",
+        "recommendations": [
+          "Immediate action required to prevent service disruption",
+          "Free up space by deleting old segments or expanding storage"
+        ]
+      },
+      {
+        "expression": "data.get('exceeds_warning') == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Warning disk threshold exceeded on broker {data.get('broker_id')}: {data.get('mount_point')} at {data.get('use_percent')}%",
+        "recommendations": [
+          "Plan remediation within 24-48 hours",
+          "Review retention policies and growth trends"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_disk_issues": {
+    "metric_keywords": ["disk_usage"],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_disk_usage', {}).get('disk_usage', {}).get('critical_brokers', [])) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_disk_usage', {}).get('disk_usage', {}).get('critical_brokers', []))}) have critical disk usage. This indicates a cluster-wide capacity issue.",
+        "recommendations": [
+          "This is a cluster-wide problem requiring immediate attention",
+          "Review retention policies across all topics",
+          "Plan emergency storage expansion for the entire cluster",
+          "Consider if topic replication factor can be temporarily reduced"
+        ]
+      },
+      {
+        "expression": "len(all_structured_findings.get('check_disk_usage', {}).get('disk_usage', {}).get('warning_brokers', [])) >= 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_disk_usage', {}).get('disk_usage', {}).get('warning_brokers', []))}) have high disk usage. Cluster-wide capacity planning needed.",
+        "recommendations": [
+          "Perform cluster-wide capacity planning review",
+          "Standardize retention policies across topics",
+          "Plan coordinated storage expansion",
+          "Review data growth trends for the entire cluster"
+        ]
+      }
+    ]
+  }
+}

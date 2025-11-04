@@ -24,29 +24,38 @@ class PostgresPlugin(BasePlugin):
     def get_rules_config(self):
         """
         Dynamically discovers and loads all .json rule files
-        from the 'rules' directory.
+        from the 'rules' directory with validation.
         """
+        from utils.rule_validator import validate_and_load_rules
+        import logging
+
+        logger = logging.getLogger(__name__)
         all_rules = {}
         # Assumes this script is in plugins/postgres/
         rules_dir = Path(__file__).parent / 'rules'
 
         if not rules_dir.is_dir():
-            print(f"⚠️ Warning: Rules directory not found at {rules_dir}")
+            logger.warning(f"Rules directory not found at {rules_dir}")
             return {}
 
         # Iterate over every .json file in the rules directory
         for rule_file in rules_dir.glob('*.json'):
             try:
                 with open(rule_file, 'r') as f:
-                    # Use the standard, secure json loader
                     loaded_rules = json.load(f)
-                    all_rules.update(loaded_rules)
+
+                # Validate and filter rules
+                validated_rules = validate_and_load_rules(loaded_rules, str(rule_file))
+
+                if validated_rules:
+                    all_rules.update(validated_rules)
+
             except json.JSONDecodeError as e:
-                # Catch specific JSON parsing errors
-                print(f"⚠️ Warning: Could not parse rule file {rule_file.name}. Error: {e}")
+                logger.error(f"Rule file {rule_file.name} has invalid JSON: {e}")
             except IOError as e:
-                # Catch file reading errors
-                print(f"⚠️ Warning: Could not read rule file {rule_file.name}. Error: {e}")
+                logger.error(f"Could not read rule file {rule_file.name}: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error loading rule file {rule_file.name}: {e}")
 
         return all_rules
 

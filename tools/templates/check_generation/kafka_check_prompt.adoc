@@ -267,6 +267,8 @@ Each object within the `rules` list defines a specific condition:
 * `reasoning`: An f-string-style message explaining why the rule triggered. It can interpolate values from the `data` record, like `{data.get('topic')}`.
 * `recommendations`: A list of actionable strings advising the user on how to resolve the issue.
 
+{% include "shared/metric_keywords_best_practices.adoc" %}
+
 == Unit Test File (Required)
 
 *Path:* `tests/{plugin_name}/checks/test_check_name.py`
@@ -367,6 +369,10 @@ The connector wraps these APIs and returns structured data.
 
 Kafka query functions return **JSON-formatted API requests** that the connector interprets.
 
+=== Kafka Connector Architecture Note
+
+The Kafka connector uses inline AsciiDoc formatting and does not depend on an external `AsciiDocFormatter` class. All formatting is done directly within the connector methods using AsciiDoc table syntax (`|===`) and admonition blocks.
+
 === CRITICAL: Supported Operations
 
 The KafkaConnector supports these operations via JSON query format. Use them exclusively.
@@ -415,6 +421,41 @@ This operation cannot default to all topics. The generated check logic MUST prov
 **Pattern 10: `list_consumer_group_offsets`**
 - **Purpose**: Gets the raw committed offsets for a consumer group without calculating lag.
 - **Query**: `{"operation": "list_consumer_group_offsets", "group_id": "my-group"}`
+
+
+=== Available Data Sources
+
+You can create checks using multiple data sources:
+
+**1. Kafka Admin API (Primary - Always Available)**
+Operations: list_topics, describe_topics, consumer_lag, broker_config, etc.
+Use for Kafka-specific metrics like topics, partitions, consumer groups.
+
+**2. OS-Level Metrics (Optional - Requires SSH)**
+Available when SSH is configured via `ssh_host`, `ssh_user`, `ssh_key_file` settings.
+
+Use `require_ssh()` helper to check availability:
+[source,python]
+----
+from plugins.common.check_helpers import require_ssh
+ssh_ok, skip_msg, skip_data = require_ssh(connector, "operation description")
+----
+
+Useful for:
+- Disk usage: `df -h /var/lib/kafka`
+- Process info: `ps aux | grep kafka`
+- Network stats: `netstat -s | grep -E "(retransmit|error)"`
+- Log file sizes: `du -sh /var/log/kafka/*`
+
+**3. Cloud Provider Metrics (Optional - Requires Cloud Config)**
+- AWS CloudWatch (for MSK): Use `require_aws()` helper
+- Azure Monitor (for Event Hubs): Use `require_azure()` helper
+- Instaclustr API: Use `require_instaclustr()` helper
+
+**CRITICAL: All optional checks MUST use the appropriate `require_*()` helper
+and gracefully skip if the service is not configured.**
+
+{% include "shared/os_level_checks_patterns.adoc" %}
 
 === Required Procedural Pattern for Single-Resource Checks
 
@@ -546,10 +587,11 @@ def get_topics_query(connector):
 ```python
 {
     'topics': ['topic1', 'topic2'],
-    'total_count': 2,
-    'internal_topics': ['__consumer_offsets']
+    'count': 2
 }
 ```
+
+**Note:** Internal topics (starting with `__`) are automatically filtered out by the connector.
 
 **Pattern 2: Describe Topics**
 
@@ -572,8 +614,7 @@ def get_topic_details_query(connector):
         'topic': 'my-topic',
         'partitions': 12,
         'replication_factor': 3,
-        'under_replicated_partitions': 0,
-        'partition_details': [...]
+        'under_replicated_partitions': 0
     }
 ]
 ```
@@ -593,11 +634,13 @@ def get_consumer_groups_query(connector):
 
 **Expected Response:**
 ```python
-{
-    'groups': [{'group_id': 'group1', 'protocol_type': 'consumer'}],
-    'total_count': 1
-}
+[
+    {'group_id': 'group1', 'protocol_type': 'consumer'},
+    {'group_id': 'group2', 'protocol_type': 'consumer'}
+]
 ```
+
+**Note:** This is a list of dictionaries, not a dict with a 'groups' key.
 
 **Pattern 4: Describe Consumer Groups**
 
@@ -620,8 +663,7 @@ def get_consumer_group_details_query(connector):
         'group_id': 'my-group',
         'state': 'Stable',
         'protocol_type': 'consumer',
-        'members': 3,
-        'coordinator': {...}
+        'members': 3
     }
 ]
 ```
@@ -632,13 +674,31 @@ def get_consumer_group_details_query(connector):
 ----
 import json
 
-def get_consumer_lag_query(connector):
-    """Returns query for consumer lag."""
+def get_consumer_lag_query(connector, group_id: str):
+    """Returns query for consumer lag for a specific group."""
     return json.dumps({
         "operation": "consumer_lag",
-        "group_id": "my-consumer-group"  # Specific group ID required
+        "group_id": group_id
     })
 ----
+
+**Expected Response (Single Group):**
+```python
+{
+    'group_id': 'my-group',
+    'details': [
+        {
+            'group_id': 'my-group',
+            'topic': 'topic1',
+            'partition': 0,
+            'current_offset': 1000,
+            'log_end_offset': 1050,
+            'lag': 50
+        }
+    ],
+    'total_lag': 50
+}
+```
 
 **Pattern 6: Consumer Lag (All Groups - Wildcard)**
 
@@ -654,10 +714,10 @@ def get_all_consumer_lag_query(connector):
     })
 ----
 
-**Expected Response:**
+**Expected Response (All Groups with wildcard "*"):**
 ```python
 {
-    'groups': [
+    'group_lags': [
         {
             'group_id': 'group1',
             'topic': 'topic1',
@@ -665,10 +725,17 @@ def get_all_consumer_lag_query(connector):
             'current_offset': 1000,
             'log_end_offset': 1050,
             'lag': 50
+        },
+        {
+            'group_id': 'group2',
+            'topic': 'topic2',
+            'partition': 0,
+            'current_offset': 2000,
+            'log_end_offset': 2100,
+            'lag': 100
         }
     ],
-    'total_lag': 150,
-    'group_count': 2
+    'total_lag': 150
 }
 ```
 
@@ -678,19 +745,23 @@ def get_all_consumer_lag_query(connector):
 ----
 import json
 
-def get_broker_config_query(connector):
+def get_broker_config_query(connector, broker_id: int):
     """Returns query for broker configuration."""
     return json.dumps({
         "operation": "broker_config",
-        "broker_id": 0  # Specific broker ID
+        "broker_id": broker_id
     })
 ----
 
 **Expected Response:**
 ```python
 {
-    'broker_id': 0,
-    'configs': {'log.retention.hours': '168', ...}
+    'name': '0',
+    'configs': {
+        'log.retention.hours': '168',
+        'num.network.threads': '8',
+        'num.io.threads': '8'
+    }
 }
 ```
 
@@ -717,6 +788,140 @@ def get_cluster_metadata_query(connector):
         {'id': 1, 'host': 'broker2', 'port': 9092}
     ]
 }
+```
+
+**Note:** The `controller_id` is an integer (not a nested object), representing the broker ID acting as controller.
+
+=== Connector Response Formats Reference
+
+The KafkaConnector returns formatted AsciiDoc strings and raw data structures. All formatting is done inline by the connector (no external AsciiDocFormatter class is used).
+
+**Response Tuple Format:**
+When `return_raw=True`, the connector returns: `(formatted_string, raw_dict_or_list)`
+
+**Key Response Structures:**
+
+**1. list_topics:**
+```python
+{
+    'topics': ['topic1', 'topic2'],
+    'count': 2
+}
+```
+
+**2. describe_topics:**
+```python
+[
+    {
+        'topic': 'my-topic',
+        'partitions': 12,
+        'replication_factor': 3,
+        'under_replicated_partitions': 0
+    }
+]
+```
+
+**3. list_consumer_groups:**
+```python
+[
+    {'group_id': 'group1', 'protocol_type': 'consumer'}
+]
+```
+
+**4. describe_consumer_groups:**
+```python
+[
+    {
+        'group_id': 'my-group',
+        'state': 'Stable',
+        'protocol_type': 'consumer',
+        'members': 3
+    }
+]
+```
+
+**5. consumer_lag (single group):**
+```python
+{
+    'group_id': 'my-group',
+    'details': [
+        {
+            'group_id': 'my-group',
+            'topic': 'my-topic',
+            'partition': 0,
+            'current_offset': 1000,
+            'log_end_offset': 1050,
+            'lag': 50
+        }
+    ],
+    'total_lag': 50
+}
+```
+
+**6. consumer_lag (wildcard "*"):**
+```python
+{
+    'group_lags': [
+        {
+            'group_id': 'group1',
+            'topic': 'topic1',
+            'partition': 0,
+            'current_offset': 1000,
+            'log_end_offset': 1050,
+            'lag': 50
+        }
+    ],
+    'total_lag': 50
+}
+```
+
+**7. broker_config / topic_config:**
+```python
+{
+    'name': '0',  # broker ID or topic name
+    'configs': {
+        'log.retention.hours': '168',
+        'num.network.threads': '8'
+    }
+}
+```
+
+**8. cluster_metadata:**
+```python
+{
+    'cluster_id': 'abc123',
+    'controller_id': 0,  # Integer, not nested object
+    'brokers': [
+        {'id': 0, 'host': 'broker1', 'port': 9092}
+    ]
+}
+```
+
+**9. describe_log_dirs:**
+```python
+[
+    {
+        'broker_id': 0,
+        'log_dir': '/var/kafka/logs',
+        'topic': 'my-topic',
+        'partition': 0,
+        'size_bytes': 104857600,
+        'offset_lag': 0
+    }
+]
+```
+
+**10. list_consumer_group_offsets:**
+```python
+[
+    {
+        'group_id': 'my-group',
+        'topic': 'my-topic',
+        'partition': 0,
+        'offset': 1000,
+        'metadata': ''
+    }
+]
 ```
 
 === Kafka JSON Trigger Rule Examples
@@ -788,53 +993,6 @@ This rule file triggers a critical alert if any topic has partitions that are no
 }
 ----
 
-
-
-
-
-=== Expected Response Format
-
-The connector returns data in this format:
-
-**Cluster Metadata Response:**
-```python
-{
-    'cluster_id': 'abc123',
-    'controller': {'id': 1, 'host': 'broker1', 'port': 9092},
-    'brokers': [
-        {'id': 1, 'host': 'broker1', 'port': 9092},
-        {'id': 2, 'host': 'broker2', 'port': 9092}
-    ]
-}
-```
-
-**Topic Details Response:**
-```python
-[
-    {
-        'topic': 'my-topic',
-        'partitions': 12,
-        'replication_factor': 3,
-        'under_replicated_partitions': 0,
-        'isr_shrinks': 0
-    }
-]
-```
-
-**Consumer Lag Response:**
-```python
-[
-    {
-        'group': 'my-consumer-group',
-        'topic': 'my-topic',
-        'partition': 0,
-        'current_offset': 1000,
-        'log_end_offset': 1050,
-        'lag': 50
-    }
-]
-```
-
 === Common Kafka Health Check Patterns
 
 **1. Consumer Lag Check**
@@ -851,30 +1009,35 @@ def run_consumer_lag(connector, settings):
     warning_lag = settings.get('kafka_lag_warning', 1000)
     critical_lag = settings.get('kafka_lag_critical', 10000)
     
-    query = get_consumer_lag_query(connector)
+    query = get_all_consumer_lag_query(connector)
     formatted, raw = connector.execute_query(query, return_raw=True)
     
     if "[ERROR]" in formatted:
         adoc_content.append(formatted)
         structured_data["consumer_lag"] = {"status": "error"}
-    elif raw:
-        # Analyze lag
+    elif raw and raw.get('group_lags'):
+        # Analyze lag from group_lags array
         high_lag_groups = [
-            group for group in raw 
-            if group.get('lag', 0) > critical_lag
+            item for item in raw['group_lags']
+            if item.get('lag', 0) > critical_lag
         ]
         
         if high_lag_groups:
             adoc_content.append("[CRITICAL]\n====\n"
                               f"**Critical Lag Detected:** {len(high_lag_groups)} "
-                              f"consumer groups have lag exceeding {critical_lag}\n"
+                              f"partitions have lag exceeding {critical_lag}\n"
                               "====\n")
         
         adoc_content.append(formatted)
         structured_data["consumer_lag"] = {
             "status": "success",
-            "data": raw
+            "data": raw['group_lags']
         }
+    else:
+        adoc_content.append("[NOTE]\n====\n"
+                          "No consumer lag detected.\n"
+                          "====\n")
+        structured_data["consumer_lag"] = {"status": "success", "data": []}
     
     return "\n".join(adoc_content), structured_data
 ----
@@ -889,26 +1052,39 @@ def run_under_replicated_partitions(connector, settings):
     adoc_content = ["=== Under-Replicated Partitions", ""]
     structured_data = {}
     
-    query = get_under_replicated_query(connector)
+    query = get_topic_details_query(connector)
     formatted, raw = connector.execute_query(query, return_raw=True)
     
     if "[ERROR]" in formatted:
         adoc_content.append(formatted)
-    elif not raw:
-        adoc_content.append("[NOTE]\n====\n"
-                          "All partitions are fully replicated.\n"
-                          "====\n")
+        structured_data["under_replicated"] = {"status": "error"}
+    elif raw:
+        # Filter topics with under-replicated partitions
+        under_replicated = [
+            t for t in raw
+            if t.get('under_replicated_partitions', 0) > 0
+        ]
+        
+        if under_replicated:
+            adoc_content.append("[CRITICAL]\n====\n"
+                              f"**Data Loss Risk:** {len(under_replicated)} topics "
+                              "have under-replicated partitions.\n"
+                              "====\n")
+            adoc_content.append(formatted)
+        else:
+            adoc_content.append("[NOTE]\n====\n"
+                              "All partitions are fully replicated.\n"
+                              "====\n")
+        
+        structured_data["under_replicated"] = {
+            "status": "success",
+            "data": raw
+        }
     else:
-        adoc_content.append("[CRITICAL]\n====\n"
-                          f"**Data Loss Risk:** {len(raw)} partitions are under-replicated. "
-                          "This indicates broker failures or network issues.\n"
+        adoc_content.append("[NOTE]\n====\n"
+                          "No topics found.\n"
                           "====\n")
-        adoc_content.append(formatted)
-    
-    structured_data["under_replicated"] = {
-        "status": "success",
-        "data": raw if raw else []
-    }
+        structured_data["under_replicated"] = {"status": "success", "data": []}
     
     return "\n".join(adoc_content), structured_data
 ----
@@ -928,7 +1104,10 @@ def run_topic_configuration(connector, settings):
     query = get_topic_details_query(connector)
     formatted, raw = connector.execute_query(query, return_raw=True)
     
-    if raw:
+    if "[ERROR]" in formatted:
+        adoc_content.append(formatted)
+        structured_data["topic_config"] = {"status": "error"}
+    elif raw:
         # Find topics with insufficient replication
         under_replicated = [
             t for t in raw 
@@ -942,8 +1121,12 @@ def run_topic_configuration(connector, settings):
                               "====\n")
         
         adoc_content.append(formatted)
-    
-    structured_data["topic_config"] = {"status": "success", "data": raw}
+        structured_data["topic_config"] = {"status": "success", "data": raw}
+    else:
+        adoc_content.append("[NOTE]\n====\n"
+                          "No topics found.\n"
+                          "====\n")
+        structured_data["topic_config"] = {"status": "success", "data": []}
     
     return "\n".join(adoc_content), structured_data
 ----
@@ -1004,9 +1187,8 @@ Generate a Kafka health check for:
 *Plugin Name:* {{ plugin_name }}
 *Request:* {{ natural_language_request }}
 
-**Remember:** - **Use JSON format** for all queries: `json.dumps({"operation": "...", ...})`
-- **Available operations are strictly limited to the 10 patterns listed above.**
-- **CRITICAL CONSTRAINT:** Generate checks ONLY for metrics accessible via the `kafka-python` client library. Do NOT create checks for OS-level metrics like CPU, Memory, or general Disk Free Space.
+**Remember:** 
+- **Use JSON format** for all queries: `json.dumps({"operation": "...", ...})`
 - **For all consumer groups:** Use `"group_id": "*"` in the `consumer_lag` operation.
 - **For all topics:** Use an empty list `"topics": []` in the `describe_topics` operation.
 - **Import json** at the top of query files

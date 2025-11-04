@@ -24,6 +24,12 @@
                        class="px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 transition">
                         Report History
                     </a>
+                    {% if current_user.has_privilege('ViewTrendAnalysis') %}
+                    <a href="{{ url_for('main.trend_analysis_page') }}" 
+                       class="px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 transition">
+                        Trend Analysis
+                    </a>
+                    {% endif %}                        
                     <a href="{{ url_for('profile.ai_settings') }}" 
                        class="px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 transition">
                         AI Settings

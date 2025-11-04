@@ -1,0 +1,57 @@
+=== OS-Level Metrics (OPTIONAL via SSH)
+
+Checks CAN include OS-level metrics when they provide valuable database health context:
+- Disk usage (critical for all databases)
+- CPU/Memory usage (performance context)
+- Network statistics (replication context)
+- Process information (detecting issues)
+
+**Pattern for SSH-dependent checks:**
+
+[source,python]
+----
+from plugins.common.check_helpers import require_ssh
+import json
+
+def run_check_disk_usage(connector, settings):
+    """Monitors disk usage on database server."""
+    adoc_content = ["=== Disk Usage Analysis", ""]
+    structured_data = {}
+    
+    # Check SSH availability using helper
+    ssh_ok, skip_msg, skip_data = require_ssh(connector, "disk usage monitoring")
+    if not ssh_ok:
+        adoc_content.append(skip_msg)
+        structured_data["disk_usage"] = skip_data
+        return "\n".join(adoc_content), structured_data
+    
+    # SSH available - execute shell command
+    try:
+        query = json.dumps({
+            "operation": "shell",
+            "command": "df -h /path/to/database/data",
+            "description": "Check database data directory disk usage"
+        })
+        
+        formatted, raw = connector.execute_query(query, return_raw=True)
+        
+        if "[ERROR]" in formatted:
+            adoc_content.append(formatted)
+            structured_data["disk_usage"] = {"status": "error", "data": raw}
+        else:
+            # Parse and analyze...
+            structured_data["disk_usage"] = {"status": "success", "data": raw}
+        
+    except Exception as e:
+        adoc_content.append(f"[ERROR]\n====\nDisk check failed: {e}\n====\n")
+        structured_data["disk_usage"] = {"status": "error", "details": str(e)}
+    
+    return "\n".join(adoc_content), structured_data
+----
+
+**Key Points:**
+1. ✅ Use `require_ssh()` helper - returns (bool, message, data) tuple
+2. ✅ If SSH not available, return gracefully with skip message
+3. ✅ Use JSON format for shell commands: `{"operation": "shell", "command": "..."}`
+4. ✅ Always include description field for auditing
+5. ✅ Set structured_data status to "skipped" when SSH unavailable

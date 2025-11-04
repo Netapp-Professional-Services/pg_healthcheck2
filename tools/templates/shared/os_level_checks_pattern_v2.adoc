@@ -1,0 +1,406 @@
+=== Common OS-Level Health Checks (Reference)
+
+These checks are valuable for ALL database technologies when SSH access is available.
+
+==== Pattern: Graceful SSH Check
+
+All OS-level checks MUST follow this pattern:
+
+[source,python]
+----
+from plugins.common.check_helpers import require_ssh
+import json
+
+def run_os_level_check(connector, settings):
+    adoc_content = ["=== OS-Level Monitoring", ""]
+    structured_data = {}
+    
+    # STEP 1: Check SSH availability
+    ssh_ok, skip_msg, skip_data = require_ssh(connector, "OS-level monitoring")
+    if not ssh_ok:
+        adoc_content.append(skip_msg)
+        structured_data["os_check"] = skip_data
+        return "\n".join(adoc_content), structured_data
+    
+    # STEP 2: SSH available - execute command
+    try:
+        query = json.dumps({
+            "operation": "shell",
+            "command": "df -h /path/to/data",
+            "description": "Check disk usage"
+        })
+        
+        formatted, raw = connector.execute_query(query, return_raw=True)
+        
+        if "[ERROR]" in formatted:
+            adoc_content.append(formatted)
+            structured_data["os_check"] = {"status": "error", "data": raw}
+        else:
+            adoc_content.append(formatted)
+            structured_data["os_check"] = {"status": "success", "data": raw}
+            
+    except Exception as e:
+        error_msg = f"[ERROR]\n====\nOS check failed: {e}\n====\n"
+        adoc_content.append(error_msg)
+        structured_data["os_check"] = {"status": "error", "details": str(e)}
+    
+    return "\n".join(adoc_content), structured_data
+----
+
+==== Disk Usage Monitoring
+
+**Purpose:** Detect full disks before database operations fail
+
+**Database-Specific Paths:**
+
+[cols="1,2"]
+|===
+|Database |Default Data Path
+
+|PostgreSQL
+|`/var/lib/postgresql/data` or `PGDATA` env var
+
+|Cassandra
+|`/var/lib/cassandra/data`
+
+|MongoDB
+|`/var/lib/mongodb` or `/data/db`
+
+|Kafka
+|`/var/lib/kafka` or `/tmp/kafka-logs`
+
+|MySQL/MariaDB
+|`/var/lib/mysql`
+
+|Redis/Valkey
+|`/var/lib/redis` or `/data`
+
+|ClickHouse
+|`/var/lib/clickhouse`
+
+|OpenSearch
+|`/var/lib/opensearch`
+|===
+
+**Shell Command:**
+```bash
+df -h /path/to/database/data
+```
+
+**Alert Thresholds:**
+- Usage > 90% = CRITICAL
+- Usage > 80% = WARNING
+- Also check log directories separately
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "df -h /var/lib/postgresql/data",
+    "description": "Check PostgreSQL data directory disk usage"
+})
+----
+
+==== Disk I/O Statistics
+
+**Purpose:** Identify I/O bottlenecks affecting database performance
+
+**Shell Command:**
+```bash
+iostat -x 1 3 | grep -A 3 'Device'
+```
+
+**What to Check:**
+- `%util` > 90% = High I/O wait (disk saturated)
+- `await` > 50ms = Slow disk response times
+- High `r_await` or `w_await` = Read/write specific issues
+
+**Alert Thresholds:**
+- %util > 90% = CRITICAL
+- %util > 75% = WARNING
+- await > 100ms = CRITICAL
+- await > 50ms = WARNING
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "iostat -x 1 3",
+    "description": "Check I/O statistics for database disks"
+})
+----
+
+==== Memory Usage
+
+**Purpose:** Detect memory pressure affecting database caches
+
+**Shell Command:**
+```bash
+free -m
+```
+
+**What to Check:**
+- Available memory < 10% of total = CRITICAL
+- Swap usage > 1GB = WARNING
+- High swap usage = Performance degradation
+
+**Alert Thresholds:**
+- Available < 10% = CRITICAL
+- Available < 20% = WARNING
+- Swap used > 2GB = CRITICAL
+- Swap used > 500MB = WARNING
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "free -m",
+    "description": "Check system memory usage"
+})
+----
+
+==== CPU Usage
+
+**Purpose:** Context for performance issues and resource contention
+
+**Shell Command:**
+```bash
+top -bn1 | head -20
+```
+
+**What to Check:**
+- CPU > 90% sustained = Performance risk
+- High `%sy` (system) = Kernel/I/O overhead
+- High `%wa` (iowait) = Disk bottleneck
+- High `%st` (steal) = VM host contention
+
+**Alert Thresholds:**
+- CPU > 95% = CRITICAL
+- CPU > 80% = WARNING
+- iowait > 30% = CRITICAL (disk bottleneck)
+- iowait > 20% = WARNING
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "top -bn1 | head -20",
+    "description": "Check CPU usage and load"
+})
+----
+
+==== Process Information
+
+**Purpose:** Detect zombie processes, thread leaks, resource exhaustion
+
+**Database-Specific Processes:**
+
+[cols="1,2"]
+|===
+|Database |Process Name
+
+|PostgreSQL
+|`postgres`
+
+|Cassandra
+|`java.*cassandra`
+
+|MongoDB
+|`mongod`
+
+|Kafka
+|`java.*kafka`
+
+|MySQL/MariaDB
+|`mysqld` or `mariadbd`
+
+|Redis/Valkey
+|`redis-server` or `valkey-server`
+|===
+
+**Shell Commands:**
+```bash
+# Check if process is running
+ps aux | grep postgres | grep -v grep
+
+# Count processes
+pgrep -c postgres
+
+# Check thread count
+ps -eLf | grep postgres | wc -l
+
+# Check for zombie processes
+ps aux | awk '$8=="Z" {print}'
+```
+
+**What to Check:**
+- Process not running = CRITICAL
+- Multiple processes when expecting one = WARNING
+- Thread count growth over time = Potential leak
+- Zombie processes (state Z) = Application issues
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "ps aux | grep postgres | grep -v grep",
+    "description": "Check PostgreSQL process status"
+})
+----
+
+==== Network Statistics
+
+**Purpose:** Detect network issues affecting replication and client connections
+
+**Shell Command:**
+```bash
+netstat -s | grep -E "(retransmit|error|failed)"
+```
+
+**What to Check:**
+- High TCP retransmit rate = Network congestion
+- Connection failures = Port blocked or process down
+- Packet errors = Network hardware issues
+
+**Alert Thresholds:**
+- Retransmit rate > 5% = WARNING
+- Retransmit rate > 10% = CRITICAL
+- Connection failures > 100/hour = WARNING
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "netstat -s",
+    "description": "Check network statistics for issues"
+})
+----
+
+==== Log File Growth
+
+**Purpose:** Detect runaway logging filling disk space
+
+**Database-Specific Log Paths:**
+
+[cols="1,2"]
+|===
+|Database |Default Log Path
+
+|PostgreSQL
+|`/var/log/postgresql` or `$PGDATA/log`
+
+|Cassandra
+|`/var/log/cassandra`
+
+|MongoDB
+|`/var/log/mongodb`
+
+|Kafka
+|`/var/log/kafka` or `$KAFKA_HOME/logs`
+
+|MySQL/MariaDB
+|`/var/log/mysql` or `/var/lib/mysql/*.log`
+
+|Redis/Valkey
+|`/var/log/redis`
+|===
+
+**Shell Commands:**
+```bash
+# Check total log directory size
+du -sh /var/log/database/*
+
+# Find large log files
+find /var/log/database -name "*.log" -size +100M -ls
+
+# Check recent log growth rate
+ls -lht /var/log/database/*.log | head -10
+```
+
+**Alert Thresholds:**
+- Single log file > 10GB = WARNING
+- Log directory > 50GB = WARNING
+- Log directory > 100GB = CRITICAL
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "du -sh /var/log/postgresql/*",
+    "description": "Check PostgreSQL log file sizes"
+})
+----
+
+==== File Handle Usage
+
+**Purpose:** Detect file descriptor exhaustion (common database issue)
+
+**Shell Command:**
+```bash
+# Check current file handles for process
+lsof -p $(pgrep postgres) | wc -l
+
+# Check system limits
+ulimit -n
+cat /proc/sys/fs/file-nr
+```
+
+**What to Check:**
+- File handles approaching ulimit = WARNING
+- File handles > 80% of limit = CRITICAL
+- System file handle exhaustion = CRITICAL
+
+**Example Query:**
+[source,python]
+----
+query = json.dumps({
+    "operation": "shell",
+    "command": "lsof -p $(pgrep postgres) 2>/dev/null | wc -l",
+    "description": "Check PostgreSQL file handle usage"
+})
+----
+
+==== Best Practices for OS-Level Checks
+
+1. **Always use require_ssh() helper** - Don't check `has_ssh_support()` directly
+2. **Include description field** - Helps with auditing and debugging
+3. **Handle command failures gracefully** - SSH commands can fail for many reasons
+4. **Use absolute paths** - Don't rely on PATH environment variable
+5. **Avoid dangerous commands** - Never use `rm`, `kill`, `shutdown`, etc.
+6. **Set reasonable timeouts** - Long-running commands can block checks
+7. **Parse output defensively** - OS command output can vary by distro/version
+8. **Document expected output format** - In check docstrings
+9. **Consider security** - Shell commands run with SSH user privileges
+10. **Test across OS variants** - Ubuntu, CentOS, Debian may differ
+
+==== Security Considerations
+
+**Safe Commands (Allowed by Default):**
+- `df`, `du`, `free`, `ps`, `top`, `uptime`
+- `netstat`, `ss`, `lsof`, `iostat`, `vmstat`
+- `ls`, `cat`, `head`, `tail`, `grep`, `awk`, `wc`
+- Database admin tools: `nodetool`, `redis-cli`, etc.
+
+**Dangerous Commands (Blocked):**
+- Commands with `;`, `&&`, `||`, backticks
+- File manipulation: `rm`, `mv`, `cp` to critical paths
+- Process control: `kill`, `killall`
+- System control: `shutdown`, `reboot`, `systemctl stop`
+- User management: `useradd`, `passwd`, `sudo`
+
+**To override security** (for trusted environments only):
+[source,python]
+----
+# In connector initialization
+self.shell_executor = ShellExecutor(
+    self.ssh_manager,
+    allow_unsafe_commands=True  # ⚠️ Use with caution!
+)
+----

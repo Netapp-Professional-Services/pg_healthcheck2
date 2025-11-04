@@ -1,0 +1,67 @@
+{
+  "critical_disk_usage_node": {
+    "metric_keywords": ["prometheus_disk_usage", "per_node_disk_usage", "data"],
+    "rules": [
+      {
+        "expression": "data.get('value', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) in {data.get('datacenter', 'unknown')}/{data.get('rack', 'unknown')} has critical disk usage: {data.get('value', 0):.2f}%. Risk of node failure and data loss.",
+        "recommendations": [
+          "URGENT: Add disk capacity immediately - node may fail",
+          "Run compaction to reclaim space",
+          "Remove old snapshots and backups",
+          "Investigate data growth patterns",
+          "DO NOT let disk reach 100% - Cassandra will stop accepting writes"
+        ]
+      },
+      {
+        "expression": "data.get('value', 0) >= 85",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critically high disk usage: {data.get('value', 0):.2f}%.",
+        "recommendations": [
+          "Very high disk usage - immediate action needed",
+          "Clean up old snapshots and commit logs",
+          "Review compaction settings",
+          "Plan capacity increase urgently"
+        ]
+      }
+    ]
+  },
+  "high_disk_usage_node": {
+    "metric_keywords": ["prometheus_disk_usage", "per_node_disk_usage", "data"],
+    "rules": [
+      {
+        "expression": "70 <= data.get('value', 0) < 85",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has high disk usage: {data.get('value', 0):.2f}%.",
+        "recommendations": [
+          "Monitor disk usage trends closely",
+          "Review data retention policies",
+          "Plan capacity increase before reaching critical levels",
+          "Check for old snapshots that can be removed"
+        ]
+      }
+    ]
+  },
+  "cluster_disk_pressure": {
+    "metric_keywords": ["prometheus_disk_usage", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('average_disk_percent', 0) >= 75",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Cluster-wide disk usage is {data.get('average_disk_percent', 0):.2f}% across {data.get('node_count', 0)} nodes. Cluster storage capacity constraints detected.",
+        "recommendations": [
+          "Cluster experiencing overall storage pressure",
+          "Review data growth rate and projections",
+          "Consider adding storage capacity cluster-wide",
+          "Review TTL settings and data retention policies",
+          "Evaluate compaction strategy effectiveness"
+        ]
+      }
+    ]
+  }
+}

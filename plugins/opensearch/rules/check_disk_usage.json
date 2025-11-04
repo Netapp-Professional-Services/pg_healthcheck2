@@ -1,0 +1,154 @@
+{
+  "disk_usage_percent": {
+    "critical": {
+      "threshold": 95,
+      "reasoning": "Disk usage above 95% triggers OpenSearch flood stage watermark, blocking all writes to prevent disk exhaustion",
+      "recommendations": [
+        "URGENT: Free up disk space immediately - cluster is in flood stage",
+        "Delete old indices or move to cold storage",
+        "Force merge read-only indices to reduce disk usage",
+        "Extend disk capacity urgently",
+        "Review and accelerate data retention policies",
+        "Consider emergency snapshot and restore to larger storage",
+        "Check for unexpected disk usage (logs, temp files, OS)"
+      ]
+    },
+    "high": {
+      "threshold": 90,
+      "reasoning": "Disk usage above 90% triggers high watermark, preventing new shard allocation to this node",
+      "recommendations": [
+        "High watermark reached - no new shards will be allocated to this node",
+        "Implement Index State Management (ISM) policies immediately",
+        "Delete or archive old data according to retention policy",
+        "Force merge indices to reduce storage overhead",
+        "Plan storage expansion within 24-48 hours",
+        "Review data growth rate and project capacity needs",
+        "Consider snapshot and delete old indices"
+      ]
+    },
+    "medium": {
+      "threshold": 85,
+      "reasoning": "Disk usage above 85% triggers low watermark, preventing replica allocation to this node",
+      "recommendations": [
+        "Low watermark reached - replica shards won't be allocated here",
+        "Monitor disk growth closely",
+        "Implement or review Index State Management policies",
+        "Plan storage expansion within 1-2 weeks",
+        "Review data retention and archival processes",
+        "Set up automated alerts for disk usage trends"
+      ]
+    }
+  },
+  "data_directory_usage_percent": {
+    "critical": {
+      "threshold": 95,
+      "reasoning": "OpenSearch data directory approaching flood stage watermark",
+      "recommendations": [
+        "Immediately free space in OpenSearch data directory",
+        "Check for old segments, deleted docs, or merge candidates",
+        "Review index.merge.policy settings",
+        "Delete unnecessary snapshots stored locally",
+        "Clear temporary files if safe to do so",
+        "Consider emergency data migration to additional disk"
+      ]
+    },
+    "high": {
+      "threshold": 90,
+      "reasoning": "Data directory above high watermark threshold",
+      "recommendations": [
+        "Plan immediate cleanup of data directory",
+        "Force merge indices to reduce segment count",
+        "Review and delete old indices",
+        "Check for index.blocks.read_only_allow_delete on indices",
+        "Plan storage expansion urgently"
+      ]
+    }
+  },
+  "available_disk_gb": {
+    "critical": {
+      "threshold": 10,
+      "reasoning": "Less than 10GB available disk space creates immediate risk of write failures",
+      "recommendations": [
+        "CRITICAL: Less than 10GB free - immediate action required",
+        "Delete data or expand storage NOW",
+        "Review largest indices for cleanup candidates",
+        "Check for log files consuming space",
+        "Consider emergency snapshot and removal of old data"
+      ]
+    },
+    "high": {
+      "threshold": 50,
+      "reasoning": "Low available disk space approaching critical levels",
+      "recommendations": [
+        "Plan storage expansion immediately",
+        "Accelerate data retention and cleanup policies",
+        "Monitor disk usage hourly",
+        "Prepare emergency cleanup procedures"
+      ]
+    }
+  },
+  "disk_io_await_ms": {
+    "critical": {
+      "threshold": 100,
+      "reasoning": "Disk I/O latency above 100ms indicates severe storage performance issues",
+      "recommendations": [
+        "Check disk health and SMART status",
+        "Review for I/O saturation on storage backend",
+        "Reduce concurrent merge operations if needed",
+        "Consider upgrading to faster storage (SSD/NVMe)",
+        "Check for other processes competing for disk I/O",
+        "Review OpenSearch merge throttle settings"
+      ]
+    },
+    "high": {
+      "threshold": 50,
+      "reasoning": "Elevated disk I/O latency can impact indexing and query performance",
+      "recommendations": [
+        "Monitor disk I/O metrics closely",
+        "Review storage backend performance",
+        "Check for merge storms or heavy indexing",
+        "Consider storage performance tuning",
+        "Plan for storage upgrade if sustained"
+      ]
+    }
+  },
+  "disk_io_utilization_percent": {
+    "critical": {
+      "threshold": 95,
+      "reasoning": "Disk I/O at capacity creates bottleneck for all operations",
+      "recommendations": [
+        "Storage I/O is saturated - immediate bottleneck",
+        "Reduce indexing rate if possible",
+        "Optimize refresh and merge settings",
+        "Upgrade to higher IOPS storage",
+        "Distribute load across more nodes",
+        "Review slow storage operations in logs"
+      ]
+    },
+    "high": {
+      "threshold": 80,
+      "reasoning": "High disk I/O utilization indicates approaching storage performance limits",
+      "recommendations": [
+        "Monitor I/O patterns and identify hotspots",
+        "Review indexing and query workloads",
+        "Consider scaling with additional nodes",
+        "Optimize merge policies to reduce I/O",
+        "Plan storage performance upgrades"
+      ]
+    }
+  },
+  "inode_usage_percent": {
+    "critical": {
+      "threshold": 90,
+      "reasoning": "High inode usage can prevent file creation even if disk space available",
+      "recommendations": [
+        "Check for excessive small files or segments",
+        "Force merge indices to reduce segment count",
+        "Review temp file creation patterns",
+        "Clean up snapshot repositories if stored locally",
+        "Increase filesystem inode limit if possible",
+        "Consider filesystem with higher inode capacity"
+      ]
+    }
+  }
+}

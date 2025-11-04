@@ -266,9 +266,47 @@ class {{ TechnologyNameCamelCase }}Plugin(BasePlugin):
 
 == Required File: connector.py
 
-=== Mixin Architecture (CRITICAL)
+=== Mixin Architecture (Technology-Dependent)
 
-YOU MUST inherit from ALL FOUR mixins regardless of database type:
+Connector mixin requirements depend on the technology type:
+
+==== Category 1: Pure API Technologies (NO mixins needed)
+
+Technologies that use native client libraries with complete Admin APIs:
+- *Kafka:* kafka-python Admin API handles all operations
+- *Elasticsearch/OpenSearch:* REST API via HTTP client
+- *Redis/Valkey:* redis-py client commands
+
+[source,python]
+----
+class {{ TechnologyNameCamelCase }}Connector:
+    """Simple connector - no mixins needed."""
+    
+    def __init__(self, settings):
+        self.settings = settings
+        self.admin_client = None  # or appropriate client
+        self.version_info = {}
+----
+
+==== Category 2: Databases with Admin Tools (SSH mixin needed)
+
+Technologies requiring SSH for administrative commands:
+- *Cassandra/ScyllaDB:* nodetool commands
+- *PostgreSQL:* pg_basebackup, pg_controldata
+- *MongoDB:* mongostat, mongotop
+
+[source,python]
+----
+class {{ TechnologyNameCamelCase }}Connector(SSHSupportMixin):
+    """Connector with SSH support for admin tools."""
+----
+
+==== Category 3: Cloud-Aware Databases (Cloud mixins needed)
+
+Technologies commonly deployed in managed services:
+- *PostgreSQL:* RDS, Azure Database, Instaclustr
+- *MongoDB:* DocumentDB, Cosmos DB, Atlas
+- *MySQL/MariaDB:* RDS, Azure Database
 
 [source,python]
 ----
@@ -278,15 +316,10 @@ class {{ TechnologyNameCamelCase }}Connector(
     AzureSupportMixin,
     InstaclustrSupportMixin
 ):
+    """Full mixin support for flexible deployment."""
 ----
 
-**Why all mixins?** We cannot predict deployment environment:
-- PostgreSQL: self-hosted, RDS, Azure Database, Instaclustr
-- MongoDB: self-hosted, DocumentDB, Cosmos DB, Atlas
-- Cassandra: self-hosted, Keyspaces, Instaclustr
-- Redis: self-hosted, ElastiCache, Azure Cache
-
-Mixins gracefully handle missing configuration (set managers to None).
+**Decision Rule:** Use the minimum mixins needed for the technology. Cloud mixins gracefully handle missing configuration (set managers to None), but don't add them unless the technology is commonly deployed in those environments.
 
 === Required Methods
 
@@ -1263,6 +1296,289 @@ class MongoDBConnector(SSHSupportMixin, AWSSupportMixin, AzureSupportMixin, Inst
             return (error_msg, {'error': str(e)}) if return_raw else error_msg
 ----
 
+=== Example 4: Streaming Platform (Kafka Pattern)
+
+This example demonstrates pure API-based connectors with no mixins needed:
+
+[source,python]
+----
+import json
+import logging
+from kafka import KafkaConsumer
+from kafka.admin import KafkaAdminClient, ConfigResource, ConfigResourceType
+from kafka.structs import TopicPartition
+
+logger = logging.getLogger(__name__)
+
+
+class KafkaConnector:
+    """Kafka connector using Admin API - no mixins needed."""
+
+    def __init__(self, settings):
+        self.settings = settings
+        self.admin_client = None
+        self.version_info = {}
+
+    def connect(self):
+        """Establishes a connection to the Kafka cluster."""
+        try:
+            bootstrap_servers = self.settings.get('bootstrap_servers', ['localhost:9092'])
+
+            # Handle both list and string formats
+            if isinstance(bootstrap_servers, str):
+                bootstrap_servers = [s.strip() for s in bootstrap_servers.split(',')]
+
+            self.admin_client = KafkaAdminClient(
+                bootstrap_servers=bootstrap_servers,
+                client_id='healthcheck_client',
+                request_timeout_ms=30000
+            )
+
+            self.version_info = self._get_version_info()
+            logger.info(f"✅ Connected to Kafka cluster")
+            
+        except Exception as e:
+            logger.error(f"Database connection failed: {e}")
+            raise ConnectionError(f"Could not connect to Kafka: {e}")
+
+    def disconnect(self):
+        """Closes all connections."""
+        if self.admin_client:
+            try:
+                self.admin_client.close()
+                logger.info("Database connection closed")
+            except Exception as e:
+                logger.warning(f"Error during disconnect: {e}")
+            finally:
+                self.admin_client = None
+
+    def close(self):
+        """Alias for disconnect()."""
+        self.disconnect()
+
+    def _get_version_info(self):
+        """Fetches broker version information."""
+        try:
+            cluster_metadata = self.admin_client._client.cluster
+            brokers = cluster_metadata.brokers()
+            return {
+                'version_string': 'Kafka (Version API not supported by client)',
+                'broker_count': len(brokers) if brokers else 0
+            }
+        except Exception as e:
+            logger.warning(f"Could not fetch version: {e}")
+            return {'version_string': 'Unknown', 'broker_count': 0}
+
+    @property
+    def version_info(self):
+        """Returns version information."""
+        return self._version_info
+
+    def get_db_metadata(self):
+        """
+        Fetches cluster-level metadata.
+        
+        Returns:
+            dict: {'version': str, 'db_name': str}
+        """
+        try:
+            cluster_info = self.admin_client.describe_cluster()
+            cluster_id = cluster_info.get('cluster_id', 'Unknown')
+            return {
+                'version': self.version_info.get('version_string', 'N/A'),
+                'db_name': f"Cluster ID: {cluster_id}"
+            }
+        except Exception as e:
+            logger.warning(f"Could not fetch metadata: {e}")
+            return {'version': 'N/A', 'db_name': 'N/A'}
+
+    def execute_query(self, query, params=None, return_raw=False):
+        """
+        Executes Kafka Admin API operations via JSON dispatch.
+        
+        Supported operations:
+        - list_topics
+        - describe_topics
+        - list_consumer_groups
+        - describe_consumer_groups
+        - consumer_lag
+        - broker_config
+        - topic_config
+        - cluster_metadata
+        - describe_log_dirs
+        - list_consumer_group_offsets
+        
+        Args:
+            query: JSON string defining the operation
+            params: Not used (for API compatibility)
+            return_raw: If True, returns (formatted, raw_data)
+        
+        Returns:
+            str or tuple: Formatted results
+        """
+        try:
+            query_obj = json.loads(query)
+            operation = query_obj.get('operation')
+
+            if operation == 'list_topics':
+                return self._list_topics(return_raw)
+            elif operation == 'describe_topics':
+                return self._describe_topics(query_obj.get('topics', []), return_raw)
+            elif operation == 'list_consumer_groups':
+                return self._list_consumer_groups(return_raw)
+            elif operation == 'describe_consumer_groups':
+                return self._describe_consumer_groups(query_obj.get('group_ids', []), return_raw)
+            elif operation == 'consumer_lag':
+                group_id = query_obj.get('group_id')
+                if not group_id:
+                    raise ValueError("'consumer_lag' requires 'group_id'")
+                if group_id == '*':
+                    return self._get_all_consumer_lag(return_raw)
+                return self._get_consumer_lag(group_id, return_raw)
+            elif operation == 'broker_config':
+                broker_id = query_obj.get('broker_id')
+                if broker_id is None:
+                    raise ValueError("'broker_config' requires 'broker_id'")
+                return self._get_broker_config(broker_id, return_raw)
+            elif operation == 'topic_config':
+                topic = query_obj.get('topic')
+                if not topic:
+                    raise ValueError("'topic_config' requires 'topic'")
+                return self._get_topic_config(topic, return_raw)
+            elif operation == 'cluster_metadata':
+                return self._get_cluster_metadata(return_raw)
+            elif operation == 'describe_log_dirs':
+                broker_ids = query_obj.get('broker_ids', [])
+                return self._describe_log_dirs(broker_ids, return_raw)
+            elif operation == 'list_consumer_group_offsets':
+                group_id = query_obj.get('group_id')
+                if not group_id:
+                    raise ValueError("'list_consumer_group_offsets' requires 'group_id'")
+                return self._list_consumer_group_offsets(group_id, return_raw)
+            else:
+                raise ValueError(f"Unsupported operation: {operation}")
+
+        except json.JSONDecodeError as e:
+            msg = f"[ERROR]\n====\nInvalid JSON query: {e}\n====\n"
+            logger.error(msg)
+            return (msg, {'error': str(e)}) if return_raw else msg
+        except Exception as e:
+            msg = f"[ERROR]\n====\nOperation failed: {e}\n====\n"
+            logger.error(msg, exc_info=True)
+            return (msg, {'error': str(e)}) if return_raw else msg
+
+    def _list_topics(self, return_raw=False):
+        """Lists all user-visible topics."""
+        topics = self.admin_client.list_topics()
+        user_topics = sorted([t for t in topics if not t.startswith('__')])
+        raw = {'topics': user_topics, 'count': len(user_topics)}
+        
+        if not user_topics:
+            formatted = "[NOTE]\n====\nNo user topics found.\n====\n"
+        else:
+            formatted = f"User Topics ({len(user_topics)}):\n"
+            formatted += "\n".join(f"  - {t}" for t in user_topics)
+        
+        return (formatted, raw) if return_raw else formatted
+
+    def _describe_topics(self, topics, return_raw=False):
+        """Gets detailed information about topics."""
+        cluster = self.admin_client._client.cluster
+        cluster.request_update()
+        
+        target_topics = topics or list(cluster.topics(exclude_internal_topics=True))
+        raw_results = []
+
+        for topic_name in sorted(target_topics):
+            partitions = cluster.partitions_for_topic(topic_name)
+            if not partitions:
+                continue
+
+            under_replicated = 0
+            tp_example = TopicPartition(topic_name, next(iter(partitions)))
+            replication_factor = len(cluster.replicas(tp_example))
+
+            for p_id in partitions:
+                tp = TopicPartition(topic_name, p_id)
+                if len(cluster.in_sync_replicas(tp)) < len(cluster.replicas(tp)):
+                    under_replicated += 1
+            
+            raw_results.append({
+                'topic': topic_name,
+                'partitions': len(partitions),
+                'replication_factor': replication_factor,
+                'under_replicated_partitions': under_replicated
+            })
+
+        if not raw_results:
+            formatted = "[NOTE]\n====\nNo topics found.\n====\n"
+        else:
+            formatted = "|===\n|Topic|Partitions|Replication Factor|Under-Replicated\n"
+            for t in raw_results:
+                formatted += f"|{t['topic']}|{t['partitions']}|{t['replication_factor']}|{t['under_replicated_partitions']}\n"
+            formatted += "|===\n"
+        
+        return (formatted, raw_results) if return_raw else formatted
+
+    def _get_consumer_lag(self, group_id, return_raw=False):
+        """Calculates consumer lag for a specific group."""
+        try:
+            committed_offsets = self.admin_client.list_consumer_group_offsets(group_id)
+            if not committed_offsets:
+                msg = f"[NOTE]\n====\nNo offsets for group '{group_id}'.\n====\n"
+                return (msg, {}) if return_raw else msg
+
+            partitions = list(committed_offsets.keys())
+            consumer = KafkaConsumer(bootstrap_servers=self.settings.get('bootstrap_servers'))
+            end_offsets = consumer.end_offsets(partitions)
+            consumer.close()
+
+            lag_data = []
+            for partition, offset_meta in committed_offsets.items():
+                committed = offset_meta.offset
+                end = end_offsets.get(partition, 0)
+                lag = max(0, end - committed)
+                lag_data.append({
+                    'group_id': group_id,
+                    'topic': partition.topic,
+                    'partition': partition.partition,
+                    'current_offset': committed,
+                    'log_end_offset': end,
+                    'lag': lag
+                })
+            
+            raw = {
+                'group_id': group_id,
+                'details': lag_data,
+                'total_lag': sum(d['lag'] for d in lag_data)
+            }
+            
+            formatted = f"Consumer Group: {group_id}\nTotal Lag: {raw['total_lag']}\n\n"
+            formatted += "|===\n|Topic|Partition|Current|End|Lag\n"
+            for item in sorted(lag_data, key=lambda x: (x['topic'], x['partition'])):
+                formatted += f"|{item['topic']}|{item['partition']}|{item['current_offset']}|{item['log_end_offset']}|{item['lag']}\n"
+            formatted += "|===\n"
+            
+            return (formatted, raw) if return_raw else formatted
+            
+        except Exception as e:
+            msg = f"[ERROR]\n====\nFailed to calculate lag: {e}\n====\n"
+            logger.error(msg, exc_info=True)
+            return (msg, {'error': str(e)}) if return_raw else msg
+
+    # Additional operation methods (_get_broker_config, _get_topic_config, etc.)
+    # would be implemented here following the same pattern...
+----
+
+**Key Features:**
+- No mixins - pure Kafka Admin API
+- JSON-based operation dispatch
+- Proper error handling with AsciiDoc formatting
+- Wildcard support (`"group_id": "*"`)
+- Empty list support (`"topics": []` for all topics)
+
+
+
 == JSON String Escaping (CRITICAL)
 
 When generating file content in JSON:
@@ -1319,14 +1635,21 @@ Use `\n` for newlines, `\"` for quotes, `\\` for backslashes.
 
 Before outputting JSON, verify:
 
-✅ All 4 mixins in connector inheritance
-✅ Complete execute_query() with all 4 JSON operation types
-✅ Security defaults (ssh_strict_host_key_checking=True, allow_unsafe_commands=False)
+✅ Correct mixin architecture for technology type:
+   - Pure API technologies (Kafka, Redis, Elasticsearch): NO mixins
+   - SSH admin tools (Cassandra, PostgreSQL): SSHSupportMixin only
+   - Cloud-deployable databases: All 4 mixins
+✅ Complete execute_query() with appropriate operations:
+   - Pure API: Technology-specific operations only
+   - With SSH: Add 'shell' operation
+   - With cloud: Add 'cloudwatch', 'azure_monitor', 'instaclustr_metrics'
+✅ Technology-appropriate operations (not generic placeholders)
 ✅ AsciiDocFormatter used for all output formatting
 ✅ No placeholders or TODOs
 ✅ Real implementations with proper error handling
 ✅ Exactly 7 directory operations and 2 file operations
 ✅ No sample checks, rules, reports, or templates
+
 
 == Your Task
 

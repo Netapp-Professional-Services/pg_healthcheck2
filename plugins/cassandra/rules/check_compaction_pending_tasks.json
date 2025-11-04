@@ -1,0 +1,19 @@
+{
+  "compaction_pending_tasks": {
+    "metric_keywords": ["cassandra", "compaction", "pending_tasks", "performance", "nodetool"],
+    "rules": [
+      {
+        "expression": "data.get('pending_tasks', 0) > 100",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Compaction backlog of {data.get('pending_tasks')} pending tasks detected, exceeding threshold of 100. Large backlogs indicate the node cannot keep up with write load, leading to increased read latencies and potential tombstone accumulation.",
+        "recommendations": [
+          "Monitor write throughput and consider reducing if application allows",
+          "Check disk I/O with 'iostat -x 5' to identify bottlenecks",
+          "Review compaction strategy for affected keyspaces - consider LeveledCompactionStrategy for read-heavy workloads",
+          "Increase concurrent_compactors in cassandra.yaml if CPU allows (default: number of disks)"
+        ]
+      }
+    ]
+  }
+}

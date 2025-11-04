@@ -1,0 +1,66 @@
+{
+  "critical_cpu_usage_node": {
+    "metric_keywords": ["prometheus_cpu", "per_node_cpu_usage", "data"],
+    "rules": [
+      {
+        "expression": "data.get('cpu_percent', 0) >= 95",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critical CPU usage: {data.get('cpu_percent', 0):.2f}%. Risk of severe performance degradation.",
+        "recommendations": [
+          "URGENT: Critical CPU saturation - immediate investigation required",
+          "Check for runaway queries or expensive operations",
+          "Review compaction activity and thread pool stats",
+          "Consider scaling out or adding CPU capacity",
+          "Monitor for client timeout errors"
+        ]
+      },
+      {
+        "expression": "data.get('cpu_percent', 0) >= 90",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critically high CPU usage: {data.get('cpu_percent', 0):.2f}%.",
+        "recommendations": [
+          "Very high CPU usage - capacity constraints likely",
+          "Review query patterns and workload",
+          "Check for compaction or repair operations",
+          "Plan capacity increase if sustained"
+        ]
+      }
+    ]
+  },
+  "high_cpu_usage_node": {
+    "metric_keywords": ["prometheus_cpu", "per_node_cpu_usage", "data"],
+    "rules": [
+      {
+        "expression": "75 <= data.get('cpu_percent', 0) < 90",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has high CPU usage: {data.get('cpu_percent', 0):.2f}%.",
+        "recommendations": [
+          "Monitor CPU trends for sustained high usage",
+          "Review workload distribution across cluster",
+          "Check for imbalanced query routing",
+          "Plan capacity if trend continues"
+        ]
+      }
+    ]
+  },
+  "cluster_cpu_pressure": {
+    "metric_keywords": ["prometheus_cpu", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('average_cpu_percent', 0) >= 80",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Cluster-wide CPU usage is {data.get('average_cpu_percent', 0):.2f}% across {data.get('node_count', 0)} nodes. Cluster capacity constraints detected.",
+        "recommendations": [
+          "Cluster experiencing overall CPU pressure",
+          "Review cluster-wide workload patterns",
+          "Consider scaling out (adding nodes)",
+          "Optimize query patterns and schema design"
+        ]
+      }
+    ]
+  }
+}

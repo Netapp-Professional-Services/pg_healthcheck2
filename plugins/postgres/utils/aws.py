@@ -1,5 +1,57 @@
 import boto3
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+
+def discover_rds_proxy(aws_region, db_identifier, cluster_id=None):
+    """Discovers RDS Proxy associated with a DB instance or cluster.
+
+    Searches for RDS Proxies that target the specified database instance
+    or cluster. This enables automatic proxy discovery without manual configuration.
+
+    Args:
+        aws_region (str): The AWS region where the RDS resources are located.
+        db_identifier (str): The DBInstanceIdentifier to search for.
+        cluster_id (str, optional): The DBClusterIdentifier to search for.
+
+    Returns:
+        str | None: The DBProxyName if found, otherwise None.
+    """
+    rds = boto3.client('rds', region_name=aws_region)
+    try:
+        # List all DB proxies in the region
+        response = rds.describe_db_proxies()
+
+        for proxy in response.get('DBProxies', []):
+            proxy_name = proxy.get('DBProxyName')
+
+            # Get the targets for this proxy
+            try:
+                targets_response = rds.describe_db_proxy_targets(DBProxyName=proxy_name)
+
+                for target in targets_response.get('Targets', []):
+                    # Check if this target matches our instance or cluster
+                    target_arn = target.get('TargetArn', '')
+
+                    # Match by instance identifier
+                    if db_identifier and db_identifier in target_arn:
+                        logger.info(f"Discovered RDS Proxy '{proxy_name}' for instance '{db_identifier}'")
+                        return proxy_name
+
+                    # Match by cluster identifier
+                    if cluster_id and cluster_id in target_arn:
+                        logger.info(f"Discovered RDS Proxy '{proxy_name}' for cluster '{cluster_id}'")
+                        return proxy_name
+
+            except Exception as e:
+                logger.debug(f"Could not check targets for proxy '{proxy_name}': {e}")
+                continue
+
+    except Exception as e:
+        logger.debug(f"Could not discover RDS Proxy: {e}")
+
+    return None
 
 def get_instance_details(aws_region, db_identifier):
     """Fetches RDS instance details like instance class and storage.
@@ -63,24 +115,39 @@ def get_cloudwatch_metrics(aws_region, dimensions, metrics_to_fetch, hours=24, p
     fetched_metrics = {}
     for metric_info in metrics_to_fetch:
         try:
-            response = cloudwatch.get_metric_statistics(
-                Namespace=metric_info['Namespace'],
-                MetricName=metric_info['MetricName'],
-                Dimensions=dimensions,
-                StartTime=start_time,
-                EndTime=end_time,
-                Period=period,
-                Statistics=[metric_info['Statistic']],
-                Unit=metric_info['Unit']
-            )
+            # Build parameters for get_metric_statistics
+            params = {
+                'Namespace': metric_info['Namespace'],
+                'MetricName': metric_info['MetricName'],
+                'Dimensions': dimensions,
+                'StartTime': start_time,
+                'EndTime': end_time,
+                'Period': period,
+                'Statistics': [metric_info['Statistic']]
+            }
+
+            # Only add Unit if it's specified (some metrics like VolumeBytesUsed don't use it)
+            if metric_info.get('Unit'):
+                params['Unit'] = metric_info['Unit']
+
+            response = cloudwatch.get_metric_statistics(**params)
             
             if response['Datapoints']:
                 # Get the most recent datapoint
                 latest_datapoint = sorted(response['Datapoints'], key=lambda x: x['Timestamp'], reverse=True)[0]
                 value = latest_datapoint.get(metric_info['Statistic'])
+                # Determine unit - use specified unit or infer from metric name
+                unit = metric_info.get('Unit')
+                if not unit:
+                    # Infer unit for metrics without explicit unit specification
+                    if 'Bytes' in metric_info['MetricName']:
+                        unit = 'Bytes'
+                    else:
+                        unit = 'None'
+
                 fetched_metrics[metric_info['MetricName']] = {
                     "value": value,
-                    "unit": metric_info['Unit'],
+                    "unit": unit,
                     "statistic": metric_info['Statistic'],
                     "timestamp": latest_datapoint['Timestamp'].isoformat()
                 }

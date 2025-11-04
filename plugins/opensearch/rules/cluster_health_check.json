@@ -1,0 +1,174 @@
+{
+  "cluster_status_yellow": {
+    "high": {
+      "threshold": 1,
+      "reasoning": "Yellow cluster status indicates replica shards are unassigned, reducing data redundancy and fault tolerance",
+      "recommendations": [
+        "Identify indices with unassigned replicas: GET _cat/indices?v&health=yellow",
+        "Check cluster allocation explanation: GET _cluster/allocation/explain",
+        "Verify sufficient data nodes for replica count",
+        "Review disk space on all nodes (check watermark thresholds)",
+        "Check for shard allocation filtering or routing restrictions",
+        "Add data nodes if cluster is at capacity",
+        "Consider reducing replica count if nodes are insufficient"
+      ]
+    }
+  },
+  "cluster_status_red": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Red cluster status means primary shards are unassigned - data is inaccessible and queries will fail",
+      "recommendations": [
+        "URGENT: Red status indicates data loss or inaccessible primary shards",
+        "Identify red indices immediately: GET _cat/indices?v&health=red",
+        "Check for node failures or network partitions",
+        "Review cluster logs for shard allocation failures",
+        "Use allocation explain API: GET _cluster/allocation/explain",
+        "Check disk space and watermark settings",
+        "Restore from snapshot if primary shards cannot be recovered",
+        "Review node logs for corruption or disk errors"
+      ]
+    }
+  },
+  "unassigned_shards_total": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Unassigned shards indicate allocation failures and reduced data availability",
+      "recommendations": [
+        "Check allocation explain: GET _cluster/allocation/explain",
+        "Review disk watermark settings (low: 85%, high: 90%, flood: 95%)",
+        "Verify available disk space on all data nodes",
+        "Check for node failures or network issues",
+        "Review shard allocation awareness and filtering",
+        "Verify index replica settings match available nodes",
+        "Add nodes if cluster is at capacity"
+      ]
+    }
+  },
+  "initializing_shards": {
+    "high": {
+      "threshold": 5,
+      "reasoning": "Many initializing shards may indicate recovery operations or performance issues",
+      "recommendations": [
+        "Monitor shard initialization progress",
+        "Check if this is expected (node restart, replica creation)",
+        "Review cluster.routing.allocation.node_concurrent_recoveries setting",
+        "Check network bandwidth between nodes",
+        "Monitor disk I/O on target nodes",
+        "Review indices.recovery.max_bytes_per_sec throttle"
+      ]
+    }
+  },
+  "relocating_shards": {
+    "high": {
+      "threshold": 10,
+      "reasoning": "Many relocating shards can impact cluster performance and may indicate instability",
+      "recommendations": [
+        "Verify if relocation is intentional (rebalancing, node addition/removal)",
+        "Check cluster.routing.rebalance.enable setting",
+        "Review cluster.routing.allocation.cluster_concurrent_rebalance",
+        "Monitor network bandwidth utilization",
+        "Check for node failures triggering reallocation",
+        "Consider temporarily disabling rebalancing if impacting performance"
+      ]
+    }
+  },
+  "pending_tasks": {
+    "critical": {
+      "threshold": 50,
+      "reasoning": "High number of pending tasks indicates master node is overwhelmed or cluster state issues",
+      "recommendations": [
+        "Check master node CPU and memory usage",
+        "Review cluster state size: GET _cluster/state/metadata?pretty",
+        "Reduce number of indices and shards if excessively high",
+        "Review pending task types: GET _cluster/pending_tasks",
+        "Consider upgrading master node resources",
+        "Check for stuck cluster state updates"
+      ]
+    },
+    "high": {
+      "threshold": 20,
+      "reasoning": "Elevated pending tasks may indicate master node performance issues",
+      "recommendations": [
+        "Monitor pending tasks trend",
+        "Check master node resource utilization",
+        "Review cluster complexity (shard count, index count)",
+        "Plan master node capacity upgrade if sustained"
+      ]
+    }
+  },
+  "task_max_waiting_time_ms": {
+    "critical": {
+      "threshold": 30000,
+      "reasoning": "Tasks waiting over 30 seconds indicates severe master node bottleneck",
+      "recommendations": [
+        "URGENT: Master node severely overloaded",
+        "Check master node CPU, memory, and GC activity",
+        "Review cluster state size and complexity",
+        "Consider emergency master node upgrade",
+        "Check for stuck or slow cluster state updates",
+        "Review recent cluster changes or operations"
+      ]
+    },
+    "high": {
+      "threshold": 10000,
+      "reasoning": "Tasks waiting over 10 seconds indicates master node performance issues",
+      "recommendations": [
+        "Monitor master node performance closely",
+        "Plan master node capacity increase",
+        "Review cluster state complexity",
+        "Check for expensive cluster state updates"
+      ]
+    }
+  },
+  "active_shards_percent": {
+    "critical": {
+      "threshold": 80,
+      "reasoning": "Less than 80% active shards indicates serious allocation problems",
+      "recommendations": [
+        "URGENT: Significant shard allocation failure",
+        "Check cluster health for red/yellow status",
+        "Review allocation explain for all unassigned shards",
+        "Check disk space across all nodes",
+        "Verify node connectivity and cluster membership",
+        "Review recent cluster events or failures"
+      ]
+    },
+    "high": {
+      "threshold": 90,
+      "reasoning": "Less than 90% active shards indicates allocation issues",
+      "recommendations": [
+        "Investigate shard allocation failures",
+        "Review cluster allocation settings",
+        "Check node availability and disk space",
+        "Monitor for continuing degradation"
+      ]
+    }
+  },
+  "number_of_in_flight_fetch": {
+    "high": {
+      "threshold": 10,
+      "reasoning": "High in-flight fetches may indicate slow network or node performance issues",
+      "recommendations": [
+        "Check network latency between nodes",
+        "Review node disk I/O performance",
+        "Monitor for slow or unresponsive nodes",
+        "Check cluster logs for timeout errors"
+      ]
+    }
+  },
+  "timed_out": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Cluster health check timing out indicates master node or network issues",
+      "recommendations": [
+        "URGENT: Cluster health API is timing out",
+        "Check master node availability and performance",
+        "Review network connectivity to master",
+        "Check master node CPU and GC activity",
+        "Review cluster state size",
+        "Consider increasing cluster health timeout"
+      ]
+    }
+  }
+}

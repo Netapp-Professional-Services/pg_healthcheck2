@@ -1,0 +1,233 @@
+{
+  "critical_fetch_purgatory": {
+    "metric_keywords": ["purgatory_size", "data"],
+    "rules": [
+      {
+        "expression": "data.get('fetch_purgatory_size', 0) >= 500",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical Fetch Purgatory size: {data.get('fetch_purgatory_size')} requests. Consumers are experiencing significant delays waiting for data.",
+        "recommendations": [
+          "IMMEDIATE: Review consumer fetch.min.bytes settings - may be too high",
+          "Check if producers are keeping up with demand - insufficient message flow",
+          "Reduce fetch.wait.max.ms to lower consumer latency if appropriate",
+          "Monitor consumer lag - high purgatory may indicate slow consumers",
+          "Verify network connectivity between consumers and brokers"
+        ]
+      },
+      {
+        "expression": "data.get('fetch_purgatory_size', 0) >= 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has elevated Fetch Purgatory size: {data.get('fetch_purgatory_size')} requests.",
+        "recommendations": [
+          "Monitor fetch purgatory trends over time",
+          "Review consumer configuration: fetch.min.bytes and fetch.wait.max.ms",
+          "Check producer throughput - consumers may be waiting for data",
+          "Verify consumer group is actively consuming from all partitions"
+        ]
+      }
+    ]
+  },
+  "critical_produce_purgatory": {
+    "metric_keywords": ["purgatory_size", "data"],
+    "rules": [
+      {
+        "expression": "data.get('produce_purgatory_size', 0) >= 500",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical Produce Purgatory size: {data.get('produce_purgatory_size')} requests. Producers using acks=all are experiencing severe delays waiting for replica acknowledgements.",
+        "recommendations": [
+          "IMMEDIATE: Check replica lag - followers may be struggling to keep up",
+          "Investigate slow replicas using kafka-topics --describe --under-replicated-partitions",
+          "Review producer acks configuration - consider if acks=all is necessary for all topics",
+          "Check broker resource usage (CPU, disk I/O, network) on follower brokers",
+          "Verify all brokers in ISR are healthy and reachable",
+          "Consider temporarily increasing request.timeout.ms to prevent producer timeouts"
+        ]
+      },
+      {
+        "expression": "data.get('produce_purgatory_size', 0) >= 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has elevated Produce Purgatory size: {data.get('produce_purgatory_size')} requests.",
+        "recommendations": [
+          "Monitor produce purgatory trends - may indicate replica synchronization issues",
+          "Check for under-replicated partitions",
+          "Review producer acks settings and replica lag",
+          "Verify network connectivity between brokers"
+        ]
+      }
+    ]
+  },
+  "cluster_wide_purgatory_issues": {
+    "metric_keywords": ["purgatory_summary"],
+    "rules": [
+      {
+        "expression": "data.get('critical_broker_count', 0) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({data.get('critical_broker_count')}) have critical purgatory sizes. This indicates a cluster-wide performance problem affecting consumer and/or producer operations.",
+        "recommendations": [
+          "CLUSTER-WIDE ISSUE: Investigate immediately",
+          "Review overall cluster capacity and workload",
+          "Check for network issues between brokers",
+          "Verify all replicas are in-sync (ISR)",
+          "Consider adding brokers to distribute load",
+          "Review topic replication factors and partition distribution"
+        ]
+      },
+      {
+        "expression": "data.get('warning_broker_count', 0) >= 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple brokers ({data.get('warning_broker_count')}) have elevated purgatory sizes. Monitor for cluster-wide capacity issues.",
+        "recommendations": [
+          "Multiple brokers showing purgatory stress",
+          "Review cluster-wide consumer and producer patterns",
+          "Monitor for increasing trends that may indicate capacity limits",
+          "Plan for capacity adjustments if trend continues"
+        ]
+      },
+      {
+        "expression": "data.get('has_cluster_wide_issue', False) == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster-wide purgatory issue detected affecting {data.get('critical_broker_count', 0)} brokers. Systematic problem requiring immediate attention.",
+        "recommendations": [
+          "This is a cluster-wide systematic issue",
+          "Check if recent configuration changes were deployed",
+          "Verify cluster has adequate resources (CPU, memory, disk I/O)",
+          "Review recent workload changes or traffic spikes"
+        ]
+      }
+    ]
+  },
+  "excessive_total_purgatory": {
+    "metric_keywords": ["purgatory_summary"],
+    "rules": [
+      {
+        "expression": "data.get('total_fetch_purgatory', 0) >= 1000",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Total cluster Fetch Purgatory is {data.get('total_fetch_purgatory')} requests across all brokers. Consumers are experiencing delays cluster-wide.",
+        "recommendations": [
+          "High cluster-wide fetch purgatory indicates consumer performance issues",
+          "Review global consumer configuration patterns",
+          "Check if producer throughput matches consumer demand",
+          "Consider if fetch.min.bytes settings are appropriate for your use case",
+          "Monitor consumer group lag metrics"
+        ]
+      },
+      {
+        "expression": "data.get('total_produce_purgatory', 0) >= 1000",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Total cluster Produce Purgatory is {data.get('total_produce_purgatory')} requests across all brokers. Producers using acks=all are experiencing delays cluster-wide.",
+        "recommendations": [
+          "High cluster-wide produce purgatory indicates replication issues",
+          "Check replica lag across all topics and partitions",
+          "Review cluster capacity - may need more brokers or resources",
+          "Verify network connectivity and bandwidth between brokers",
+          "Consider if all topics truly need acks=all durability guarantee"
+        ]
+      }
+    ]
+  },
+  "individual_broker_imbalance": {
+    "metric_keywords": ["purgatory_size", "data"],
+    "rules": [
+      {
+        "expression": "data.get('fetch_purgatory_size', 0) > 0 and data.get('fetch_purgatory_size', 0) >= (all_structured_findings.get('check_purgatory_size', {}).get('purgatory_summary', {}).get('data', [{}])[0].get('max_fetch_purgatory', 0) * 0.8)",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has disproportionately high Fetch Purgatory ({data.get('fetch_purgatory_size')} requests) compared to cluster. May indicate partition imbalance or consumer group imbalance.",
+        "recommendations": [
+          "Check partition distribution - this broker may have more leader partitions",
+          "Review consumer group subscriptions - may be unevenly distributed",
+          "Consider rebalancing partitions if this broker is consistently higher",
+          "Verify this broker has adequate resources compared to others"
+        ]
+      },
+      {
+        "expression": "data.get('produce_purgatory_size', 0) > 0 and data.get('produce_purgatory_size', 0) >= (all_structured_findings.get('check_purgatory_size', {}).get('purgatory_summary', {}).get('data', [{}])[0].get('max_produce_purgatory', 0) * 0.8)",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has disproportionately high Produce Purgatory ({data.get('produce_purgatory_size')} requests) compared to cluster. May indicate this broker is a leader for many high-traffic partitions.",
+        "recommendations": [
+          "Check partition leadership distribution across brokers",
+          "This broker may be handling more leader partitions than others",
+          "Review partition rebalancing to distribute load more evenly",
+          "Verify follower replicas on other brokers are keeping up"
+        ]
+      }
+    ]
+  },
+  "zero_purgatory_with_high_throughput": {
+    "metric_keywords": ["purgatory_size", "data"],
+    "rules": [
+      {
+        "expression": "data.get('fetch_purgatory_size', 0) == 0 and data.get('produce_purgatory_size', 0) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has healthy purgatory sizes (fetch: {data.get('fetch_purgatory_size')}, produce: {data.get('produce_purgatory_size')}). Consumers are receiving data without delay and producers are getting timely acknowledgements.",
+        "recommendations": []
+      }
+    ]
+  },
+  "purgatory_collection_errors": {
+    "metric_keywords": ["purgatory_size"],
+    "rules": [
+      {
+        "expression": "data.get('status', '') == 'error'",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Purgatory size check failed: {data.get('details', 'Unknown error')}. Cannot monitor purgatory metrics.",
+        "recommendations": [
+          "Verify JMX is enabled on all Kafka brokers (default port 9999)",
+          "Check kafka-run-class is available in PATH or configure kafka_run_class_path",
+          "Verify SSH connectivity from healthcheck machine to all brokers",
+          "Test JMX connectivity manually: kafka-run-class kafka.tools.JmxTool --jmx-url ...",
+          "Review broker logs for JMX initialization errors"
+        ]
+      },
+      {
+        "expression": "len(data.get('errors', [])) > 0 and len(data.get('errors', [])) < data.get('brokers_checked', 0)",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Could not collect purgatory metrics from {len(data.get('errors', []))} out of {data.get('brokers_checked', 0)} brokers. Partial visibility into cluster purgatory health.",
+        "recommendations": [
+          "Check JMX connectivity on brokers with errors",
+          "Verify kafka-run-class is accessible on all brokers",
+          "Review error details in check output for specific broker issues",
+          "Ensure consistent JMX configuration across all brokers"
+        ]
+      },
+      {
+        "expression": "len(data.get('errors', [])) > 0 and len(data.get('errors', [])) == data.get('brokers_checked', 0)",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Failed to collect purgatory metrics from all {data.get('brokers_checked', 0)} brokers. Complete loss of purgatory visibility.",
+        "recommendations": [
+          "IMMEDIATE: JMX monitoring is completely non-functional",
+          "Verify JMX_PORT environment variable is set (export JMX_PORT=9999)",
+          "Check if JMX is enabled in Kafka startup scripts",
+          "Test JMX connectivity: netstat -an | grep 9999 on each broker",
+          "Review kafka-run-class path configuration in settings"
+        ]
+      }
+    ]
+  },
+  "purgatory_monitoring_health": {
+    "metric_keywords": ["purgatory_size"],
+    "rules": [
+      {
+        "expression": "data.get('brokers_checked', 0) > 0 and len(data.get('critical_brokers', [])) == 0 and len(data.get('warning_brokers', [])) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "All {data.get('brokers_checked')} brokers have healthy purgatory sizes. Consumers and producers are operating efficiently without delays.",
+        "recommendations": []
+      }
+    ]
+  }
+}

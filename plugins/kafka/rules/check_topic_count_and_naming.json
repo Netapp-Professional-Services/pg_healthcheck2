@@ -1,0 +1,97 @@
+{
+  "topic_proliferation": {
+    "metric_keywords": ["kafka", "topic_analysis"],
+    "rules": [
+      {
+        "expression": "data.get('total_count', 0) > data.get('max_threshold', 100)",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Topic count of {data.get('total_count', 0)} exceeds threshold of {data.get('max_threshold', 100)}, indicating potential proliferation issues.",
+        "recommendations": [
+          "Review and consolidate unnecessary topics to reduce management overhead.",
+          "Implement approval processes for new topic creation.",
+          "Consider using topic lifecycle management policies."
+        ]
+      },
+      {
+        "expression": "data.get('total_count', 0) > (data.get('max_threshold', 100) * 0.8)",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Topic count of {data.get('total_count', 0)} is approaching the threshold of {data.get('max_threshold', 100)} (80% full).",
+        "recommendations": [
+          "Audit existing topics for active usage.",
+          "Plan for topic lifecycle management.",
+          "Monitor topic creation rate."
+        ]
+      },
+      {
+        "expression": "data.get('violation_count', 0) > 10",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('violation_count', 0)} topics have naming violations, indicating lack of governance.",
+        "recommendations": [
+          "Implement naming conventions enforcement at topic creation time.",
+          "Review and rename violating topics in batches.",
+          "Document topic naming standards for your organization."
+        ]
+      },
+      {
+        "expression": "data.get('violation_count', 0) > 0",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "{data.get('violation_count', 0)} topics have naming violations.",
+        "recommendations": [
+          "Rename topics to follow naming conventions.",
+          "Implement validation in topic creation workflows."
+        ]
+      }
+    ]
+  },
+  "individual_topic_violations": {
+    "metric_keywords": ["kafka", "topic_details"],
+    "rules": [
+      {
+        "expression": "data.get('starts_with_digit', False) == True",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Topic '{data.get('topic', 'unknown')}' violates naming conventions by starting with a digit.",
+        "recommendations": [
+          "Rename the topic to start with a letter (e.g., 't_{data.get('topic', 'name')}').",
+          "Topic names should begin with a letter for better compatibility."
+        ]
+      },
+      {
+        "expression": "data.get('contains_space', False) == True",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Topic '{data.get('topic', 'unknown')}' violates naming conventions by containing spaces.",
+        "recommendations": [
+          "Rename the topic to use underscores instead of spaces.",
+          "Spaces in topic names can cause parsing issues with some tools."
+        ]
+      },
+      {
+        "expression": "data.get('contains_hyphen', False) == True",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Topic '{data.get('topic', 'unknown')}' uses hyphens instead of underscores, which is discouraged in Kafka naming conventions.",
+        "recommendations": [
+          "Rename the topic to use underscores instead of hyphens (e.g., '{data.get('topic', 'name').replace('-', '_')}').",
+          "Hyphens can cause issues with metrics systems and some monitoring tools.",
+          "Underscores are the preferred separator in Kafka topic names."
+        ]
+      },
+      {
+        "expression": "data.get('contains_uppercase', False) == True",
+        "level": "low",
+        "score": 3,
+        "reasoning": "Topic '{data.get('topic', 'unknown')}' contains uppercase letters, which can lead to case-sensitivity issues.",
+        "recommendations": [
+          "Rename the topic to use only lowercase letters (e.g., '{data.get('topic', 'name').lower()}').",
+          "Lowercase-only naming prevents confusion and ensures consistency across systems.",
+          "Some tools and platforms are case-sensitive while others are not."
+        ]
+      }
+    ]
+  }
+}

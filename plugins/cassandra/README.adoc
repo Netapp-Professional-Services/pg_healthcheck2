@@ -5,30 +5,40 @@
 
 == Overview
 
-The Cassandra plugin provides comprehensive health monitoring for Apache Cassandra clusters. It supports multiple query execution methods to gather metrics from both Cassandra internals and the underlying operating system.
+The Cassandra plugin provides comprehensive health monitoring for Apache Cassandra clusters. It supports multiple query execution methods to gather metrics from both Cassandra internals, the underlying operating system, and Prometheus monitoring endpoints.
+
+*Deployment Support:*
+- ✅ **Self-managed clusters** - Full access via CQL + SSH (nodetool/shell)
+- ✅ **Instaclustr managed clusters** - CQL + Prometheus metrics (no SSH access)
+- ✅ **Other managed providers** - CQL-only checks (limited SSH)
 
 == Connector Capabilities
 
-The `CassandraConnector` class provides a unified interface for three distinct types of operations:
+The `CassandraConnector` class provides a unified interface for four distinct types of operations:
 
 [cols="1,2,1,2"]
 |===
-|Type |Description |SSH Required |Use Case
+|Type |Description |Requirements |Use Case
 
 |*CQL Queries*
 |Standard Cassandra Query Language
-|❌ No
+|CQL credentials
 |Schema information, replication settings, keyspace/table metadata
+
+|*Prometheus Metrics*
+|Cluster metrics via Prometheus endpoints
+|Prometheus API access
+|**Instaclustr**: JVM heap, CPU, disk, latency, compaction (managed clusters without SSH)
 
 |*Nodetool Commands*
 |Cassandra operational tools via SSH
-|✅ Yes
-|Node status, compaction stats, thread pools, cluster metrics
+|SSH access
+|**Self-managed**: Node status, compaction stats, thread pools, cluster metrics
 
 |*Shell Commands*
 |Operating system commands via SSH
-|✅ Yes
-|Disk space, memory usage, process status, log analysis
+|SSH access
+|**Self-managed**: Disk space, memory usage, process status, log analysis
 |===
 
 === CQL Queries
@@ -68,6 +78,134 @@ def run_keyspace_check(connector, settings):
     query = get_keyspaces_query(connector)
     formatted, raw = connector.execute_query(query, return_raw=True)
     # Process results...
+----
+
+=== Prometheus Metrics
+
+Prometheus metrics provide operational monitoring for managed Cassandra clusters (like Instaclustr) where SSH access is not available.
+
+*Connection Requirements:*
+- Prometheus endpoint URL
+- API credentials (username/API key)
+- Cluster ID (for service discovery)
+- Network access to Prometheus endpoint
+
+*Configuration Example:*
+[source,yaml]
+----
+cassandra:
+  hosts:
+    - cassandra-node-1.instaclustr.com
+  port: 9042
+  user: iccassandra
+  password: ********
+
+  # Prometheus configuration for Instaclustr
+  instaclustr_cluster_id: 6010a91d-c018-417d-9a14-70e6005a34f0
+  instaclustr_prometheus_enabled: true
+  instaclustr_prometheus_base_url: https://b0da7454-3865-4166-8e0b-6a73487ab49d.prometheus.monitoring.instaclustr.com
+  instaclustr_prometheus_username: your_username
+  instaclustr_prometheus_api_key: your_api_key
+----
+
+*Available Metrics:*
+
+[cols="1,2,2"]
+|===
+|Metric |Description |Thresholds
+
+|JVM Heap Usage
+|Per-node heap utilization percentage
+|WARNING: >75%, CRITICAL: >85%
+
+|CPU Utilization
+|Per-node CPU usage percentage
+|WARNING: >75%, CRITICAL: >90%
+
+|Disk Usage
+|Per-node disk utilization percentage
+|WARNING: >70%, CRITICAL: >85%
+
+|Compaction Pending
+|Pending compaction tasks per node
+|WARNING: >5 tasks, CRITICAL: >20 tasks
+
+|Read Latency (P95)
+|95th percentile read latency
+|WARNING: >50ms, CRITICAL: >100ms
+
+|Write Latency (P95)
+|95th percentile write latency
+|WARNING: >30ms, CRITICAL: >75ms
+|===
+
+*How It Works:*
+
+1. **Service Discovery**: Queries `/discovery/v1/{cluster_id}` to find all node endpoints
+2. **Metric Scraping**: Scrapes `/metrics/v2/query` from each node
+3. **Text Parsing**: Parses Prometheus text exposition format
+4. **Aggregation**: Combines metrics across all nodes
+
+*Example Check:*
+[source,python]
+----
+from plugins.common.prometheus_client import InstaclustrPrometheusClient
+from plugins.common.check_helpers import CheckContentBuilder
+
+def check_prometheus_jvm_heap(connector, settings):
+    """Monitor JVM heap usage via Prometheus."""
+    builder = CheckContentBuilder()
+    builder.h3("JVM Heap Usage (Prometheus)")
+
+    # Check if Prometheus is enabled
+    if not settings.get('instaclustr_prometheus_enabled'):
+        builder.info("⏭️ Check skipped - Prometheus not enabled")
+        findings = {'prometheus_jvm_heap': {'status': 'skipped'}}
+        return builder.build(), findings
+
+    # Initialize Prometheus client
+    client = InstaclustrPrometheusClient(
+        cluster_id=settings['instaclustr_cluster_id'],
+        username=settings['instaclustr_prometheus_username'],
+        api_key=settings['instaclustr_prometheus_api_key'],
+        prometheus_base_url=settings['instaclustr_prometheus_base_url']
+    )
+
+    # Get metrics
+    heap_data = client.get_cassandra_jvm_heap()
+
+    # Analyze and generate report
+    for node in heap_data.get('data', []):
+        if node['heap_used_percent'] >= 85:
+            builder.critical(f"Node {node['node_id']}: {node['heap_used_percent']}% heap")
+
+    return builder.build(), {'prometheus_jvm_heap': heap_data}
+----
+
+*Returned Data Structure:*
+[source,python]
+----
+{
+    'status': 'success',
+    'data': [
+        {
+            'node_id': 'a1b2c3d4',
+            'public_ip': '54.211.151.192',
+            'datacenter': 'AWS_VPC_US_EAST_1',
+            'rack': 'us-east-1a',
+            'heap_used': 716177408,       # bytes
+            'heap_max': 1610612736,        # bytes
+            'heap_used_percent': 44.82,    # percentage
+            'timestamp': '2025-10-31T10:15:30Z'
+        }
+        # ... more nodes
+    ],
+    'metadata': {
+        'source': 'prometheus',
+        'metric': 'jvm_heap',
+        'node_count': 3
+    }
+}
 ----
 
 === Nodetool Commands
@@ -386,20 +524,25 @@ Use this decision tree to choose the right query type for your check:
 
 [source,text]
 ----
-┌─────────────────────────────────────────────────┐
-│  What information do you need?                  │
-└──────────────────┬──────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  What deployment model?                                       │
+└──────────────────┬────────────────────────────────────────────┘
                    │
-                   ├─ Schema/Topology/Replication?
-                   │  └─> Use CQL
-                   │      (system_schema.*, system.local, system.peers_v2)
+                   ├─ Instaclustr managed cluster (no SSH)?
+                   │  │
+                   │  ├─ Schema/Topology/Replication? → Use CQL
+                   │  └─ Operational metrics? → Use Prometheus
+                   │      (JVM, CPU, disk, latency, compaction)
                    │
-                   ├─ Cassandra operational metrics?
-                   │  └─> Use Nodetool
-                   │      (status, compactionstats, tpstats, etc.)
-                   │
-                   └─ OS-level/System metrics?
-                      └─> Use Shell
+                   └─ Self-managed cluster (SSH available)?
+                      │
+                      ├─ Schema/Topology/Replication? → Use CQL
+                      │   (system_schema.*, system.local, system.peers_v2)
+                      │
+                      ├─ Cassandra operational metrics? → Use Nodetool
+                      │   (status, compactionstats, tpstats, etc.)
+                      │
+                      └─ OS-level/System metrics? → Use Shell
                           (df, free, ps, tail, etc.)
 ----
 
@@ -505,19 +648,45 @@ ssh -i /path/to/key ubuntu@cassandra-node-1.example.com "df -h /var/lib/cassandr
 
 The Cassandra plugin includes several pre-built checks:
 
-=== CQL-Based Checks
+=== Prometheus-Based Checks (Instaclustr Managed Clusters)
 
-*Keyspace Replication Check*:: Analyzes replication strategies and identifies keyspaces using SimpleStrategy (not recommended for production).
+*JVM Heap Usage*:: Monitors heap memory utilization across all nodes. Alerts on >75% (warning) or >85% (critical).
 
-=== Nodetool-Based Checks
+*CPU Utilization*:: Tracks CPU usage per node. Alerts on >75% (warning) or >90% (critical).
 
-*Compaction Pending Tasks*:: Monitors compaction backlog using `nodetool compactionstats`.
+*Disk Usage*:: Monitors disk capacity across all nodes. Alerts on >70% (warning) or >85% (critical).
+
+*Compaction Pending Tasks*:: Tracks pending compaction backlog per node. Alerts on >5 tasks (warning) or >20 tasks (critical).
+
+*Read/Write Latency (P95)*:: Monitors 95th percentile latency. Read: >50ms warning, >100ms critical. Write: >30ms warning, >75ms critical.
+
+=== CQL-Based Checks (All Deployments)
+
+*Table Statistics*:: Analyzes table counts, compaction strategies, bloom filters, CDC settings, and TTL configurations.
+
+*Read Repair Settings*:: Verifies read repair configuration across all tables. Detects non-recommended settings.
+
+*Secondary Indexes*:: Identifies secondary indexes (anti-pattern in Cassandra). Warns if found.
+
+*Network Topology*:: Analyzes datacenter/rack distribution and peer connectivity.
+
+*Keyspace Replication*:: Checks replication strategies. Identifies keyspaces using SimpleStrategy (not production-ready).
+
+=== Nodetool-Based Checks (Self-Managed Clusters)
+
+*Compaction Pending Tasks (SSH)*:: Monitors compaction backlog using `nodetool compactionstats`.
 
 *Schema Version Consistency*:: Verifies all nodes agree on schema version using `nodetool describecluster`.
 
 *Disk Space per Keyspace*:: Analyzes disk usage by keyspace/table using `nodetool tablestats`.
 
-=== Shell-Based Checks
+*JVM Statistics*:: Monitors garbage collection and heap usage using `nodetool info` and `nodetool gcstats`.
+
+*Thread Pool Statistics*:: Checks for thread pool saturation using `nodetool tpstats`.
+
+*Cluster Connectivity Diagnostics*:: Comprehensive gossip and connectivity analysis using `nodetool status` and `nodetool gossipinfo`.
+
+=== Shell-Based Checks (Self-Managed Clusters)
 
 *Data Directory Disk Space*:: Monitors disk capacity for Cassandra data directory using `df -h`.
 
@@ -526,6 +695,10 @@ The Cassandra plugin includes several pre-built checks:
 *Cassandra Process Status*:: Verifies Cassandra process is running using `ps aux`.
 
 *System Log Error Analysis*:: Scans recent log entries for errors and warnings using `tail` and `grep`.
+
+*CPU Load Average*:: Monitors system load using `uptime`.
+
+*Temporary Files Check*:: Identifies cleanup opportunities using `find` for temporary files.
 
 == Creating New Checks
 
@@ -809,6 +982,55 @@ python3 main.py --config config/config.yaml
 - Check Cassandra is running: `systemctl status cassandra`
 - Test connectivity: `cqlsh -u cassandra -p cassandra`
 - Check firewall rules for port 9042
+
+=== Prometheus Connection Issues
+
+*Problem:* Prometheus checks fail or return errors
+
+*Common Errors:*
+
+**401 Unauthorized**
+- Verify `instaclustr_prometheus_username` and `instaclustr_prometheus_api_key` are correct
+- Check API key hasn't expired
+- Ensure credentials have Prometheus access permissions
+
+**429 Rate Limit Exceeded**
+- Instaclustr throttles rapid API requests
+- This is expected when running multiple checks in quick succession
+- In production, health checks run periodically (every 5-15 minutes), so rate limits are rarely hit
+- If persistent, contact Instaclustr support to discuss rate limit increases
+
+**404 Not Found**
+- Verify `instaclustr_cluster_id` is correct
+- Check `instaclustr_prometheus_base_url` matches your cluster
+- Ensure Prometheus monitoring is enabled for your cluster
+
+**Connection Timeout**
+- Verify network connectivity to Prometheus endpoint
+- Check firewall rules allow HTTPS (443) to prometheus.monitoring.instaclustr.com
+- Test manually: `curl -u username:api_key https://[prometheus_url]/discovery/v1/[cluster_id]`
+
+**Service Discovery Fails**
+- Verify cluster ID is correct (find in Instaclustr console)
+- Check that all nodes are up and registered
+- Review Instaclustr console for cluster status
+
+**Empty Metrics / No Data**
+- Prometheus may not have scraped recent metrics yet (scrape interval typically 30-60s)
+- Check cluster is actually running and serving traffic
+- Verify nodes are healthy in Instaclustr console
+
+*Testing Prometheus Access:*
+[source,bash]
+----
+# Test service discovery endpoint
+curl -u username:api_key \
+  https://[prometheus_url]/discovery/v1/[cluster_id]
+
+# Test node metric scraping (use node ID from service discovery)
+curl -u username:api_key \
+  https://[node_id].prometheus.monitoring.instaclustr.com/metrics/v2/query
+----
 
 === SSH Connection Issues
 

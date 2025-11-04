@@ -1,0 +1,133 @@
+{
+  "node_heap_usage_percent": {
+    "critical": {
+      "threshold": 85,
+      "reasoning": "JVM heap usage above 85% indicates severe memory pressure that can lead to long GC pauses, cluster instability, and OOM errors",
+      "recommendations": [
+        "Scale cluster by adding data nodes to distribute heap load",
+        "Increase JVM heap size (up to 32GB max for compressed OOPs)",
+        "Review and optimize memory-intensive queries and aggregations",
+        "Enable slow query logging to identify problematic queries",
+        "Consider reducing cache sizes if overprovisioned"
+      ]
+    },
+    "high": {
+      "threshold": 75,
+      "reasoning": "Heap usage above 75% indicates elevated memory pressure that may impact performance during traffic spikes",
+      "recommendations": [
+        "Plan cluster scaling within 1-2 weeks",
+        "Monitor heap usage trends to predict when critical threshold will be reached",
+        "Review query patterns for optimization opportunities",
+        "Ensure GC settings are appropriate for workload"
+      ]
+    },
+    "medium": {
+      "threshold": 65,
+      "reasoning": "Heap usage above 65% is approaching high levels and should be monitored",
+      "recommendations": [
+        "Set up alerts for heap usage trends",
+        "Review heap allocation based on node role and workload",
+        "Monitor GC activity for increasing frequency"
+      ]
+    }
+  },
+  "node_disk_usage_percent": {
+    "critical": {
+      "threshold": 90,
+      "reasoning": "Disk usage above 90% triggers OpenSearch flood stage watermark, blocking writes to prevent data loss",
+      "recommendations": [
+        "Free up space immediately by deleting old indices",
+        "Force merge read-only indices to reduce disk usage",
+        "Scale storage capacity urgently",
+        "Review and adjust disk watermark settings if appropriate"
+      ]
+    },
+    "high": {
+      "threshold": 85,
+      "reasoning": "Disk usage above 85% triggers high watermark, preventing shard allocation to the node",
+      "recommendations": [
+        "Implement Index State Management (ISM) policies for automated lifecycle",
+        "Delete or archive old data",
+        "Plan storage expansion within days",
+        "Review data retention policies"
+      ]
+    },
+    "medium": {
+      "threshold": 75,
+      "reasoning": "Disk usage above 75% approaching low watermark threshold (85%)",
+      "recommendations": [
+        "Monitor disk usage growth rate",
+        "Set up automated alerts",
+        "Review index sizes and implement lifecycle policies",
+        "Plan storage capacity expansion"
+      ]
+    }
+  },
+  "thread_pool_rejections": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Any thread pool rejections indicate the cluster is overloaded and unable to process requests",
+      "recommendations": [
+        "Scale cluster immediately by adding nodes",
+        "Review and optimize resource-intensive operations",
+        "Increase thread pool sizes if appropriate",
+        "Implement request throttling at application layer",
+        "Review bulk request sizes and indexing patterns"
+      ]
+    }
+  },
+  "file_descriptor_usage_percent": {
+    "critical": {
+      "threshold": 90,
+      "reasoning": "File descriptor exhaustion will prevent new connections and operations, causing cluster failures",
+      "recommendations": [
+        "Increase system file descriptor limits immediately (ulimit -n)",
+        "Review number of shards per node (too many shards increases FD usage)",
+        "Restart OpenSearch process after increasing limits",
+        "Consider consolidating indices to reduce shard count"
+      ]
+    },
+    "high": {
+      "threshold": 75,
+      "reasoning": "High file descriptor usage may cause issues during traffic spikes or recovery operations",
+      "recommendations": [
+        "Plan to increase file descriptor limits",
+        "Review shard allocation strategy",
+        "Monitor FD usage trends"
+      ]
+    }
+  },
+  "old_generation_gc_time_percent": {
+    "high": {
+      "threshold": 10,
+      "reasoning": "Old generation GC consuming >10% of time indicates memory pressure and performance degradation",
+      "recommendations": [
+        "Increase JVM heap size if below 32GB",
+        "Review and optimize memory-intensive operations",
+        "Scale cluster to distribute load",
+        "Tune GC settings (G1GC recommended for large heaps)"
+      ]
+    },
+    "medium": {
+      "threshold": 5,
+      "reasoning": "Old generation GC above 5% of time warrants monitoring",
+      "recommendations": [
+        "Monitor GC activity trends",
+        "Review heap sizing relative to workload",
+        "Consider enabling GC logging for detailed analysis"
+      ]
+    }
+  },
+  "circuit_breaker_tripped": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Circuit breaker trips indicate operations are consuming too much memory, protecting cluster from OOM",
+      "recommendations": [
+        "Review and optimize the queries or operations causing breaker trips",
+        "Increase circuit breaker limits if operations are legitimate",
+        "Increase JVM heap size if consistently hitting memory limits",
+        "Implement query result size limits at application layer"
+      ]
+    }
+  }
+}

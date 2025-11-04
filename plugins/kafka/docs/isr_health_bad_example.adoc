@@ -1,0 +1,66 @@
+=== In-Sync Replicas (ISR) Health Check
+
+[IMPORTANT]
+====
+**Critical Under-Replication Detected**
+
+* **Affected Partitions:** 3
+* **Severity:** Multiple replicas out of sync
+* **Risk Level:** HIGH - Data loss risk if leader fails
+====
+
+[WARNING]
+====
+**Under-Replicated Partitions Detected:** 5 partition(s) have fewer in-sync replicas than configured. This reduces fault tolerance.
+====
+
+==== Affected Topics Summary
+
+|===
+|Status|Topic|Under-Replicated|Total Partitions|ISR Shrinks
+|🔴|critical_events|3|6|15
+|⚠️|user_activity|2|12|8
+|⚠️|order_processing|3|8|22
+|===
+
+==== Under-Replicated Partitions
+
+|===
+|Status|Topic|Partition|Leader|RF|ISR Count|Missing
+|🔴|critical_events|2|1|3|1|2
+|🔴|critical_events|4|2|3|1|2
+|🔴|order_processing|0|3|3|1|2
+|⚠️|critical_events|5|1|3|2|1
+|⚠️|user_activity|3|2|3|2|1
+|⚠️|user_activity|7|1|3|2|1
+|⚠️|order_processing|1|2|3|2|1
+|⚠️|order_processing|6|3|3|2|1
+|===
+
+==== Recommendations
+
+[TIP]
+====
+**🔴 Critical Priority (Immediate Action):**
+
+* **Immediate investigation required** - Multiple replicas out of sync poses data loss risk
+* **Check broker health** - Verify all brokers are running and accessible
+* **Review broker logs** - Look for replication errors or disk issues
+* **Do not restart leader broker** until replicas catch up
+
+**⚠️ High Priority (Plan Optimization):**
+
+* **Verify network connectivity** between brokers
+* **Check for slow brokers** - Review I/O metrics and GC pauses
+* **Monitor replication lag** - Use kafka.server:type=ReplicaManager metrics
+* **Plan for increased capacity** if persistent
+
+**📋 General Best Practices:**
+
+* Ensure all Kafka brokers are operational and can communicate
+* Verify network connectivity and resolve any latency issues between brokers
+* Monitor broker logs for replication errors or disk-related problems
+* For production environments, maintain a replication factor of at least 3
+* Set up alerts for under-replicated partitions (alert immediately at count > 0)
+* Document runbook for under-replication response procedures
+====

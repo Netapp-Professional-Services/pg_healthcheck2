@@ -1,27 +1,36 @@
-import json
-import logging
+"""Kafka connector implementation."""
 
-from kafka import KafkaConsumer
-from kafka.admin import KafkaAdminClient, ConfigResource, ConfigResourceType
-from kafka.structs import TopicPartition
+import logging
+import json
+from kafka import KafkaAdminClient, KafkaConsumer
+from kafka.admin import NewTopic, ConfigResource, ConfigResourceType
+from plugins.common.ssh_mixin import SSHSupportMixin
+from plugins.common.output_formatters import AsciiDocFormatter
 
 logger = logging.getLogger(__name__)
 
 
-class KafkaConnector:
-    """Handles all direct communication with Kafka."""
-
+class KafkaConnector(SSHSupportMixin):
+    """Connector for Kafka clusters with multi-broker SSH support."""
+    
     def __init__(self, settings):
+        """Initialize Kafka connector."""
         self.settings = settings
         self.admin_client = None
-        self.version_info = {}
-
+        self._version_info = {}
+        self.formatter = AsciiDocFormatter()
+        
+        # Initialize SSH support (from mixin)
+        self.initialize_ssh()
+        
+        logger.info(f"Kafka connector initialized")
+    
     def connect(self):
-        """Establishes a connection to the Kafka cluster."""
+        """Establishes connections to Kafka cluster and all SSH hosts."""
         try:
             bootstrap_servers = self.settings.get('bootstrap_servers', ['localhost:9092'])
 
-            # Handle both list and string formats for bootstrap_servers
+            # Handle both list and string formats
             if isinstance(bootstrap_servers, str):
                 bootstrap_servers = [s.strip() for s in bootstrap_servers.split(',')]
 
@@ -31,36 +40,120 @@ class KafkaConnector:
                 request_timeout_ms=30000
             )
 
-            # Get version/broker info
-            self.version_info = self._get_version_info()
+            self._version_info = self._get_version_info()
+            
+            # Connect all SSH hosts (from mixin)
+            connected_ssh_hosts = self.connect_all_ssh()
+            
+            # Map SSH hosts to broker IDs
+            if connected_ssh_hosts:
+                self._map_ssh_hosts_to_brokers()
+            
+            # Display connection status
+            print("✅ Successfully connected to Kafka cluster")
+            
+            # Get cluster metadata for detailed status
+            try:
+                cluster = self.admin_client._client.cluster
+                cluster.request_update()
+                
+                brokers = list(cluster.brokers())
+                broker_count = len(brokers)
+                
+                # Get cluster ID
+                try:
+                    cluster_id = cluster.cluster_id if hasattr(cluster, 'cluster_id') else 'Unknown'
+                except:
+                    cluster_id = 'Unknown'
+                
+                # Get controller info
+                try:
+                    controller = cluster.controller
+                    if callable(controller):
+                        controller = controller()
+                    controller_id = controller.nodeId if hasattr(controller, 'nodeId') else (controller.id if hasattr(controller, 'id') else -1)
+                except:
+                    controller_id = -1
+                
+                print(f"   - Cluster ID: {cluster_id}")
+                print(f"   - Brokers: {broker_count}")
+                if controller_id != -1:
+                    print(f"   - Controller: Broker {controller_id}")
+                
+                # Show broker addresses
+                if broker_count > 0:
+                    print(f"   - Broker Addresses:")
+                    for broker in brokers[:5]:
+                        try:
+                            broker_id = broker.nodeId if hasattr(broker, 'nodeId') else broker.id
+                            print(f"      • {broker.host}:{broker.port} (ID: {broker_id})")
+                        except Exception as e:
+                            logger.debug(f"Could not format broker info: {e}")
+                    if broker_count > 5:
+                        print(f"      ... and {broker_count - 5} more")
+                
+                # SSH status (from mixin)
+                if self.has_ssh_support():
+                    print(f"   - SSH: Connected to {len(connected_ssh_hosts)}/{len(self.get_ssh_hosts())} host(s)")
+                    unmapped_hosts = []
+                    for ssh_host in connected_ssh_hosts:
+                        broker_id = self.ssh_host_to_node.get(ssh_host)
+                        if broker_id is not None:
+                            print(f"      • {ssh_host} (Broker {broker_id})")
+                        else:
+                            print(f"      • {ssh_host} (⚠️  Not recognized as cluster broker)")
+                            unmapped_hosts.append(ssh_host)
 
-            print(f"✅ Successfully connected to Kafka.")
-            print(f"   - Brokers: {self.version_info.get('broker_count', 'N/A')}")
-
+                    if unmapped_hosts:
+                        print(f"   ⚠️  WARNING: {len(unmapped_hosts)} SSH host(s) are not recognized as cluster brokers!")
+                        print(f"      This may indicate brokers that are down or not part of the cluster.")
+                else:
+                    print(f"   - SSH: Not configured (OS-level checks unavailable)")
+                    
+            except Exception as e:
+                logger.warning(f"Could not retrieve detailed cluster info: {e}")
+            
+            logger.info("✅ Connected to Kafka cluster")
+            
         except Exception as e:
             logger.error(f"Failed to connect to Kafka: {e}")
             raise ConnectionError(f"Could not connect to Kafka: {e}")
-
+    
     def disconnect(self):
-        """Closes the connection."""
+        """Closes connections to Kafka and all SSH hosts."""
         if self.admin_client:
-            try:
-                self.admin_client.close()
-                print(f"🔌 Disconnected from Kafka.")
-            except Exception as e:
-                logger.warning(f"Error during disconnect: {e}")
-            finally:
-                self.admin_client = None
+            self.admin_client.close()
+            logger.info("Disconnected from Kafka cluster")
+        
+        # Disconnect all SSH (from mixin)
+        self.disconnect_all_ssh()
+    
+    def _map_ssh_hosts_to_brokers(self):
+        """Kafka-specific logic to map SSH hosts to broker IDs."""
+        try:
+            cluster = self.admin_client._client.cluster
+            cluster.request_update()
+            
+            # Build host-to-broker mapping
+            host_node_mapping = {}
+            for broker in cluster.brokers():
+                broker_id = broker.nodeId if hasattr(broker, 'nodeId') else broker.id
+                broker_host = broker.host
+                host_node_mapping[broker_host] = broker_id
+            
+            # Use mixin's mapping method
+            self.map_ssh_hosts_to_nodes(host_node_mapping)
+                    
+        except Exception as e:
+            logger.warning(f"Could not map SSH hosts to broker IDs: {e}")
 
     def close(self):
-        """Alias for disconnect() for DB-API 2.0 compatibility."""
+        """Alias for disconnect()."""
         self.disconnect()
 
     def _get_version_info(self):
-        """Fetches broker version information using the internal cluster state."""
+        """Fetches broker version information."""
         try:
-            # NOTE: Accessing internal _client.cluster as it's a reliable way
-            # to get the count of known brokers without a separate public API call.
             cluster_metadata = self.admin_client._client.cluster
             brokers = cluster_metadata.brokers()
             return {
@@ -68,11 +161,23 @@ class KafkaConnector:
                 'broker_count': len(brokers) if brokers else 0
             }
         except Exception as e:
-            logger.warning(f"Could not fetch broker/version info: {e}")
+            logger.warning(f"Could not fetch version: {e}")
             return {'version_string': 'Unknown', 'broker_count': 0}
 
+    @property
+    def version_info(self):
+        """Returns version information."""
+        if self._version_info is None:
+            self._version_info = self._get_version_info()
+        return self._version_info
+
     def get_db_metadata(self):
-        """Fetches cluster-level metadata."""
+        """
+        Fetches cluster-level metadata.
+        
+        Returns:
+            dict: {'version': str, 'db_name': str}
+        """
         try:
             cluster_info = self.admin_client.describe_cluster()
             cluster_id = cluster_info.get('cluster_id', 'Unknown')
@@ -81,12 +186,13 @@ class KafkaConnector:
                 'db_name': f"Cluster ID: {cluster_id}"
             }
         except Exception as e:
-            logger.warning(f"Could not fetch cluster metadata: {e}")
+            logger.warning(f"Could not fetch metadata: {e}")
             return {'version': 'N/A', 'db_name': 'N/A'}
 
     def execute_query(self, query, params=None, return_raw=False):
         """
-        Executes a Kafka admin operation based on a JSON query.
+        Executes Kafka Admin API operations or shell commands via JSON dispatch.
+        
         Supported operations:
         - list_topics
         - describe_topics
@@ -98,12 +204,24 @@ class KafkaConnector:
         - cluster_metadata
         - describe_log_dirs
         - list_consumer_group_offsets
+        - shell (requires SSH)
+        
+        Args:
+            query: JSON string defining the operation
+            params: Not used (for API compatibility)
+            return_raw: If True, returns (formatted, raw_data)
+        
+        Returns:
+            str or tuple: Formatted results
         """
         try:
             query_obj = json.loads(query)
             operation = query_obj.get('operation')
 
-            if operation == 'list_topics':
+            # Route to appropriate handler
+            if operation == 'shell':
+                return self._execute_shell_command(query_obj.get('command'), return_raw)
+            elif operation == 'list_topics':
                 return self._list_topics(return_raw)
             elif operation == 'describe_topics':
                 return self._describe_topics(query_obj.get('topics', []), return_raw)
@@ -114,19 +232,19 @@ class KafkaConnector:
             elif operation == 'consumer_lag':
                 group_id = query_obj.get('group_id')
                 if not group_id:
-                    raise ValueError("'consumer_lag' operation requires a 'group_id'")
+                    raise ValueError("'consumer_lag' requires 'group_id'")
                 if group_id == '*':
                     return self._get_all_consumer_lag(return_raw)
                 return self._get_consumer_lag(group_id, return_raw)
             elif operation == 'broker_config':
                 broker_id = query_obj.get('broker_id')
                 if broker_id is None:
-                    raise ValueError("'broker_config' operation requires a 'broker_id'")
+                    raise ValueError("'broker_config' requires 'broker_id'")
                 return self._get_broker_config(broker_id, return_raw)
             elif operation == 'topic_config':
                 topic = query_obj.get('topic')
                 if not topic:
-                    raise ValueError("'topic_config' operation requires a 'topic'")
+                    raise ValueError("'topic_config' requires 'topic'")
                 return self._get_topic_config(topic, return_raw)
             elif operation == 'cluster_metadata':
                 return self._get_cluster_metadata(return_raw)
@@ -136,35 +254,77 @@ class KafkaConnector:
             elif operation == 'list_consumer_group_offsets':
                 group_id = query_obj.get('group_id')
                 if not group_id:
-                    raise ValueError("'list_consumer_group_offsets' operation requires a 'group_id'")
+                    raise ValueError("'list_consumer_group_offsets' requires 'group_id'")
                 return self._list_consumer_group_offsets(group_id, return_raw)
             else:
                 raise ValueError(f"Unsupported operation: {operation}")
 
         except json.JSONDecodeError as e:
-            msg = f"[ERROR]\n====\nInvalid JSON query: {e}\n====\n"
+            msg = self.formatter.format_error(f"Invalid JSON query: {e}")
             logger.error(msg)
             return (msg, {'error': str(e)}) if return_raw else msg
         except Exception as e:
-            msg = f"[ERROR]\n====\nOperation failed: {e}\n====\n"
+            msg = self.formatter.format_error(f"Operation failed: {e}")
             logger.error(msg, exc_info=True)
             return (msg, {'error': str(e)}) if return_raw else msg
+
+    def _execute_shell_command(self, command, return_raw=False):
+        """
+        Executes a shell command on a Kafka broker via SSH.
+        
+        Delegates to ShellExecutor which handles:
+        - Command sanitization
+        - SSH execution
+        - Output formatting
+        - Error handling
+        
+        Args:
+            command: Shell command to execute (e.g., 'df -h /var/lib/kafka')
+            return_raw: If True, returns tuple (formatted, raw_data)
+        
+        Returns:
+            str or tuple: Formatted output or (formatted, raw) if return_raw=True
+        """
+        if not self.ssh_manager:
+            error_msg = self.formatter.format_error(
+                "SSH not configured. Required settings: ssh_host, ssh_user, "
+                "and ssh_key_file or ssh_password"
+            )
+            return (error_msg, {'error': 'SSH not configured'}) if return_raw else error_msg
+        
+        try:
+            # Build JSON query for ShellExecutor
+            query = json.dumps({
+                "operation": "shell",
+                "command": command
+            })
+            
+            # Delegate to ShellExecutor (uses shared formatter)
+            return self.shell_executor.execute(query, return_raw=return_raw)
+            
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Shell command failed: {str(e)}")
+            logger.error(error_msg, exc_info=True)
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
 
     def _list_topics(self, return_raw=False):
         """Lists all user-visible topics."""
         topics = self.admin_client.list_topics()
         user_topics = sorted([t for t in topics if not t.startswith('__')])
         raw = {'topics': user_topics, 'count': len(user_topics)}
+        
         if not user_topics:
-            formatted = "[NOTE]\n====\nNo user topics found.\n====\n"
+            formatted = self.formatter.format_note("No user topics found.")
         else:
-            formatted = f"User Topics ({len(user_topics)}):\n" + "\n".join(f"  - {t}" for t in user_topics)
+            formatted = f"User Topics ({len(user_topics)}):\n\n"
+            formatted += "\n".join(f"  - {t}" for t in user_topics)
+        
         return (formatted, raw) if return_raw else formatted
 
     def _describe_topics(self, topics, return_raw=False):
-        """Gets detailed information about topics using cluster metadata."""
+        """Gets detailed information about topics."""
         cluster = self.admin_client._client.cluster
-        cluster.request_update() # Ensure metadata is fresh
+        cluster.request_update()
         
         target_topics = topics or list(cluster.topics(exclude_internal_topics=True))
         raw_results = []
@@ -184,227 +344,509 @@ class KafkaConnector:
                     under_replicated += 1
             
             raw_results.append({
-                'topic': topic_name, 'partitions': len(partitions),
-                'replication_factor': replication_factor, 'under_replicated_partitions': under_replicated
+                'topic': topic_name,
+                'partitions': len(partitions),
+                'replication_factor': replication_factor,
+                'under_replicated_partitions': under_replicated
             })
 
         if not raw_results:
-            formatted = "[NOTE]\n====\nNo topics found or metadata available.\n====\n"
+            formatted = self.formatter.format_note("No topics found.")
         else:
             formatted = "|===\n|Topic|Partitions|Replication Factor|Under-Replicated\n"
             for t in raw_results:
                 formatted += f"|{t['topic']}|{t['partitions']}|{t['replication_factor']}|{t['under_replicated_partitions']}\n"
             formatted += "|===\n"
+        
         return (formatted, raw_results) if return_raw else formatted
 
     def _list_consumer_groups(self, return_raw=False):
         """Lists all consumer groups."""
-        groups = self.admin_client.list_consumer_groups()
-        raw = [{'group_id': g[0], 'protocol_type': g[1]} for g in groups]
-        if not groups:
-            formatted = "[NOTE]\n====\nNo consumer groups found.\n====\n"
-        else:
-            formatted = f"Consumer Groups ({len(groups)}):\n" + "\n".join(f"  - {g[0]} ({g[1]})" for g in sorted(groups))
-        return (formatted, raw) if return_raw else formatted
+        try:
+            groups = self.admin_client.list_consumer_groups()
+            raw_results = [{'group_id': g[0], 'protocol_type': g[1]} for g in groups]
+            
+            if not raw_results:
+                formatted = self.formatter.format_note("No consumer groups found.")
+            else:
+                formatted = self.formatter.format_table(raw_results)
+            
+            return (formatted, raw_results) if return_raw else formatted
+            
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to list consumer groups: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
 
     def _describe_consumer_groups(self, group_ids, return_raw=False):
         """Gets detailed information about consumer groups."""
-        target_groups = group_ids or [g[0] for g in self.admin_client.list_consumer_groups()]
-        if not target_groups:
-            return ("[NOTE]\n====\nNo consumer groups to describe.\n====\n", []) if return_raw else "[NOTE]\n====\nNo consumer groups to describe.\n====\n"
-
-        descriptions = self.admin_client.describe_consumer_groups(target_groups)
-        raw_results = []
-        for desc in descriptions:
-            if desc.error_code == 0:
-                raw_results.append({
-                    'group_id': desc.group, 'state': desc.state,
-                    'protocol_type': desc.protocol_type, 'members': len(desc.members)
-                })
-        
-        if not raw_results:
-            formatted = "[NOTE]\n====\nCould not describe any of the specified groups.\n====\n"
-        else:
-            formatted = "|===\n|Group ID|State|Members|Protocol\n"
-            for g in sorted(raw_results, key=lambda x: x['group_id']):
-                formatted += f"|{g['group_id']}|{g['state']}|{g['members']}|{g['protocol_type']}\n"
-            formatted += "|===\n"
-        return (formatted, raw_results) if return_raw else formatted
-
-    def _get_consumer_lag(self, group_id, return_raw=False):
-        """Calculates consumer lag for a specific group efficiently."""
         try:
+            if not group_ids:
+                # Get all groups
+                groups = self.admin_client.list_consumer_groups()
+                group_ids = [g[0] for g in groups]
+            
+            if not group_ids:
+                formatted = self.formatter.format_note("No consumer groups found.")
+                return (formatted, []) if return_raw else formatted
+            
+            descriptions = self.admin_client.describe_consumer_groups(group_ids)
+            raw_results = []
+            
+            # Handle both dict and list return types from describe_consumer_groups
+            if isinstance(descriptions, dict):
+                # Dict format: {group_id: description_object}
+                for group_id, description in descriptions.items():
+                    raw_results.append({
+                        'group_id': group_id,
+                        'state': description.state,
+                        'protocol_type': description.protocol_type,
+                        'members': len(description.members)
+                    })
+            elif isinstance(descriptions, list):
+                # List format: [description_object, ...]
+                for description in descriptions:
+                    # FIX: Use 'group' not 'group_id'
+                    group_id = getattr(description, 'group', getattr(description, 'group_id', 'unknown'))
+                    state = getattr(description, 'state', 'unknown')
+                    protocol_type = getattr(description, 'protocol_type', 'unknown')
+                    members = len(getattr(description, 'members', []))
+                    
+                    raw_results.append({
+                        'group_id': group_id,
+                        'state': state,
+                        'protocol_type': protocol_type,
+                        'members': members
+                    })
+            else:
+                raise ValueError(f"Unexpected descriptions format: {type(descriptions)}")
+            
+            if not raw_results:
+                formatted = self.formatter.format_note("No consumer group details found.")
+            else:
+                formatted = self.formatter.format_table(raw_results)
+            
+            return (formatted, raw_results) if return_raw else formatted
+            
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to describe consumer groups: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+        
+    def _get_consumer_lag(self, group_id, return_raw=False):
+        """Calculates consumer lag for a specific group."""
+        try:
+            logger.info(f"Fetching consumer lag for group: {group_id}")
             committed_offsets = self.admin_client.list_consumer_group_offsets(group_id)
+            
+            logger.info(f"Got {len(committed_offsets) if committed_offsets else 0} committed offsets for {group_id}")
+            
             if not committed_offsets:
-                msg = f"[NOTE]\n====\nNo committed offsets found for group '{group_id}'.\n====\n"
+                msg = self.formatter.format_note(f"No offsets for group '{group_id}'.")
                 return (msg, {}) if return_raw else msg
-
+    
             partitions = list(committed_offsets.keys())
+            logger.info(f"Partitions for {group_id}: {partitions}")
+            
             consumer = KafkaConsumer(bootstrap_servers=self.settings.get('bootstrap_servers'))
             end_offsets = consumer.end_offsets(partitions)
             consumer.close()
-
+            
+            logger.info(f"End offsets: {end_offsets}")
+    
             lag_data = []
             for partition, offset_meta in committed_offsets.items():
                 committed = offset_meta.offset
                 end = end_offsets.get(partition, 0)
                 lag = max(0, end - committed)
                 lag_data.append({
-                    'group_id': group_id, 'topic': partition.topic, 'partition': partition.partition,
-                    'current_offset': committed, 'log_end_offset': end, 'lag': lag
+                    'group_id': group_id,
+                    'topic': partition.topic,
+                    'partition': partition.partition,
+                    'current_offset': committed,
+                    'log_end_offset': end,
+                    'lag': lag
                 })
             
-            raw = {'group_id': group_id, 'details': lag_data, 'total_lag': sum(d['lag'] for d in lag_data)}
-            formatted = f"Consumer Group: {group_id}\nTotal Lag: {raw['total_lag']} messages\n\n"
-            formatted += "|===\n|Topic|Partition|Current Offset|End Offset|Lag\n"
+            raw = {
+                'group_id': group_id,
+                'details': lag_data,
+                'total_lag': sum(d['lag'] for d in lag_data)
+            }
+            
+            logger.info(f"Calculated lag for {group_id}: total={raw['total_lag']}, details count={len(lag_data)}")
+            
+            formatted = f"Consumer Group: {group_id}\nTotal Lag: {raw['total_lag']}\n\n"
+            formatted += "|===\n|Topic|Partition|Current|End|Lag\n"
             for item in sorted(lag_data, key=lambda x: (x['topic'], x['partition'])):
                 formatted += f"|{item['topic']}|{item['partition']}|{item['current_offset']}|{item['log_end_offset']}|{item['lag']}\n"
             formatted += "|===\n"
+            
             return (formatted, raw) if return_raw else formatted
+            
         except Exception as e:
-            msg = f"[ERROR]\n====\nFailed to calculate consumer lag for {group_id}: {e}\n====\n"
-            logger.error(msg, exc_info=True)
-            return (msg, {'error': str(e)}) if return_raw else msg
+            logger.error(f"Failed to calculate lag for {group_id}: {e}", exc_info=True)
+            error_msg = self.formatter.format_error(f"Failed to calculate lag: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
 
     def _get_all_consumer_lag(self, return_raw=False):
-        """Calculates lag for all consumer groups."""
-        groups = [g[0] for g in self.admin_client.list_consumer_groups()]
-        if not groups:
-            return ("[NOTE]\n====\nNo consumer groups found.\n====\n", []) if return_raw else "[NOTE]\n====\nNo consumer groups found.\n====\n"
-
-        all_lags = []
-        total_cluster_lag = 0
-        for group_id in groups:
-            _, raw_lag = self._get_consumer_lag(group_id, return_raw=True)
-            if raw_lag and 'details' in raw_lag:
-                # Add group_id to each record for better context
-                for detail in raw_lag['details']:
-                    detail['group_id'] = group_id
-                all_lags.extend(raw_lag['details'])
-                total_cluster_lag += raw_lag.get('total_lag', 0)
+        """Calculates consumer lag for all groups.
         
-        raw = {'group_lags': all_lags, 'total_lag': total_cluster_lag}
-        formatted = f"Total Lag Across All Groups: {total_cluster_lag} messages\n\n"
-        formatted += "|===\n|Group ID|Topic|Partition|Lag\n"
-        for item in sorted(all_lags, key=lambda x: (x.get('group_id', ''), x['topic'], x['partition'])):
-            formatted += f"|{item.get('group_id')}|{item['topic']}|{item['partition']}|{item['lag']}\n"
-        formatted += "|===\n"
-        return (formatted, raw) if return_raw else formatted
-
-    def _get_config(self, resource_type, resource_name, return_raw=False):
-        """Generic helper to get broker or topic configuration."""
-        resource = ConfigResource(resource_type, resource_name)
+        Returns aggregated facts without interpretation. Returns metadata
+        about which groups have no offsets so checks can interpret appropriately.
+        """
         try:
-            futures = self.admin_client.describe_configs([resource])
-            future_result = futures[resource].get(timeout=10)
-            error_code, config_entries = future_result
-
-            if error_code != 0:
-                raise Exception(f"Describe_configs error code {error_code} for {resource_name}")
-
+            groups = self.admin_client.list_consumer_groups()
+            if not groups:
+                msg = self.formatter.format_note("No consumer groups found.")
+                return (msg, {
+                    'group_lags': [],
+                    'total_lag': 0,
+                    'groups_without_offsets': []  # ✅ Empty list
+                }) if return_raw else msg
+            
+            all_lag_data = []
+            total_lag = 0
+            errors = []
+            groups_without_offsets = []  # ✅ Track groups with no offsets
+            
+            for group_tuple in groups:
+                group_id = group_tuple[0] if isinstance(group_tuple, tuple) else group_tuple
+                
+                try:
+                    _, raw = self._get_consumer_lag(group_id, return_raw=True)
+                    
+                    # Check for error
+                    if isinstance(raw, dict) and 'error' in raw:
+                        errors.append({
+                            'group_id': group_id,
+                            'error': raw['error']
+                        })
+                        continue
+                    
+                    # Check for no offsets (FACT, not interpretation)
+                    if isinstance(raw, dict) and raw.get('no_committed_offsets'):
+                        groups_without_offsets.append(group_id)  # ✅ Just track the fact
+                        continue
+                    
+                    # Aggregate lag data
+                    if isinstance(raw, dict) and 'details' in raw:
+                        all_lag_data.extend(raw['details'])
+                        total_lag += raw.get('total_lag', 0)
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to get lag for group {group_id}: {e}")
+                    errors.append({
+                        'group_id': group_id,
+                        'error': str(e)
+                    })
+            
+            # Build response with FACTS only
             raw = {
-                'name': resource_name,
-                'configs': {e.name: e.value for e in config_entries}
+                'group_lags': all_lag_data,
+                'total_lag': total_lag,
+                'groups_without_offsets': groups_without_offsets,  # ✅ Fact
+                'groups_with_errors': errors  # ✅ Fact
             }
-            formatted = f"{resource_type.name.title()} '{resource_name}' Configuration (Top 25):\n\n"
-            formatted += "|===\n|Config Key|Value\n"
-            for key, val in sorted(raw['configs'].items())[:25]:
-                formatted += f"|{key}|{str(val)[:80]}\n"
-            formatted += "|===\n"
+            
+            # Minimal factual formatting
+            formatted = f"All Consumer Groups\nTotal Lag: {total_lag}\n"
+            formatted += f"Groups Analyzed: {len(groups)}\n"
+            formatted += f"Groups With Data: {len(all_lag_data) // max(len(all_lag_data), 1) if all_lag_data else 0}\n"
+            formatted += f"Groups Without Offsets: {len(groups_without_offsets)}\n"
+            formatted += f"Groups With Errors: {len(errors)}\n\n"
+            
+            # Show data table if available
+            if all_lag_data:
+                formatted += self.formatter.format_table(all_lag_data)
+            else:
+                formatted += "No lag data available.\n"
+            
             return (formatted, raw) if return_raw else formatted
+            
         except Exception as e:
-            msg = f"[ERROR]\n====\nFailed to get config for {resource_type.name} {resource_name}: {e}\n====\n"
-            logger.error(msg, exc_info=True)
-            return (msg, {'error': str(e)}) if return_raw else msg
-    
+            error_msg = self.formatter.format_error(f"Failed to calculate lag for all groups: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+                        
     def _get_broker_config(self, broker_id, return_raw=False):
         """Gets configuration for a specific broker."""
-        return self._get_config(ConfigResourceType.BROKER, str(broker_id), return_raw)
+        try:
+            config_resource = ConfigResource(ConfigResourceType.BROKER, str(broker_id))
+            configs = self.admin_client.describe_configs([config_resource])
+            
+            config_dict = {}
+            for resource, future in configs.items():
+                config = future.result()
+                for key, value in config.resources[0][4].items():
+                    config_dict[key] = value.value
+            
+            raw = {'name': str(broker_id), 'configs': config_dict}
+            
+            formatted = f"Broker {broker_id} Configuration:\n\n"
+            formatted += self.formatter.format_dict_as_table(config_dict, 'Setting', 'Value')
+            
+            return (formatted, raw) if return_raw else formatted
+            
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to get broker config: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
 
-    def _get_topic_config(self, topic_name, return_raw=False):
+    def _get_topic_config(self, topic, return_raw=False):
         """Gets configuration for a specific topic."""
-        return self._get_config(ConfigResourceType.TOPIC, topic_name, return_raw)
+        try:
+            config_resource = ConfigResource(ConfigResourceType.TOPIC, topic)
+            configs = self.admin_client.describe_configs([config_resource])
+            
+            config_dict = {}
+            for resource, future in configs.items():
+                config = future.result()
+                for key, value in config.resources[0][4].items():
+                    config_dict[key] = value.value
+            
+            raw = {'name': topic, 'configs': config_dict}
+            
+            formatted = f"Topic '{topic}' Configuration:\n\n"
+            formatted += self.formatter.format_dict_as_table(config_dict, 'Setting', 'Value')
+            
+            return (formatted, raw) if return_raw else formatted
+            
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to get topic config: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
 
     def _get_cluster_metadata(self, return_raw=False):
-        """Gets high-level cluster metadata."""
+            """Gets cluster-wide metadata."""
+            try:
+                cluster = self.admin_client._client.cluster
+                cluster.request_update()
+                
+                brokers = []
+                for broker in cluster.brokers():
+                    brokers.append({
+                        'id': broker.nodeId if hasattr(broker, 'nodeId') else broker.id,
+                        'host': broker.host,
+                        'port': broker.port
+                    })
+                
+                # Get controller - it's an object, not a method
+                controller = cluster.controller
+                controller_id = controller.nodeId if hasattr(controller, 'nodeId') else controller.id
+                
+                # Get cluster_id - it's a property, not a method
+                cluster_id = cluster.cluster_id if hasattr(cluster, 'cluster_id') else 'Unknown'
+                
+                raw = {
+                    'cluster_id': cluster_id,
+                    'controller_id': controller_id,
+                    'brokers': brokers
+                }
+                
+                formatted = f"Cluster ID: {raw['cluster_id']}\n"
+                formatted += f"Controller: {raw['controller_id']}\n\n"
+                formatted += "Brokers:\n"
+                formatted += self.formatter.format_table(brokers)
+                
+                return (formatted, raw) if return_raw else formatted
+                
+            except Exception as e:
+                error_msg = self.formatter.format_error(f"Failed to get cluster metadata: {e}")
+                return (error_msg, {'error': str(e)}) if return_raw else error_msg
+
+
+
+
+    def _old_get_cluster_metadata(self, return_raw=False):
+        """Gets cluster-wide metadata."""
         try:
-            info = self.admin_client.describe_cluster()
+            cluster = self.admin_client._client.cluster
+            cluster.request_update()
+            
+            brokers = []
+            for broker in cluster.brokers():
+                brokers.append({
+                    'id': broker.nodeId if hasattr(broker, 'nodeId') else broker.id,
+                    'host': broker.host,
+                    'port': broker.port
+                })
+            
+            controller_id = cluster.controller().nodeId if hasattr(cluster.controller(), 'nodeId') else cluster.controller().id
+            
             raw = {
-                'cluster_id': info.get('cluster_id'),
-                'controller_id': info.get('controller_id'),
-                'brokers': [{
-                    'id': b.get('node_id'), 'host': b.get('host'), 'port': b.get('port')
-                } for b in info.get('brokers', [])]
+                'cluster_id': cluster.cluster_id() if hasattr(cluster, 'cluster_id') else 'Unknown',
+                'controller_id': controller_id,
+                'brokers': brokers
             }
-            formatted = f"Cluster ID: {raw['cluster_id']}\nController: Broker {raw['controller_id']}\n"
-            if raw['brokers']:
-                formatted += f"Brokers ({len(raw['brokers'])}):\n\n|===\n|Broker ID|Address\n"
-                for b in sorted(raw['brokers'], key=lambda x: x['id']):
-                    formatted += f"|{b['id']}|{b['host']}:{b['port']}\n"
-                formatted += "|===\n"
+            
+            formatted = f"Cluster ID: {raw['cluster_id']}\n"
+            formatted += f"Controller: {raw['controller_id']}\n\n"
+            formatted += "Brokers:\n"
+            formatted += self.formatter.format_table(brokers)
+            
             return (formatted, raw) if return_raw else formatted
+            
         except Exception as e:
-            msg = f"[ERROR]\n====\nFailed to get cluster metadata: {e}\n====\n"
-            logger.error(msg, exc_info=True)
-            return (msg, {'error': str(e)}) if return_raw else msg
+            error_msg = self.formatter.format_error(f"Failed to get cluster metadata: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
 
-    def _describe_log_dirs(self, broker_ids, return_raw=False):
-        """Gets log directory information from brokers, including partition sizes."""
-        target_brokers = broker_ids or [b.get('id') for b in self.get_db_metadata().get('brokers', [])]
-        if not target_brokers:
-             return ("[NOTE]\n====\nNo brokers specified or found to describe log directories.\n====\n", {}) if return_raw else "[NOTE]\n====\nNo brokers specified or found to describe log directories.\n====\n"
+    def _describe_log_dirs(self, broker_ids=None, return_raw=False):
+        """Gets log directory information for brokers.
+        
+        The response structure is:
+        log_dirs = [
+            (broker_id, log_dir_path, [
+                (topic_name, [
+                    (partition_id, size_bytes, offset_lag, is_future),
+                    ...
+                ]),
+                ...
+            ]),
+            ...
+        ]
+        """
         try:
-            futures = self.admin_client.describe_log_dirs(target_brokers)
-            results = self.admin_client._wait_for_futures(futures)
+            response = self.admin_client.describe_log_dirs()
             
-            raw_data = []
-            for broker_id, future_result in results.items():
-                log_dirs_info = future_result.get()
-                for log_dir, info in log_dirs_info.items():
-                    for topic_partition, partition_info in info.topics.items():
-                        raw_data.append({
-                            'broker_id': broker_id,
-                            'log_dir': log_dir,
-                            'topic': topic_partition[0],
-                            'partition': topic_partition[1],
-                            'size_bytes': partition_info.size,
-                            'offset_lag': partition_info.offset_lag
-                        })
-
-            if not raw_data:
-                formatted = "[NOTE]\n====\nNo log directory information returned from brokers.\n====\n"
+            raw_results = []
+            
+            # Parse the log_dirs attribute
+            if hasattr(response, 'log_dirs'):
+                for log_dir_entry in response.log_dirs:
+                    # Each entry is: (broker_id, log_dir_path, topics_list)
+                    broker_id = log_dir_entry[0]
+                    log_dir_path = log_dir_entry[1]
+                    topics_list = log_dir_entry[2]
+                    
+                    # Parse each topic
+                    for topic_entry in topics_list:
+                        topic_name = topic_entry[0]
+                        partitions_list = topic_entry[1]
+                        
+                        # Parse each partition
+                        for partition_info in partitions_list:
+                            partition_id = partition_info[0]
+                            size_bytes = partition_info[1]
+                            offset_lag = partition_info[2]
+                            is_future = partition_info[3]
+                            
+                            raw_results.append({
+                                'broker_id': broker_id,
+                                'log_dir': log_dir_path,
+                                'topic': topic_name,
+                                'partition': partition_id,
+                                'size_bytes': size_bytes,
+                                'offset_lag': offset_lag,
+                                'is_future': is_future
+                            })
+            
+            # If broker_ids was specified, filter results
+            if broker_ids:
+                raw_results = [r for r in raw_results if r['broker_id'] in broker_ids]
+            
+            if not raw_results:
+                formatted = self.formatter.format_note("No log directory information found.")
             else:
-                formatted = "|===\n|Broker ID|Topic|Partition|Size (MB)\n"
-                for item in sorted(raw_data, key=lambda x: (-x['size_bytes'], x['broker_id'], x['topic'])):
-                     size_mb = round(item['size_bytes'] / (1024 * 1024), 2)
-                     formatted += f"|{item['broker_id']}|{item['topic']}|{item['partition']}|{size_mb}\n"
-                formatted += "|===\n"
-            return (formatted, raw_data) if return_raw else formatted
-        except Exception as e:
-            msg = f"[ERROR]\n====\nFailed to describe log directories: {e}\n====\n"
-            logger.error(msg, exc_info=True)
-            return (msg, {'error': str(e)}) if return_raw else msg
+                formatted = self.formatter.format_table(raw_results)
             
+            return (formatted, raw_results) if return_raw else formatted
+            
+        except Exception as e:
+            logger.error(f"Failed to describe log dirs: {e}", exc_info=True)
+            error_msg = self.formatter.format_error(f"Failed to describe log dirs: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+        
+
+
+
+    def DEBUG_describe_log_dirs(self, broker_ids=None, return_raw=False):
+        """Gets log directory information for brokers."""
+        try:
+            response = self.admin_client.describe_log_dirs()
+            
+            # DEBUG: Let's see what we're actually getting
+            logger.info(f"describe_log_dirs response type: {type(response)}")
+            logger.info(f"describe_log_dirs response dir: {dir(response)}")
+            
+            # Try to inspect the response
+            print(f"[DEBUG] Response type: {type(response)}")
+            print(f"[DEBUG] Response attributes: {dir(response)}")
+            if hasattr(response, '__dict__'):
+                print(f"[DEBUG] Response dict: {response.__dict__}")
+            
+            # For now, return the debug info
+            formatted = f"Response type: {type(response)}\nAttributes: {dir(response)}"
+            return (formatted, {'debug': str(response)}) if return_raw else formatted
+            
+        except Exception as e:
+            logger.error(f"Failed to describe log dirs: {e}", exc_info=True)
+            error_msg = self.formatter.format_error(f"Failed to describe log dirs: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+
+
+
+
+
+
+    def _old_describe_log_dirs(self, broker_ids=None, return_raw=False):
+        """Gets log directory information for brokers.
+        
+        Note: kafka-python's describe_log_dirs() doesn't accept broker_ids parameter.
+        It always returns data for all brokers in the cluster.
+        """
+        try:
+            # describe_log_dirs() takes no arguments - returns all brokers automatically
+            log_dirs = self.admin_client.describe_log_dirs()
+            
+            raw_results = []
+            for broker_id, dirs in log_dirs.items():
+                for dir_path, topics in dirs.items():
+                    for topic, partitions in topics.items():
+                        for partition, info in partitions.items():
+                            raw_results.append({
+                                'broker_id': broker_id,
+                                'log_dir': dir_path,
+                                'topic': topic,
+                                'partition': partition,
+                                'size_bytes': info.get('size', 0),
+                                'offset_lag': info.get('offsetLag', 0)
+                            })
+            
+            # If broker_ids was specified, filter results (even though API returned all)
+            if broker_ids:
+                raw_results = [r for r in raw_results if r['broker_id'] in broker_ids]
+            
+            if not raw_results:
+                formatted = self.formatter.format_note("No log directory information found.")
+            else:
+                formatted = self.formatter.format_table(raw_results)
+            
+            return (formatted, raw_results) if return_raw else formatted
+            
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to describe log dirs: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+
     def _list_consumer_group_offsets(self, group_id, return_raw=False):
-        """Lists the raw committed offsets for a consumer group."""
+        """Lists committed offsets for a consumer group."""
         try:
             offsets = self.admin_client.list_consumer_group_offsets(group_id)
+            
             if not offsets:
-                msg = f"[NOTE]\n====\nNo committed offsets found for group '{group_id}'.\n====\n"
-                return (msg, {}) if return_raw else msg
-
-            raw_data = [{
-                'group_id': group_id, 'topic': tp.topic, 'partition': tp.partition,
-                'offset': meta.offset, 'metadata': meta.metadata
-            } for tp, meta in offsets.items()]
-
-            formatted = f"Committed Offsets for Group: {group_id}\n\n"
-            formatted += "|===\n|Topic|Partition|Committed Offset\n"
-            for item in sorted(raw_data, key=lambda x: (x['topic'], x['partition'])):
-                formatted += f"|{item['topic']}|{item['partition']}|{item['offset']}\n"
-            formatted += "|===\n"
-            return (formatted, raw_data) if return_raw else formatted
+                msg = self.formatter.format_note(f"No offsets for group '{group_id}'.")
+                return (msg, []) if return_raw else msg
+            
+            raw_results = []
+            for partition, offset_meta in offsets.items():
+                raw_results.append({
+                    'group_id': group_id,
+                    'topic': partition.topic,
+                    'partition': partition.partition,
+                    'offset': offset_meta.offset,
+                    'metadata': offset_meta.metadata
+                })
+            
+            formatted = f"Consumer Group '{group_id}' Offsets:\n\n"
+            formatted += self.formatter.format_table(raw_results)
+            
+            return (formatted, raw_results) if return_raw else formatted
+            
         except Exception as e:
-            msg = f"[ERROR]\n====\nFailed to list consumer group offsets for {group_id}: {e}\n====\n"
-            logger.error(msg, exc_info=True)
-            return (msg, {'error': str(e)}) if return_raw else msg
+            error_msg = self.formatter.format_error(f"Failed to list offsets: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg

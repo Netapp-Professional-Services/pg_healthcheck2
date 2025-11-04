@@ -1,0 +1,68 @@
+{
+  "broker_unavailable": {
+    "metric_keywords": ["broker_availability", "data"],
+    "rules": [
+      {
+        "expression": "data.get('status') == 'unavailable'",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} ({data.get('host')}:{data.get('port')}) is unavailable and not responding to API calls. This indicates a serious service disruption.",
+        "recommendations": [
+          "Immediately SSH to the broker host and check broker process status",
+          "Check system logs: journalctl -u kafka or equivalent for your service manager",
+          "Check Kafka broker logs for errors (typically in /var/log/kafka or kafka/logs/)",
+          "Verify disk space is not full: df -h",
+          "Check memory availability: free -h",
+          "Review recent system changes or deployments that may have caused the failure",
+          "If process crashed, investigate root cause before restarting",
+          "Common causes: OOM killer, disk full, network failure, configuration errors"
+        ]
+      }
+    ]
+  },
+  "controller_unavailable": {
+    "metric_keywords": ["broker_availability"],
+    "data_conditions": [
+      {"key": "controller_available", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "not data.get('controller_available', True) and data.get('controller_id', -1) != -1",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "The cluster controller (Broker {data.get('controller_id')}) is unavailable. Administrative operations like topic creation, partition reassignment, and leader election cannot be performed until a new controller is elected.",
+        "recommendations": [
+          "Immediately investigate the controller broker and bring it back online",
+          "Kafka will automatically elect a new controller from available brokers",
+          "Check ISR status - controller unavailability may cause under-replication",
+          "Do not make cluster configuration changes until controller is stable",
+          "Monitor for controller re-election in broker logs",
+          "Document controller failover procedures for future incidents"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_unavailable": {
+    "metric_keywords": ["broker_availability"],
+    "data_conditions": [
+      {"key": "unavailable_count", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('unavailable_count', 0) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers are unavailable ({data.get('unavailable_count')} of {data.get('count')} total brokers). This may indicate a cluster-wide issue such as network partition, shared infrastructure failure, or cascading failures.",
+        "recommendations": [
+          "This is a critical cluster-wide incident - engage senior engineering immediately",
+          "Check for infrastructure-level issues: network partition, power loss, shared storage failure",
+          "Review recent changes that may have affected multiple brokers simultaneously",
+          "Do NOT restart brokers until root cause is identified",
+          "Verify client applications are handling the outage gracefully",
+          "Consider declaring an incident and activating disaster recovery procedures if data loss risk is high",
+          "Check for cascading failures - one broker failure causing others to fail"
+        ]
+      }
+    ]
+  }
+}

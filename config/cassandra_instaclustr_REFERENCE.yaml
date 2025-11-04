@@ -1,0 +1,430 @@
+# ============================================================================
+# Netapp Instaclustr Cassandra Configuration - Reference Guide
+# ============================================================================
+# This file provides a comprehensive reference for all configuration options
+# when connecting to an Instaclustr managed Cassandra cluster.
+#
+# Key Features for Instaclustr:
+#   - CQL-based checks (works on all managed clusters)
+#   - Prometheus metrics integration (comprehensive monitoring)
+#   - No SSH required (managed service)
+#   - Multi-datacenter support
+#   - AI-powered analysis
+#   - Trend tracking and historical analysis
+# ============================================================================
+
+# ============================================================================
+# BASIC CONFIGURATION
+# ============================================================================
+
+db_type: cassandra
+
+company_name: Instaclustr Cassandra
+report_title: Cassandra Health Check Report
+
+# ============================================================================
+# CQL CONNECTION SETTINGS
+# ============================================================================
+# Instaclustr provides multiple connection methods. Choose based on your
+# network architecture and security requirements.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# CONNECTION METHOD 1: Public IP Endpoints (SIMPLE - RECOMMENDED FOR TESTING)
+# ----------------------------------------------------------------------------
+# Connect directly to Cassandra nodes via public IPs
+# Best for: Initial testing, external monitoring, development
+# Note: Ensure firewall rules allow your IP to connect on port 9042
+# ----------------------------------------------------------------------------
+
+hosts:
+  - "54.211.151.192"
+  - "100.24.74.94"
+  - "3.218.14.119"
+
+port: 9042
+
+# ----------------------------------------------------------------------------
+# CONNECTION METHOD 2: Private VPC Endpoints (RECOMMENDED FOR PRODUCTION)
+# ----------------------------------------------------------------------------
+# Connect via private IPs within your VPC (requires VPC peering)
+# Best for: Production use, lower latency, reduced data transfer costs
+# Requires: VPC peering configured between your VPC and Instaclustr VPC
+#
+# To use this method, replace the hosts section above with:
+#
+# hosts:
+#   - "10.0.1.100"
+#   - "10.0.1.101"
+#   - "10.0.1.102"
+#
+# Advantages:
+#   - Reduced latency (direct VPC routing)
+#   - Lower costs (private IP data transfer)
+#   - Enhanced security (traffic stays in private network)
+# ----------------------------------------------------------------------------
+
+# Authentication credentials
+# Get these from Instaclustr Console > Clusters > Connection Info
+user: "iccassandra"
+password: "your_cassandra_password_here"
+
+# Datacenter Configuration
+# REQUIRED: Cassandra driver requires local_dc for DC-aware load balancing
+# Find this in Instaclustr Console > Clusters > Settings > Datacenter
+# Format: CLOUD_PROVIDER_REGION (e.g., AWS_VPC_US_EAST_1, GCP_US_CENTRAL1)
+local_dc: "AWS_VPC_US_EAST_1"
+
+# Connection timeout (seconds)
+connect_timeout: 10
+
+# Request timeout (seconds)
+request_timeout: 30
+
+# Optional: Default keyspace to connect to
+# Leave commented to not set a default keyspace (recommended)
+# keyspace: "your_keyspace_name"
+
+# ============================================================================
+# PROMETHEUS MONITORING INTEGRATION (RECOMMENDED)
+# ============================================================================
+# Instaclustr provides comprehensive Prometheus-compatible metrics endpoint
+# This is the PREFERRED monitoring method for managed clusters.
+#
+# To get your Prometheus credentials:
+# 1. Log in to Instaclustr Console (https://console.instaclustr.com)
+# 2. Click Account Settings (top right)
+# 3. Navigate to API Keys section
+# 4. Generate a new Prometheus API key
+# 5. Copy the username and API key
+#
+# Documentation:
+# https://www.instaclustr.com/support/documentation/monitoring/prometheus/
+# ============================================================================
+
+# Find your cluster ID in Instaclustr Console > Clusters > Overview
+# It's the UUID in the cluster details
+instaclustr_cluster_id: "6010a91d-c018-417d-9a14-70e6005a34f0"
+
+# Enable Prometheus monitoring
+instaclustr_prometheus_enabled: true
+
+# Prometheus endpoint base URL
+# Format: https://{prometheus-id}.prometheus.monitoring.instaclustr.com
+# Find this in Instaclustr Console > Clusters > Monitoring
+instaclustr_prometheus_base_url: "https://b0da7454-3865-4166-8e0b-6a73487ab49d.prometheus.monitoring.instaclustr.com"
+
+# Prometheus credentials (from Account Settings > API Keys)
+instaclustr_prometheus_username: "your_username"
+instaclustr_prometheus_api_key: "your_prometheus_api_key"
+
+# Prometheus request timeout (seconds)
+prometheus_timeout: 30
+
+# Available Prometheus Metrics (when enabled):
+# - JVM Heap: jvm_memory_heap_used, jvm_memory_heap_max
+# - JVM GC: jvm_gc_collection_seconds_count, jvm_gc_collection_seconds_sum
+# - CPU: process_cpu_usage, system_cpu_usage
+# - Disk: cassandra_table_disk_space_used_bytes, cassandra_total_disk_space_used_bytes
+# - Compaction: cassandra_compaction_pending_tasks, cassandra_compaction_bytes_compacted_total
+# - Latency: cassandra_table_read_latency_seconds, cassandra_table_write_latency_seconds (p95)
+# - Thread Pools: cassandra_thread_pool_active_tasks, cassandra_thread_pool_pending_tasks
+# - Client Connections: cassandra_client_connected_native_clients
+# - Read/Write Operations: cassandra_table_read_total, cassandra_table_write_total
+# - Dropped Messages: cassandra_dropped_message_total
+# - And 100+ additional Cassandra metrics
+
+# ============================================================================
+# PROMETHEUS-BASED HEALTH CHECKS
+# ============================================================================
+# When Prometheus is enabled, the following checks are available:
+#
+# 1. JVM Heap Usage (prometheus_jvm_heap)
+#    - Monitors heap utilization across all nodes
+#    - Thresholds: WARNING >75%, CRITICAL >85%
+#    - Helps prevent OOM errors
+#
+# 2. CPU Utilization (prometheus_cpu)
+#    - Tracks CPU usage per node
+#    - Thresholds: WARNING >75%, CRITICAL >90%
+#    - Detects capacity constraints
+#
+# 3. Disk Usage (prometheus_disk_usage)
+#    - Monitors disk space utilization
+#    - Thresholds: WARNING >70%, CRITICAL >85%
+#    - CRITICAL: Cassandra stops accepting writes at 100%
+#
+# 4. Compaction Backlog (prometheus_compaction)
+#    - Tracks pending compaction tasks
+#    - Thresholds: WARNING >5 tasks, CRITICAL >20 tasks
+#    - Indicates storage efficiency issues
+#
+# 5. Read/Write Latency (prometheus_latency)
+#    - Monitors p95 latency for operations
+#    - Read: WARNING >50ms, CRITICAL >100ms
+#    - Write: WARNING >30ms, CRITICAL >75ms
+#    - Detects performance degradation
+# ============================================================================
+
+# ============================================================================
+# SSH CONFIGURATION (NOT AVAILABLE FOR INSTACLUSTR)
+# ============================================================================
+# SSH is NOT available for managed Instaclustr clusters
+# Nodetool-based and shell-based checks will be automatically skipped
+# Use Prometheus metrics and CQL-based checks instead
+# ============================================================================
+
+ssh_enabled: false
+
+# Note: For self-managed Cassandra clusters with SSH access, you would configure:
+# ssh_enabled: true
+# ssh_hosts:
+#   - "10.0.1.100"
+#   - "10.0.1.101"
+#   - "10.0.1.102"
+# ssh_user: "cassandra"
+# ssh_key_file: "/home/user/.ssh/id_rsa"
+# # OR: ssh_password: "your_ssh_password"
+# ssh_timeout: 10
+# ssh_port: 22
+
+# ============================================================================
+# NODETOOL CONFIGURATION (NOT AVAILABLE FOR INSTACLUSTR)
+# ============================================================================
+# Nodetool requires SSH access, which is not available on managed clusters
+# The following checks will be skipped on Instaclustr:
+#   - compaction_pending_tasks (use prometheus_compaction instead)
+#   - gossip_status (use CQL-based checks instead)
+#   - schema_consistency
+#   - tpstats (thread pool statistics)
+#   - cfstats (column family statistics)
+#   - netstats (network statistics)
+# ============================================================================
+
+# ============================================================================
+# CQL-BASED HEALTH CHECKS (AVAILABLE ON ALL CLUSTERS)
+# ============================================================================
+# These checks work on both managed and self-managed clusters:
+#
+# 1. Table Statistics (table_statistics)
+#    - Analyzes table counts per keyspace
+#    - Checks compaction strategies
+#    - Reviews bloom filter settings
+#    - Identifies CDC-enabled tables
+#
+# 2. Secondary Indexes (secondary_indexes)
+#    - Detects secondary index usage
+#    - Warns about performance implications
+#    - Identifies SASI and custom indexes
+#    - Recommends alternatives
+#
+# 3. Read Repair Settings (read_repair_settings)
+#    - Checks read repair configurations
+#    - Identifies non-recommended settings
+#    - Reviews per-table settings
+#
+# 4. Network Topology (network_topology)
+#    - Analyzes datacenter distribution
+#    - Checks rack assignment
+#    - Reviews replication strategies
+#
+# 5. Keyspace Replication (keyspace_replication_health)
+#    - Validates replication factors
+#    - Checks consistency across DCs
+#    - Identifies misconfigurations
+# ============================================================================
+
+# ============================================================================
+# REPORT SETTINGS
+# ============================================================================
+
+# Output format: asciidoc, markdown, json
+output_format: asciidoc
+
+# Show query details in reports
+show_qry: true
+
+# Limit number of rows displayed in tables
+row_limit: 10
+
+# Include metadata in output
+include_metadata: true
+
+# ============================================================================
+# AI-POWERED ANALYSIS (OPTIONAL)
+# ============================================================================
+# Enable AI to provide intelligent recommendations, trend analysis,
+# and actionable insights based on health check findings.
+# ============================================================================
+
+# Master switch for AI analysis
+ai_analyze: true
+
+# Run AI analysis integrated with main report generation
+# If false, AI analysis runs separately after health check completes
+ai_run_integrated: true
+
+# AI Provider Configuration
+# Supported providers: xAI, anthropic, openai
+ai_provider: xAI
+ai_endpoint: https://api.x.ai/
+ai_api_key: your_xai_api_key_here
+ai_model: grok-4
+
+# Alternative providers:
+# Anthropic Claude:
+#   ai_provider: anthropic
+#   ai_endpoint: https://api.anthropic.com/
+#   ai_model: claude-3-5-sonnet-20241022
+#
+# OpenAI:
+#   ai_provider: openai
+#   ai_endpoint: https://api.openai.com/v1/
+#   ai_model: gpt-4-turbo
+
+# AI request headers (optional)
+ai_user_header: "X-User-ID"
+
+# Temperature: Controls randomness (0.0-1.0)
+# Lower = more focused and deterministic
+# Higher = more creative and varied
+ai_temperature: 0.1
+
+# Maximum tokens in AI response
+ai_max_output_tokens: 20000
+
+# Maximum tokens to send in prompt (for cost control)
+ai_max_prompt_tokens: 12000
+
+# ============================================================================
+# TREND ANALYSIS & HISTORICAL TRACKING (OPTIONAL)
+# ============================================================================
+# Ship health check findings to PostgreSQL database for trend analysis
+# and historical tracking. Enables:
+#   - Time-series analysis of metrics
+#   - Trend detection (degradation, improvements)
+#   - Historical comparison
+#   - Predictive insights
+# ============================================================================
+
+# Enable trend shipping (requires PostgreSQL database)
+# trend_shipper_enabled: true
+
+# PostgreSQL connection for trend database
+# trend_db_host: "localhost"
+# trend_db_port: 5432
+# trend_db_name: "health_trends"
+# trend_db_user: "postgres"
+# trend_db_password: "your_postgres_password"
+
+# Trend retention period (days)
+# trend_retention_days: 90
+
+# ============================================================================
+# RULE-BASED ANALYSIS (AUTOMATIC)
+# ============================================================================
+# Health checks automatically evaluate findings against JSON rule files
+# located in plugins/cassandra/rules/
+#
+# Available rule files:
+#   - prometheus_jvm_heap.json
+#   - prometheus_cpu.json
+#   - prometheus_disk_usage.json
+#   - prometheus_compaction.json
+#   - prometheus_latency.json
+#   - table_statistics.json
+#   - secondary_indexes.json
+#   - read_repair_settings.json
+#   - keyspace_replication_health.json
+#
+# Rules define:
+#   - Severity levels (critical, high, medium, low)
+#   - Score impacts (for overall health score)
+#   - Reasoning templates
+#   - Actionable recommendations
+# ============================================================================
+
+# ============================================================================
+# CHECK-SPECIFIC CONFIGURATION (OPTIONAL)
+# ============================================================================
+# Override default thresholds for specific checks
+# ============================================================================
+
+# Prometheus JVM Heap thresholds
+# prometheus_jvm_heap_warning_threshold: 75  # Percent
+# prometheus_jvm_heap_critical_threshold: 85 # Percent
+
+# Prometheus CPU thresholds
+# prometheus_cpu_warning_threshold: 75   # Percent
+# prometheus_cpu_critical_threshold: 90  # Percent
+
+# Prometheus Disk Usage thresholds
+# prometheus_disk_warning_threshold: 70   # Percent
+# prometheus_disk_critical_threshold: 85  # Percent
+
+# Prometheus Compaction thresholds
+# prometheus_compaction_warning_threshold: 5   # Pending tasks
+# prometheus_compaction_critical_threshold: 20 # Pending tasks
+
+# Prometheus Latency thresholds (milliseconds)
+# prometheus_read_latency_warning_threshold: 50   # ms (p95)
+# prometheus_read_latency_critical_threshold: 100 # ms (p95)
+# prometheus_write_latency_warning_threshold: 30  # ms (p95)
+# prometheus_write_latency_critical_threshold: 75 # ms (p95)
+
+# Table statistics thresholds
+# table_count_warning_threshold: 50   # Tables per keyspace
+# table_count_critical_threshold: 100 # Tables per keyspace
+
+# ============================================================================
+# EXAMPLE: CLUSTER DISCOVERED INFORMATION
+# ============================================================================
+# This information is discovered automatically when you connect:
+#
+# Cluster Name: Instaclustr Cassandra Production
+# Version: 5.0.5
+# Datacenter: AWS_VPC_US_EAST_1
+# Nodes: 3
+# Contact Points:
+#   - 54.211.151.192
+#   - 100.24.74.94
+#   - 3.218.14.119
+#
+# Available Health Checks:
+#   CQL-Based: 5 checks (work on all clusters)
+#   Prometheus-Based: 5 checks (managed clusters only)
+#   Nodetool-Based: 0 checks (requires SSH - not available)
+#   Shell-Based: 0 checks (requires SSH - not available)
+#
+# Monitoring Capabilities:
+#   - Prometheus metrics: 100+ metrics available
+#   - Service discovery: Automatic node discovery
+#   - Per-node metrics: Individual node monitoring
+#   - Cluster aggregates: Cluster-wide statistics
+# ============================================================================
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+#
+# Connection Issues:
+#   - Verify firewall allows your IP on port 9042
+#   - Check credentials in Instaclustr Console
+#   - Ensure local_dc matches your cluster datacenter
+#
+# Prometheus Issues:
+#   - 401 Unauthorized: Check API key in Account Settings
+#   - 429 Rate Limit: Reduce check frequency (expected during testing)
+#   - 404 Not Found: Verify cluster ID and Prometheus base URL
+#   - Empty metrics: Check Prometheus is enabled on cluster
+#
+# AI Analysis Issues:
+#   - Verify AI provider API key is valid
+#   - Check endpoint URL matches provider
+#   - Ensure token limits are appropriate for model
+#
+# For additional help:
+#   - Instaclustr Support: https://support.instaclustr.com
+#   - Documentation: plugins/cassandra/README.adoc
+#   - Example configs: config/cassandra_instaclustr.yaml
+# ============================================================================

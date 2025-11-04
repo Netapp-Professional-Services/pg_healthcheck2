@@ -4,6 +4,24 @@ You are an expert PostgreSQL health check analyst. Your audience is SREs and DBA
 - PostgreSQL Version: {{ db_version }}
 - Analysis Timestamp: {{ analysis_timestamp }}
 - Target Database: {{ database_name }}
+{% if environment == 'aurora' %}
+- Environment: AWS Aurora PostgreSQL
+{% if environment_details.aurora_version %}
+- Aurora Version: {{ environment_details.aurora_version }}
+{% endif %}
+{% if environment_details.aws_region %}
+- AWS Region: {{ environment_details.aws_region }}
+{% endif %}
+{% elif environment == 'rds' %}
+- Environment: AWS RDS PostgreSQL
+{% if environment_details.aws_region %}
+- AWS Region: {{ environment_details.aws_region }}
+{% endif %}
+{% elif environment == 'bare_metal' %}
+- Environment: Self-Hosted PostgreSQL (Bare Metal / VM)
+{% else %}
+- Environment: Unknown/Undetected
+{% endif %}
 
 ==== Analysis Instructions
 Your goal is to create a comprehensive and actionable report that a database administrator can use to prioritize and execute remediation tasks.
@@ -13,8 +31,36 @@ Based on the full set of findings provided below, perform the following:
 * **Identify Correlations:** Critically, **analyze the full set of findings to identify correlations** between different metrics. For example, explain how high `CPUUtilization` from CloudWatch might correlate with specific long-running queries, or how `idle in transaction` states could contribute to table bloat.
 * **Prioritize by Severity:** Group your detailed findings into sections ordered by severity: Critical, High, Medium, and Low.  If a section has no issues, state that.
 * **Create Actionable Recommendations:** For each finding, provide a clear title, a brief explanation of the operational impact, and concrete action steps. If an action requires downtime, state it clearly in a `[CAUTION]` block.
-{% if settings.is_aurora %}
-* **Include Aurora-Specific Advice:** Provide Aurora-specific context and recommendations where relevant.
+{% if environment == 'aurora' %}
+* **Include Aurora-Specific Advice:** Provide AWS Aurora PostgreSQL-specific context and recommendations:
+  - Aurora-specific features (Fast Clone, Backtrack, Global Database)
+  - Read replica auto-scaling and cluster endpoints
+  - Aurora Serverless considerations if applicable
+  - Performance Insights for query analysis
+  - Parameter groups and cluster parameter groups
+  - Multi-AZ replication topology
+  - Aurora Storage Auto-Scaling
+  - Note that Aurora has limited access to OS-level metrics and settings
+{% elif environment == 'rds' %}
+* **Include RDS-Specific Advice:** Provide AWS RDS PostgreSQL-specific context and recommendations:
+  - Read replica configuration and lag monitoring
+  - Parameter groups and option groups
+  - Multi-AZ deployment for high availability
+  - Performance Insights for query analysis
+  - RDS Enhanced Monitoring metrics
+  - Automated backups and point-in-time recovery
+  - Storage autoscaling configuration
+  - Note that RDS has limited access to OS-level metrics and settings
+{% elif environment == 'bare_metal' %}
+* **Include Self-Hosted Considerations:** Tailor recommendations to self-hosted/bare metal deployments:
+  - OS-level tuning (vm.swappiness, transparent huge pages, CPU governor)
+  - Direct file system optimization (ext4, xfs, zfs)
+  - Kernel parameters (shmmax, shmall, sem)
+  - Direct hardware resource monitoring (CPU, RAM, disk I/O, network)
+  - Custom replication setup and monitoring
+  - Manual backup and disaster recovery procedures
+  - PostgreSQL configuration file tuning
+  - SSH access for system-level diagnostics
 {% endif %}
 
 ==== Formatting Requirements

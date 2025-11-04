@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+
+{% block title %}Trend Analysis - Health Check Trends{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-semibold text-slate-900">Trend Analysis</h1>
+        <p class="mt-1 text-sm text-slate-600">Analyze historical health check trends to generate consulting engagement recommendations.</p>
+    </div>
+
+    <!-- Generate Analysis Card -->
+    <div class="bg-white border border-slate-200 mb-6 shadow-sm">
+        <div class="px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <h2 class="text-sm font-semibold text-slate-900">Generate New Analysis</h2>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <!-- Company Selection -->
+                <div>
+                    <label for="company-select" class="block text-xs font-medium text-slate-700 mb-1.5">
+                        Company <span class="text-red-600">*</span>
+                    </label>
+                    <select id="company-select" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="" disabled selected>Select company...</option>
+                    </select>
+                </div>
+                
+                <!-- Time Period -->
+                <div>
+                    <label for="period-select" class="block text-xs font-medium text-slate-700 mb-1.5">
+                        Analysis Period <span class="text-red-600">*</span>
+                    </label>
+                    <select id="period-select" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="30">Last 30 days</option>
+                        <option value="60">Last 60 days</option>
+                        <option value="90" selected>Last 90 days</option>
+                        <option value="180">Last 6 months</option>
+                        <option value="365">Last year</option>
+                    </select>
+                </div>
+                
+                <!-- AI Profile -->
+                <div>
+                    <label for="ai-profile-select" class="block text-xs font-medium text-slate-700 mb-1.5">
+                        AI Profile <span class="text-red-600">*</span>
+                    </label>
+                    <select id="ai-profile-select" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="" disabled selected>Select AI profile...</option>
+                    </select>
+                </div>
+                
+                <!-- Report Type -->
+                <div>
+                    <label for="template-select" class="block text-xs font-medium text-slate-700 mb-1.5">
+                        Analysis Type <span class="text-red-600">*</span>
+                    </label>
+                    <select id="template-select" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="" disabled selected>Loading templates...</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Buttons -->
+            <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-500">
+                    <span class="text-red-600">*</span> Required fields
+                </p>
+                <div class="flex gap-2">
+                    <button id="cancel-btn" class="hidden px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded shadow-sm transition-colors">
+                        Cancel
+                    </button>
+                    <button id="generate-btn" disabled class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600">
+                        Generate Analysis
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Status Message -->
+            <div id="status-message" class="mt-4 hidden"></div>
+        </div>
+    </div>
+
+    <!-- Recent Analyses Card -->
+    <div class="bg-white border border-slate-200 shadow-sm">
+        <div class="px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <h2 class="text-sm font-semibold text-slate-900">Recent Trend Analyses</h2>
+        </div>
+        <div class="p-6">
+            {% if recent_analyses %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-medium text-slate-700">Company</th>
+                            <th class="px-4 py-3 text-left font-medium text-slate-700">Analysis Period</th>
+                            <th class="px-4 py-3 text-left font-medium text-slate-700">Generated</th>
+                            <th class="px-4 py-3 text-left font-medium text-slate-700">By</th>
+                            <th class="px-4 py-3 text-center font-medium text-slate-700">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200">
+                        {% for analysis in recent_analyses %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-4 py-3 text-slate-900">{{ analysis.company_name }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ analysis.analysis_period_days }} days</td>
+                            <td class="px-4 py-3 text-slate-600">
+                                <span class="text-xs">{{ analysis.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-slate-600">{{ analysis.username }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <a href="{{ url_for('profile.view_report', report_type='trend_analysis', report_id=analysis.id) }}" 
+                                   class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors">
+                                    View Report
+                                    <svg class="ml-1 w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-slate-900">No trend analyses yet</h3>
+                <p class="mt-1 text-sm text-slate-500">Generate your first analysis using the form above.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const companySelect = document.getElementById('company-select');
+        const periodSelect = document.getElementById('period-select');
+        const aiProfileSelect = document.getElementById('ai-profile-select');
+        const templateSelect = document.getElementById('template-select');
+        const generateBtn = document.getElementById('generate-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const statusMessage = document.getElementById('status-message');
+        
+        let previewData = null;
+        let isPreviewMode = true;
+        
+        // Load companies
+        fetch("{{ url_for('main.get_companies_for_trend_analysis') }}")
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load companies');
+                return response.json();
+            })
+            .then(companies => {
+                if (companies.length === 0) {
+                    companySelect.innerHTML = '<option disabled>No accessible companies</option>';
+                    return;
+                }
+                companies.forEach(company => {
+                    const option = new Option(company.name, company.id);
+                    companySelect.add(option);
+                });
+            })
+            .catch(err => {
+                console.error('Failed to load companies:', err);
+                companySelect.innerHTML = '<option disabled>Error loading companies</option>';
+            });
+        
+        // Load AI profiles
+        fetch("{{ url_for('main.get_user_ai_profiles') }}")
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load AI profiles');
+                return response.json();
+            })
+            .then(profiles => {
+                if (profiles.length === 0) {
+                    aiProfileSelect.innerHTML = '<option disabled>No AI profiles configured</option>';
+                    return;
+                }
+                profiles.forEach(profile => {
+                    const option = new Option(profile.name, profile.id);
+                    aiProfileSelect.add(option);
+                });
+            })
+            .catch(err => {
+                console.error('Failed to load AI profiles:', err);
+                aiProfileSelect.innerHTML = '<option disabled>Error loading profiles</option>';
+            });
+        
+        // Load trend analysis templates
+        fetch("{{ url_for('main.get_trend_analysis_templates') }}")
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load templates');
+                return response.json();
+            })
+            .then(templates => {
+                templateSelect.innerHTML = '<option value="" disabled selected>Select analysis type...</option>';
+                if (templates.length === 0) {
+                    templateSelect.innerHTML = '<option disabled>No trend analysis templates found</option>';
+                    return;
+                }
+                templates.forEach(template => {
+                    const option = new Option(template.name, template.id);
+                    templateSelect.add(option);
+                });
+            })
+            .catch(err => {
+                console.error('Failed to load templates:', err);
+                templateSelect.innerHTML = '<option disabled>Error loading templates</option>';
+            });
+        
+        // Enable/disable button based on form state
+        function checkFormReady() {
+            if (isPreviewMode) {
+                const ready = companySelect.value && periodSelect.value;
+                generateBtn.disabled = !ready;
+                generateBtn.textContent = ready ? 'Preview Data' : 'Generate Analysis';
+            } else {
+                const ready = companySelect.value && 
+                             periodSelect.value && 
+                             aiProfileSelect.value && 
+                             templateSelect.value;
+                generateBtn.disabled = !ready;
+            }
+        }
+        
+        // Reset to preview mode
+        function resetToPreviewMode() {
+            isPreviewMode = true;
+            previewData = null;
+            generateBtn.textContent = 'Preview Data';
+            generateBtn.className = 'px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600';
+            statusMessage.classList.add('hidden');
+            cancelBtn.classList.add('hidden');
+            checkFormReady();
+        }
+        
+        // Cancel button handler
+        cancelBtn.addEventListener('click', function() {
+            resetToPreviewMode();
+        });
+        
+        companySelect.addEventListener('change', function() {
+            resetToPreviewMode();
+            checkFormReady();
+        });
+        periodSelect.addEventListener('change', function() {
+            resetToPreviewMode();
+            checkFormReady();
+        });
+        aiProfileSelect.addEventListener('change', checkFormReady);
+        templateSelect.addEventListener('change', checkFormReady);
+        
+        // Main button click handler
+        generateBtn.addEventListener('click', async function() {
+            if (isPreviewMode) {
+                await showPreview();
+            } else {
+                await generateAnalysis();
+            }
+        });
+        
+        // Show data preview
+        async function showPreview() {
+            const originalText = generateBtn.textContent;
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<svg class="inline w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Loading preview...';
+            
+            try {
+                const response = await fetch("{{ url_for('main.get_trend_preview') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        company_id: parseInt(companySelect.value),
+                        days: parseInt(periodSelect.value)
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to load preview');
+                }
+                
+                previewData = await response.json();
+                displayPreview(previewData);
+                
+                // Switch to generate mode
+                isPreviewMode = false;
+                generateBtn.textContent = 'Generate AI Analysis';
+                generateBtn.className = 'px-5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+                checkFormReady();
+                
+            } catch (error) {
+                statusMessage.className = 'mt-4 p-4 text-sm bg-red-50 border border-red-200 text-red-800 rounded';
+                statusMessage.textContent = `❌ Failed to load preview: ${error.message}`;
+                statusMessage.classList.remove('hidden');
+                
+                generateBtn.disabled = false;
+                generateBtn.textContent = originalText;
+            }
+        }
+        
+        // Display preview data
+        function displayPreview(data) {
+            const summary = data.summary;
+            const recurring = data.recurring_issues || [];
+            const health = data.health_score_trend || [];
+            const crossTech = data.cross_technology_patterns || [];
+            
+            let html = '<div class="mt-4 p-6 bg-slate-50 border border-slate-200 rounded">';
+            html += '<h3 class="text-sm font-semibold text-slate-900 mb-4">📊 Trend Data Preview</h3>';
+            
+            // Summary section
+            html += '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">';
+            html += `<div class="bg-white p-3 rounded border border-slate-200">
+                <div class="text-xs text-slate-600">Total Runs</div>
+                <div class="text-lg font-semibold text-slate-900">${summary.total_runs}</div>
+            </div>`;
+            html += `<div class="bg-white p-3 rounded border border-slate-200">
+                <div class="text-xs text-slate-600">Technologies</div>
+                <div class="text-sm font-medium text-slate-900">${summary.technologies.join(', ')}</div>
+            </div>`;
+            html += `<div class="bg-white p-3 rounded border border-slate-200">
+                <div class="text-xs text-slate-600">Date Range</div>
+                <div class="text-xs font-medium text-slate-900">${data.time_period.first_run} to ${data.time_period.last_run}</div>
+            </div>`;
+            html += `<div class="bg-white p-3 rounded border border-slate-200">
+                <div class="text-xs text-slate-600">Recurring Issues</div>
+                <div class="text-lg font-semibold text-slate-900">${recurring.length}</div>
+            </div>`;
+            html += '</div>';
+            
+            // Recurring Issues Table
+            if (recurring.length > 0) {
+                html += '<div class="mb-6"><h4 class="text-xs font-semibold text-slate-700 mb-2">Top Recurring Issues</h4>';
+                html += '<div class="bg-white border border-slate-200 rounded overflow-hidden"><table class="w-full text-xs">';
+                html += '<thead class="bg-slate-100"><tr>';
+                html += '<th class="px-3 py-2 text-left font-medium text-slate-700">Rule</th>';
+                html += '<th class="px-3 py-2 text-center font-medium text-slate-700">Severity</th>';
+                html += '<th class="px-3 py-2 text-center font-medium text-slate-700">Occurrences</th>';
+                html += '<th class="px-3 py-2 text-center font-medium text-slate-700">Status</th>';
+                html += '</tr></thead><tbody class="divide-y divide-slate-200">';
+                
+                recurring.slice(0, 10).forEach(issue => {
+                    const severityColor = {
+                        'critical': 'text-red-700 bg-red-50',
+                        'high': 'text-orange-700 bg-orange-50',
+                        'medium': 'text-yellow-700 bg-yellow-50',
+                        'low': 'text-blue-700 bg-blue-50'
+                    }[issue.severity] || 'text-slate-700 bg-slate-50';
+                    
+                    const status = issue.in_latest_run 
+                        ? '<span class="text-red-600">🔴 Active</span>' 
+                        : '<span class="text-green-600">✅ Resolved</span>';
+                    
+                    html += '<tr class="hover:bg-slate-50">';
+                    html += `<td class="px-3 py-2 text-slate-900">${issue.rule_name}</td>`;
+                    html += `<td class="px-3 py-2 text-center"><span class="px-2 py-1 rounded text-xs font-medium ${severityColor}">${issue.severity}</span></td>`;
+                    html += `<td class="px-3 py-2 text-center text-slate-700">${issue.occurrences}</td>`;
+                    html += `<td class="px-3 py-2 text-center">${status}</td>`;
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div></div>';
+            } else {
+                html += '<div class="mb-6 p-4 bg-green-50 border border-green-200 rounded text-sm text-green-800">✅ No recurring issues detected</div>';
+            }
+            
+            // Health Score Trend
+            if (health.length >= 2) {
+                const first = health[0].calculated_score;
+                const last = health[health.length - 1].calculated_score;
+                const trend = last > first ? '📈 Improving' : last < first ? '📉 Degrading' : '➡️ Stable';
+                const trendColor = last > first ? 'text-green-700 bg-green-50' : last < first ? 'text-red-700 bg-red-50' : 'text-slate-700 bg-slate-50';
+                
+                html += '<div class="mb-6"><h4 class="text-xs font-semibold text-slate-700 mb-2">Health Score Trend</h4>';
+                html += `<div class="bg-white p-4 border border-slate-200 rounded">`;
+                html += `<div class="flex items-center justify-between mb-2">`;
+                html += `<span class="text-sm font-medium ${trendColor} px-3 py-1 rounded">${trend}</span>`;
+                html += `<span class="text-xs text-slate-600">${first} → ${last}</span>`;
+                html += `</div>`;
+                html += `<div class="text-xs text-slate-600">Recent scores: ${health.slice(-10).map(s => s.calculated_score).join(', ')}</div>`;
+                html += `</div></div>`;
+            }
+            
+            // Cross-Technology Patterns
+            if (crossTech.length > 1) {
+                html += '<div><h4 class="text-xs font-semibold text-slate-700 mb-2">Cross-Technology Overview</h4>';
+                html += '<div class="grid grid-cols-1 md:grid-cols-3 gap-3">';
+                crossTech.forEach(tech => {
+                    html += `<div class="bg-white p-3 border border-slate-200 rounded">`;
+                    html += `<div class="text-sm font-medium text-slate-900 mb-2">${tech.db_technology}</div>`;
+                    html += `<div class="text-xs text-slate-600">Issues: ${tech.unique_issues} | Triggers: ${tech.total_triggered_rules}</div>`;
+                    html += `<div class="text-xs text-slate-600 mt-1">Critical: ${tech.critical_count} | High: ${tech.high_count} | Medium: ${tech.medium_count}</div>`;
+                    html += `</div>`;
+                });
+                html += '</div></div>';
+            }
+            
+            html += '</div>';
+            
+            statusMessage.innerHTML = html;
+            statusMessage.classList.remove('hidden');
+            
+            // Show cancel button
+            cancelBtn.classList.remove('hidden');
+            
+            // Scroll to preview
+            statusMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        
+        // Generate AI analysis
+        async function generateAnalysis() {
+            if (!aiProfileSelect.value || !templateSelect.value) {
+                statusMessage.className = 'mt-4 p-4 text-sm bg-yellow-50 border border-yellow-200 text-yellow-800 rounded';
+                statusMessage.textContent = '⚠️ Please select an AI Profile and Analysis Type';
+                statusMessage.classList.remove('hidden');
+                return;
+            }
+            
+            const originalText = generateBtn.textContent;
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<svg class="inline w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Generating...';
+            
+            statusMessage.className = 'mt-4 p-4 text-sm bg-blue-50 border border-blue-200 text-blue-800 rounded';
+            statusMessage.textContent = '🔄 Generating AI analysis... This may take 30-60 seconds.';
+            statusMessage.classList.remove('hidden');
+            
+            try {
+                const response = await fetch("{{ url_for('main.generate_trend_analysis_api') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        company_id: parseInt(companySelect.value),
+                        days: parseInt(periodSelect.value),
+                        profile_id: parseInt(aiProfileSelect.value),
+                        template_id: parseInt(templateSelect.value)
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                statusMessage.className = 'mt-4 p-4 text-sm bg-green-50 border border-green-200 text-green-800 rounded';
+                statusMessage.innerHTML = `✅ Analysis complete! <a href="${result.view_url}" class="font-medium underline hover:text-green-900">View Report →</a>`;
+                
+                setTimeout(() => window.location.reload(), 2000);
+                
+            } catch (error) {
+                statusMessage.className = 'mt-4 p-4 text-sm bg-red-50 border border-red-200 text-red-800 rounded';
+                statusMessage.textContent = `❌ Failed to generate analysis: ${error.message}`;
+                
+                generateBtn.disabled = false;
+                generateBtn.textContent = originalText;
+            }
+        }
+    });
+</script>
+{% endblock %}

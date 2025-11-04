@@ -1,0 +1,237 @@
+{
+  "dcs_etcd_no_leader": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "dcs_type", "equals": "etcd" },
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(issue.get('type') == 'etcd_no_leader' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "etcd cluster has no leader - the DCS is non-operational. This will cause immediate Patroni cluster failures and prevent all leader election and failover operations.",
+        "recommendations": [
+          "URGENT: This is a critical situation requiring immediate action.",
+          "Check etcd quorum: Ensure majority of etcd members are online and reachable.",
+          "Review etcd logs on all members: Look for network partitions, timeouts, or crash loops.",
+          "Verify network connectivity between etcd members.",
+          "Check disk space and I/O performance on etcd nodes.",
+          "If split-brain: Identify which partition has quorum and isolate failed members.",
+          "Restart etcd services if necessary, but ensure quorum is maintained.",
+          "Until resolved, Patroni cannot perform failovers or update configuration."
+        ]
+      }
+    ]
+  },
+  "dcs_consul_no_leader": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "dcs_type", "equals": "consul" },
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(issue.get('type') == 'consul_no_leader' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Consul cluster has no leader - the DCS is non-operational. Patroni cannot perform leader election or failover operations.",
+        "recommendations": [
+          "URGENT: Check Consul raft logs for election failures.",
+          "Verify network connectivity between Consul servers.",
+          "Ensure majority of Consul servers are online (quorum).",
+          "Check Consul server logs for errors.",
+          "Review gossip protocol health between servers.",
+          "Verify no network partitions or firewall issues.",
+          "Restart Consul services if necessary while maintaining quorum."
+        ]
+      }
+    ]
+  },
+  "dcs_zookeeper_no_quorum": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "dcs_type", "equals": "zookeeper" },
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(issue.get('type') == 'zookeeper_no_quorum' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "ZooKeeper ensemble does not have quorum - the DCS is non-operational. Patroni cannot perform leader election or coordination.",
+        "recommendations": [
+          "URGENT: Ensure majority of ZooKeeper nodes are online and reachable.",
+          "Check ZooKeeper logs on all ensemble members.",
+          "Verify network connectivity between ZooKeeper nodes.",
+          "Check disk space on ZooKeeper data and log directories.",
+          "Verify transaction log directories are not full.",
+          "Restart failed ZooKeeper nodes if necessary.",
+          "Ensure time synchronization (NTP) across ensemble members."
+        ]
+      }
+    ]
+  },
+  "dcs_endpoints_unhealthy": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(issue.get('type') == 'etcd_endpoints_unhealthy' and issue.get('severity') == 'critical' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "All DCS endpoints are unhealthy or unreachable. Patroni cannot access the DCS for cluster coordination.",
+        "recommendations": [
+          "URGENT: All DCS endpoints are down - Patroni cluster coordination is impossible.",
+          "Check if DCS processes are running on all nodes.",
+          "Verify network connectivity from Patroni hosts to DCS endpoints.",
+          "Check firewall rules and security groups.",
+          "Review DCS logs for crashes or fatal errors.",
+          "Check disk space and resource availability on DCS nodes.",
+          "Verify DNS resolution if using hostnames.",
+          "Consider starting DCS services or restoring from backup if data corruption occurred."
+        ]
+      },
+      {
+        "expression": "any(issue.get('type') == 'etcd_endpoints_unhealthy' and issue.get('severity') == 'high' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Some DCS endpoints are unhealthy. This reduces DCS resilience and may impact Patroni operations.",
+        "recommendations": [
+          "Investigate unhealthy DCS endpoints to restore full redundancy.",
+          "Check logs on failed endpoints for errors.",
+          "Verify network connectivity to failed endpoints.",
+          "Check resource utilization (CPU, memory, disk) on failed nodes.",
+          "If persistent, consider removing and re-adding failed members.",
+          "Monitor remaining healthy endpoints closely.",
+          "Restore failed endpoints before performing maintenance on healthy ones."
+        ]
+      }
+    ]
+  },
+  "dcs_large_database": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "dcs_type", "equals": "etcd" },
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(issue.get('type') == 'etcd_large_database' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "warning",
+        "score": 5,
+        "reasoning": "etcd database is very large. This can cause performance degradation, slow reads/writes, and increased memory usage.",
+        "recommendations": [
+          "Large etcd databases impact performance and can cause timeouts.",
+          "Compact the etcd database: `etcdctl compact <revision>`",
+          "Defragment to reclaim space: `etcdctl defrag --cluster`",
+          "Review Patroni history retention settings - old events may be accumulating.",
+          "Consider reducing Patroni's DCS data retention period.",
+          "Schedule regular compaction and defragmentation maintenance.",
+          "Monitor etcd database size and set up alerts for growth.",
+          "etcd default quota is 2GB - approaching this can cause write failures."
+        ]
+      }
+    ]
+  },
+  "dcs_health_score_low": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('health_score', 100) < 50",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "DCS health score is {data.get('analysis', {}).get('health_score', 100)}/100. The DCS has critical issues that will cause Patroni instability.",
+        "recommendations": [
+          "URGENT: DCS health is critically low - this is the root cause of Patroni issues.",
+          "Review all detected issues in the DCS health report above.",
+          "Address critical issues first (no leader, no quorum, unreachable endpoints).",
+          "DCS problems manifest as: unnecessary Patroni failovers, slow configuration updates, cluster instability.",
+          "Do not perform Patroni maintenance until DCS health is restored.",
+          "Consider engaging platform/infrastructure team for DCS troubleshooting.",
+          "Monitor DCS metrics continuously until health is restored."
+        ]
+      },
+      {
+        "expression": "data.get('analysis', {}).get('health_score', 100) < 70",
+        "level": "high",
+        "score": 6,
+        "reasoning": "DCS health score is {data.get('analysis', {}).get('health_score', 100)}/100. The DCS has significant issues that may impact Patroni.",
+        "recommendations": [
+          "DCS health is degraded - investigate and address issues promptly.",
+          "Review detected issues in the DCS health report.",
+          "DCS problems can cause: intermittent Patroni failures, slow operations, false failovers.",
+          "Address high-severity issues during the next maintenance window.",
+          "Increase monitoring of both DCS and Patroni cluster.",
+          "Test DCS resilience (ensure quorum survives single node failure)."
+        ]
+      },
+      {
+        "expression": "data.get('analysis', {}).get('health_score', 100) < 90",
+        "level": "warning",
+        "score": 3,
+        "reasoning": "DCS health score is {data.get('analysis', {}).get('health_score', 100)}/100. Minor DCS issues detected.",
+        "recommendations": [
+          "Review DCS health issues and plan remediation.",
+          "Address warnings during scheduled maintenance.",
+          "Monitor DCS metrics to ensure issues don't worsen.",
+          "Verify DCS has proper monitoring and alerting configured."
+        ]
+      }
+    ]
+  },
+  "dcs_consul_no_quorum": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "dcs_type", "equals": "consul" },
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(issue.get('type') == 'consul_no_quorum' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Consul cluster does not have quorum. Leader election and cluster operations are impossible.",
+        "recommendations": [
+          "URGENT: Restore Consul quorum immediately.",
+          "Ensure majority of Consul servers are online and reachable.",
+          "Check Consul server logs for errors and raft issues.",
+          "Verify network connectivity between Consul servers.",
+          "Check for split-brain scenarios or network partitions.",
+          "Verify DNS and gossip protocol health.",
+          "If necessary, restore Consul from snapshots.",
+          "Do not restart all Consul servers simultaneously - maintain quorum."
+        ]
+      }
+    ]
+  },
+  "dcs_connection_issues": {
+    "metric_keywords": ["patroni_dcs_health"],
+    "data_conditions": [
+      { "key": "health", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('dcs_type') == 'etcd' and len([e for e in data.get('health', {}).get('endpoints', []) if not e.get('reachable', True)]) > 0",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{len([e for e in data.get('health', {}).get('endpoints', []) if not e.get('reachable', True)])} etcd endpoint(s) are unreachable from Patroni host.",
+        "recommendations": [
+          "Some etcd endpoints cannot be reached from the Patroni host.",
+          "Verify network connectivity: ping and telnet to etcd ports.",
+          "Check firewall rules and security groups.",
+          "Verify etcd service is running on unreachable hosts.",
+          "Check DNS resolution if using hostnames.",
+          "Review Patroni configuration for correct etcd endpoints.",
+          "Monitor network latency between Patroni and etcd hosts.",
+          "High latency can cause timeouts even if endpoints are technically reachable."
+        ]
+      }
+    ]
+  }
+}

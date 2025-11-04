@@ -357,7 +357,8 @@ def get_superuser_owned_functions_query(connector):
             pg_get_userbyid(p.proowner) AS owner
         FROM pg_proc p
         JOIN pg_namespace n ON p.pronamespace = n.oid
-        WHERE (SELECT rolsuper FROM pg_authid WHERE oid = p.proowner) IS TRUE
+        JOIN pg_roles r ON r.oid = p.proowner
+        WHERE r.rolsuper IS TRUE
         ORDER BY schema_name, function_name
         LIMIT %(limit)s;
     """

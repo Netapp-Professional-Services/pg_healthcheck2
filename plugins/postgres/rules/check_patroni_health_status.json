@@ -1,0 +1,229 @@
+{
+  "patroni_unhealthy_nodes": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "summary", "exists": true },
+      { "key": "nodes", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('summary', {}).get('healthy_nodes', 0) < data.get('summary', {}).get('total_nodes', 0)",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('summary', {}).get('total_nodes', 0) - data.get('summary', {}).get('healthy_nodes', 0)} node(s) are reporting unhealthy PostgreSQL status. These nodes cannot accept connections and may be down.",
+        "recommendations": [
+          "Identify the unhealthy node(s) using the 'Node Health Status' table.",
+          "Check PostgreSQL service status on the affected node(s): 'systemctl status postgresql' or 'pg_ctl status'.",
+          "Review PostgreSQL logs for crash reports, out-of-memory errors, or corruption.",
+          "Check system resources (disk space, memory, CPU) on the affected node(s).",
+          "If PostgreSQL is down, attempt to start it and monitor for errors.",
+          "Consider manual failover if the leader is unhealthy."
+        ]
+      }
+    ]
+  },
+  "patroni_nodes_not_alive": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "summary", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('summary', {}).get('alive_nodes', 0) < data.get('summary', {}).get('total_nodes', 0)",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('summary', {}).get('total_nodes', 0) - data.get('summary', {}).get('alive_nodes', 0)} node(s) are not responding to Patroni liveness checks. This indicates Patroni service is down or unreachable.",
+        "recommendations": [
+          "Check Patroni service status on the affected node(s): 'systemctl status patroni'.",
+          "Verify DCS (etcd/Consul/ZooKeeper) connectivity from the affected node(s).",
+          "Review Patroni logs for errors or connection issues.",
+          "Check network connectivity between nodes and to the DCS cluster.",
+          "Verify that the Patroni API port (default 8008) is accessible.",
+          "If Patroni is down, restart the service: 'systemctl restart patroni'.",
+          "A node that fails liveness checks cannot participate in failover or elections."
+        ]
+      }
+    ]
+  },
+  "patroni_nodes_not_ready": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "summary", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('summary', {}).get('ready_nodes', 0) < data.get('summary', {}).get('total_nodes', 0) and data.get('summary', {}).get('ready_nodes', 0) < data.get('summary', {}).get('alive_nodes', 0)",
+        "level": "warning",
+        "score": 5,
+        "reasoning": "{data.get('summary', {}).get('total_nodes', 0) - data.get('summary', {}).get('ready_nodes', 0)} node(s) are not ready to accept traffic. This typically indicates high replication lag on replicas.",
+        "recommendations": [
+          "Check the 'Node Health Status' table to identify which nodes are not ready.",
+          "Review replication lag for affected replicas in the 'Patroni Cluster Topology' check.",
+          "Investigate causes of replication lag: slow disk I/O, network issues, or high write load.",
+          "Nodes not ready should not receive read traffic from load balancers.",
+          "Monitor lag trends - if increasing, investigate and resolve the root cause.",
+          "Consider temporarily redirecting read traffic away from lagging replicas."
+        ]
+      }
+    ]
+  },
+  "patroni_cluster_degraded": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "overall_status", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('overall_status') == 'critical'",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Patroni cluster is in a CRITICAL state. Multiple nodes are experiencing failures that severely impact cluster availability and durability.",
+        "recommendations": [
+          "Review all nodes in the 'Node Health Status' section for specific failures.",
+          "This is an urgent situation requiring immediate attention.",
+          "Prioritize restoring leader node health if affected.",
+          "Check DCS (etcd/Consul/ZooKeeper) cluster health and quorum.",
+          "Review system-wide issues: network outages, storage failures, or resource exhaustion.",
+          "Consider activating incident response procedures."
+        ]
+      },
+      {
+        "expression": "data.get('overall_status') == 'degraded'",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Patroni cluster is in a DEGRADED state. Some nodes are experiencing issues that reduce cluster redundancy and fault tolerance.",
+        "recommendations": [
+          "Review all nodes in the 'Node Health Status' section for specific failures.",
+          "Investigate and resolve node issues to restore full cluster health.",
+          "Monitor cluster closely for any further degradation.",
+          "Verify that at least one healthy replica is available for failover.",
+          "Check that DCS (etcd/Consul/ZooKeeper) is accessible from all nodes."
+        ]
+      }
+    ]
+  },
+  "patroni_health_low_score": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "health_score", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('health_score', 100)) < 70",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Patroni health score is {data.get('health_score')}/100. Significant issues are affecting multiple health checks (PostgreSQL health, Patroni liveness, or readiness).",
+        "recommendations": [
+          "Review the 'Node Health Status' table for specific node issues.",
+          "Address critical issues first (nodes not healthy or not alive).",
+          "Check system resources and network connectivity across all nodes.",
+          "Verify DCS connectivity and health.",
+          "A health score below 70 indicates the cluster may not handle failover reliably."
+        ]
+      },
+      {
+        "expression": "int(data.get('health_score', 100)) < 90",
+        "level": "warning",
+        "score": 4,
+        "reasoning": "Patroni health score is {data.get('health_score')}/100. Minor issues are affecting some health checks.",
+        "recommendations": [
+          "Review the 'Node Health Status' table for specific node issues.",
+          "Monitor the cluster for any degrading conditions.",
+          "Address readiness issues (typically replication lag) if present."
+        ]
+      }
+    ]
+  },
+  "patroni_critical_issues_detected": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "issues", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(issue.get('severity') == 'critical' for issue in data.get('issues', []))",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "{len([i for i in data.get('issues', []) if i.get('severity') == 'critical'])} critical issue(s) detected in Patroni health checks. Immediate action required.",
+        "recommendations": [
+          "Review the 'Issues Detected' section for specific critical problems.",
+          "Critical issues typically involve PostgreSQL or Patroni services being down.",
+          "Address leader node issues with highest priority.",
+          "Follow the specific recommendations provided for each issue.",
+          "Consider escalating to senior DBA or on-call team if issues persist."
+        ]
+      },
+      {
+        "expression": "any(issue.get('severity') == 'warning' for issue in data.get('issues', []))",
+        "level": "warning",
+        "score": 4,
+        "reasoning": "{len([i for i in data.get('issues', []) if i.get('severity') == 'warning'])} warning(s) detected in Patroni health checks.",
+        "recommendations": [
+          "Review the 'Issues Detected' section for specific warnings.",
+          "Warnings typically involve readiness issues or minor replication lag.",
+          "Monitor these issues to ensure they don't escalate.",
+          "Address warnings proactively to maintain optimal cluster health."
+        ]
+      }
+    ]
+  },
+  "patroni_leader_health_issues": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "nodes", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(node.get('role') == 'leader' and not node.get('health', {}).get('healthy', True) for node in data.get('nodes', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "The Patroni leader node is reporting unhealthy status. The primary database is down or not accepting connections.",
+        "recommendations": [
+          "This is a CRITICAL situation - the primary database is unavailable.",
+          "All write operations are blocked until the leader is restored or a failover occurs.",
+          "Check PostgreSQL service on the leader immediately.",
+          "Review leader node system resources (disk space, memory, CPU).",
+          "Check PostgreSQL logs for errors or crashes.",
+          "If the leader cannot be recovered quickly, consider manual failover to a healthy replica.",
+          "Patroni should automatically attempt failover if the leader remains unhealthy and replicas are available."
+        ]
+      },
+      {
+        "expression": "any(node.get('role') == 'leader' and not node.get('liveness', {}).get('alive', True) for node in data.get('nodes', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "The Patroni leader node is not responding to liveness checks. Patroni service on the leader may be down.",
+        "recommendations": [
+          "Check Patroni service on the leader immediately: 'systemctl status patroni'.",
+          "Verify DCS connectivity from the leader node.",
+          "Check for network issues preventing Patroni heartbeat.",
+          "If Patroni on the leader is down, it may trigger automatic failover to a replica.",
+          "If failover doesn't occur, verify replica health and DCS quorum."
+        ]
+      }
+    ]
+  },
+  "patroni_all_replicas_unhealthy": {
+    "metric_keywords": ["patroni_health_status"],
+    "data_conditions": [
+      { "key": "nodes", "exists": true },
+      { "key": "summary", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "len([n for n in data.get('nodes', []) if n.get('role') == 'replica']) > 0 and all(not node.get('health', {}).get('healthy', True) for node in data.get('nodes', []) if node.get('role') == 'replica')",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "All replica nodes are unhealthy. The cluster has no failover capability - if the leader fails, there will be an outage.",
+        "recommendations": [
+          "This is a critical situation - there is no high availability.",
+          "Investigate why all replicas are unhealthy simultaneously (likely a systemic issue).",
+          "Check for cluster-wide problems: DCS issues, network partitions, or storage failures.",
+          "Attempt to restore at least one replica to healthy status to enable failover capability.",
+          "Consider bringing up additional nodes if existing replicas cannot be recovered.",
+          "Until replicas are healthy, the cluster cannot survive a leader failure."
+        ]
+      }
+    ]
+  }
+}

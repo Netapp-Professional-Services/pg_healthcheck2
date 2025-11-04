@@ -96,14 +96,22 @@ def main():
     print(f"\n--- Starting AI Analysis for '{active_tech}' using offline data ---")
 
     analysis_rules = active_plugin.get_rules_config()
-    
+
     # --- Agnostic Metadata Extraction ---
     db_version = active_plugin.get_db_version_from_findings(all_structured_findings)
     db_name = active_plugin.get_db_name_from_findings(all_structured_findings)
 
+    # Create metadata dict for offline analysis (no environment detection available)
+    db_metadata = {
+        'version': db_version,
+        'db_name': db_name,
+        'environment': 'unknown',
+        'environment_details': {}
+    }
+
     settings['ai_run_integrated'] = True
 
-    dynamic_analysis = generate_dynamic_prompt(all_structured_findings, settings, analysis_rules, db_version, db_name, active_plugin)
+    dynamic_analysis = generate_dynamic_prompt(all_structured_findings, settings, analysis_rules, db_metadata, active_plugin)
     full_prompt = dynamic_analysis['prompt']
 
     ai_adoc, _ = run_recommendation(settings, full_prompt)

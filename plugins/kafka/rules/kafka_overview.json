@@ -1,0 +1,93 @@
+{
+  "version_detection": {
+    "metric_keywords": ["kafka_overview", "version_info", "version"],
+    "rules": [
+      {
+        "expression": "data.get('version', '') in ['Unknown', '3.x (KRaft)', 'N/A', '']",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Kafka version could not be detected (showing as '{data.get('version', 'Unknown')}'). Configure 'kafka_version' in config.yaml for accurate version tracking in trend analysis.",
+        "recommendation": "Add 'kafka_version: X.Y.Z' to your config.yaml under the Kafka target configuration."
+      }
+    ]
+  },
+  "controller_health": {
+    "metric_keywords": ["kafka_overview", "version_info", "controller_id"],
+    "rules": [
+      {
+        "expression": "str(data.get('controller_id', '')).startswith('N/A') or data.get('controller_id') is None",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Cluster controller is not available. Controller ID shows as '{data.get('controller_id', 'N/A')}'.",
+        "recommendation": "Check broker logs for controller election issues. Verify all brokers are running and can communicate. For KRaft clusters, verify controller.quorum.voters configuration."
+      }
+    ]
+  },
+  "broker_count_critical": {
+    "metric_keywords": ["kafka_overview", "version_info", "broker_count"],
+    "rules": [
+      {
+        "expression": "data.get('broker_count', 0) == 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "No brokers detected in cluster. This indicates a severe connectivity or configuration issue.",
+        "recommendation": "Verify bootstrap_servers configuration. Check network connectivity to Kafka brokers. Review broker logs for startup errors."
+      },
+      {
+        "expression": "data.get('broker_count', 0) == 1",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster is running with only 1 broker. Single-broker cluster has no fault tolerance.",
+        "recommendation": "Add at least 2 more brokers immediately for production workloads. Single-broker should only be used for development/testing."
+      }
+    ]
+  },
+  "broker_count_warning": {
+    "metric_keywords": ["kafka_overview", "version_info", "broker_count"],
+    "rules": [
+      {
+        "expression": "data.get('broker_count', 0) == 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Cluster has only 2 brokers. This provides minimal fault tolerance but is not recommended for production.",
+        "recommendation": "Add at least 1 more broker to achieve proper quorum and fault tolerance. Recommended minimum is 3 brokers for production."
+      }
+    ]
+  },
+  "cluster_id_validation": {
+    "metric_keywords": ["kafka_overview", "version_info", "cluster_id"],
+    "rules": [
+      {
+        "expression": "data.get('cluster_id', '') in ['N/A', 'Unknown', '', None]",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Cluster ID could not be determined. Cluster ID is important for disaster recovery and multi-cluster operations.",
+        "recommendation": "Verify cluster metadata integrity. For KRaft clusters, check controller.quorum.voters configuration. For ZooKeeper-based clusters, verify ZooKeeper connectivity."
+      }
+    ]
+  },
+  "broker_id_validation": {
+    "metric_keywords": ["kafka_overview", "broker_info", "broker_id"],
+    "rules": [
+      {
+        "expression": "data.get('broker_id') in ['N/A', None, '']",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Broker at {data.get('host', 'unknown')}:{data.get('port', '?')} has missing or invalid ID.",
+        "recommendation": "Verify kafka-python library version compatibility with your Kafka version. Check broker metadata in KRaft controller or ZooKeeper."
+      }
+    ]
+  },
+  "rack_awareness": {
+    "metric_keywords": ["kafka_overview", "broker_info", "rack"],
+    "rules": [
+      {
+        "expression": "data.get('rack') in ['default', None]",
+        "level": "low",
+        "score": 3,
+        "reasoning": "Broker {data.get('broker_id', '?')} at {data.get('host', 'unknown')} is not configured with rack awareness (rack: {data.get('rack', 'default')}). For multi-broker clusters, rack awareness improves fault tolerance across availability zones.",
+        "recommendation": "Configure broker.rack in server.properties for each broker to enable rack-aware replica placement."
+      }
+    ]
+  }
+}

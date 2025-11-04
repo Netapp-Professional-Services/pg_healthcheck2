@@ -1,25 +1,25 @@
 {
   "high_consumer_lag": {
-    "metric_keywords": ["kafka", "lag", "consumer", "backlog"],
+    "metric_keywords": ["consumer_lag", "group_lags", "lag"],
     "rules": [
       {
-        "expression": "int(data.get('lag', 0)) > 10000",
+        "expression": "data.get('lag', 0) > 10000",
         "level": "critical",
         "score": 9,
-        "reasoning": "Consumer group '{data.get('group_id')}' on topic '{data.get('topic')}' has CRITICAL lag of {data.get('lag')} messages, indicating a severe processing delay or stalled consumer.",
+        "reasoning": "Consumer group '{data.get('group_id', 'unknown')}' on topic '{data.get('topic', 'unknown')}' has critical lag of {data.get('lag')} messages.",
         "recommendations": [
-          "Immediately investigate the health of the consumers in this group to ensure they are not crashed or stuck.",
-          "Consider scaling up the number of consumers for this topic if processing cannot keep up with the message rate."
+          "Investigate consumer health and scale if necessary.",
+          "Check for processing bottlenecks or errors in consumer logs."
         ]
       },
       {
-        "expression": "int(data.get('lag', 0)) > 1000",
+        "expression": "data.get('lag', 0) > 1000",
         "level": "high",
         "score": 7,
-        "reasoning": "Consumer group '{data.get('group_id')}' on topic '{data.get('topic')}' has high lag of {data.get('lag')} messages, indicating consumers are falling behind producers.",
+        "reasoning": "Consumer group '{data.get('group_id', 'unknown')}' on topic '{data.get('topic', 'unknown')}' has high lag of {data.get('lag')} messages.",
         "recommendations": [
-          "Monitor consumer performance and CPU/memory usage to identify bottlenecks.",
-          "Review consumer logs for errors or frequent rebalancing events that could slow down processing."
+          "Monitor consumer performance metrics.",
+          "Review topic production rates and consumer throughput."
         ]
       }
     ]

@@ -1,8 +1,9 @@
 import json
 import logging
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, ExecutionProfile, EXEC_PROFILE_DEFAULT
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.query import dict_factory
+from cassandra.policies import DCAwareRoundRobinPolicy, TokenAwarePolicy
 from typing import Dict, List, Optional
 
 # Import shared utilities
@@ -40,7 +41,7 @@ class CassandraConnector(SSHSupportMixin):
             {"operation": "shell", "command": "df -h"}
     
     SSH Configuration (required for nodetool and shell):
-        - ssh_host: Hostname or IP of Cassandra node
+        - ssh_hosts: List of hostnames/IPs of Cassandra nodes
         - ssh_user: SSH username
         - ssh_key_file: Path to private key (or ssh_password)
         - ssh_timeout: Connection timeout in seconds (default: 10)
@@ -64,49 +65,70 @@ class CassandraConnector(SSHSupportMixin):
         self.cluster = None
         self.session = None
         self.version_info = {}
-        
-        # Initialize SSH support
-        self.ssh_manager = None
-        self.shell_executor = None
+
+        # Initialize formatters and parsers
         self.formatter = AsciiDocFormatter()
         self.parser = NodetoolParser()
-        
+
         # Multi-node support
-        self.ssh_managers = {}  # Dict of SSHConnectionManager keyed by node IP
         self.cluster_nodes = []  # List of discovered node addresses
-        
-        # Initialize SSH if configured
-        if settings.get('ssh_host'):
-            try:
-                self.ssh_manager = SSHConnectionManager(settings)
-                self.shell_executor = ShellExecutor(self.ssh_manager, self.formatter)
-                logger.info("SSH support enabled for Cassandra connector")
-            except Exception as e:
-                logger.warning(f"SSH configuration present but invalid: {e}")
-                self.ssh_manager = None
-                self.shell_executor = None
+
+        # Environment detection
+        self.environment = None
+        self.environment_details = {}
+
+        # Initialize SSH support (from mixin)
+        self.initialize_ssh()
+
+        logger.info("Cassandra connector initialized")
 
     def connect(self):
-        """Establishes a CQL connection to the cluster."""
+        """Establishes CQL connection to the cluster and SSH connections to all nodes."""
         try:
             contact_points = self.settings.get('hosts', ['localhost'])
             port = self.settings.get('port', 9042)
-            
+
             auth_provider = None
             if self.settings.get('user') and self.settings.get('password'):
                 auth_provider = PlainTextAuthProvider(
                     username=self.settings.get('user'),
                     password=self.settings.get('password')
                 )
-            
+
+            # Setup load balancing policy (DC-aware for multi-DC clusters)
+            local_dc = self.settings.get('local_dc') or self.settings.get('datacenter')
+            load_balancing_policy = None
+
+            if local_dc:
+                # Use DC-aware policy wrapped with token-aware for optimal routing
+                load_balancing_policy = TokenAwarePolicy(
+                    DCAwareRoundRobinPolicy(local_dc=local_dc)
+                )
+                logger.info(f"Using DC-aware load balancing policy for datacenter: {local_dc}")
+
+            # Create execution profile
+            execution_profiles = None
+            if load_balancing_policy:
+                # When using profiles, row_factory must be in the profile
+                execution_profiles = {
+                    EXEC_PROFILE_DEFAULT: ExecutionProfile(
+                        load_balancing_policy=load_balancing_policy,
+                        row_factory=dict_factory
+                    )
+                }
+
             self.cluster = Cluster(
                 contact_points=contact_points,
                 port=port,
-                auth_provider=auth_provider
+                auth_provider=auth_provider,
+                execution_profiles=execution_profiles
             )
-            
+
             self.session = self.cluster.connect()
-            self.session.row_factory = dict_factory
+
+            # Only set row_factory on session if NOT using execution profiles
+            if not execution_profiles:
+                self.session.row_factory = dict_factory
             
             # Set keyspace if specified
             keyspace = self.settings.get('keyspace')
@@ -115,15 +137,58 @@ class CassandraConnector(SSHSupportMixin):
             
             self.version_info = self._get_version_info()
             
-            # Connect SSH if configured
-            if self.ssh_manager:
-                try:
-                    self.ssh_manager.connect()
-                    logger.info("SSH connection established")
-                except Exception as e:
-                    logger.warning(f"SSH connection failed: {e}")
+            # Connect all SSH hosts (from mixin)
+            connected_ssh_hosts = self.connect_all_ssh()
             
-            logger.info("Successfully connected to Cassandra")
+            # Map SSH hosts to Cassandra nodes
+            if connected_ssh_hosts:
+                self._map_ssh_hosts_to_nodes()
+
+            # Detect environment (Instaclustr vs self-hosted)
+            self._detect_environment()
+
+            # Display connection status
+            print("✅ Successfully connected to Cassandra cluster")
+            
+            # Get cluster metadata for detailed status
+            try:
+                # Get node information
+                nodes = self._discover_nodes()
+                
+                print(f"   - Version: {self.version_info.get('version_string', 'Unknown')}")
+                print(f"   - Nodes: {len(nodes)}")
+                print(f"   - Keyspace: {self.session.keyspace if self.session else 'None'}")
+                
+                # Show contact points
+                if contact_points:
+                    print(f"   - Contact Points:")
+                    for cp in contact_points[:5]:
+                        print(f"      • {cp}")
+                    if len(contact_points) > 5:
+                        print(f"      ... and {len(contact_points) - 5} more")
+                
+                # SSH status (from mixin)
+                if self.has_ssh_support():
+                    print(f"   - SSH: Connected to {len(connected_ssh_hosts)}/{len(self.get_ssh_hosts())} host(s)")
+                    unmapped_hosts = []
+                    for ssh_host in connected_ssh_hosts:
+                        node_id = self.ssh_host_to_node.get(ssh_host)
+                        if node_id:
+                            print(f"      • {ssh_host} (Node: {node_id})")
+                        else:
+                            print(f"      • {ssh_host} (⚠️  Not in cluster membership)")
+                            unmapped_hosts.append(ssh_host)
+
+                    if unmapped_hosts:
+                        print(f"   ⚠️  WARNING: {len(unmapped_hosts)} SSH host(s) are not recognized as cluster members!")
+                        print(f"      This may indicate nodes that are down or not fully joined to the cluster.")
+                else:
+                    print(f"   - SSH: Not configured (nodetool checks unavailable)")
+                    
+            except Exception as e:
+                logger.warning(f"Could not retrieve detailed cluster info: {e}")
+            
+            logger.info("✅ Connected to Cassandra cluster")
             logger.info(f"Version: {self.version_info.get('version_string', 'Unknown')}")
             
         except Exception as e:
@@ -131,7 +196,7 @@ class CassandraConnector(SSHSupportMixin):
             raise ConnectionError(f"Could not connect to Cassandra: {e}")
 
     def disconnect(self):
-        """Closes the connection and cleans up resources."""
+        """Closes the CQL connection and all SSH connections."""
         if self.cluster:
             try:
                 self.cluster.shutdown()
@@ -142,23 +207,92 @@ class CassandraConnector(SSHSupportMixin):
                 self.cluster = None
                 self.session = None
         
-        # Disconnect all multi-node SSH connections
-        for node_ip, ssh_mgr in list(self.ssh_managers.items()):
-            try:
-                ssh_mgr.disconnect()
-                logger.info(f"Closed SSH connection to {node_ip}")
-            except Exception as e:
-                logger.warning(f"Error closing SSH connection to {node_ip}: {e}")
-        
-        self.ssh_managers = {}
-        
-        # Disconnect main SSH connection
-        if self.ssh_manager:
-            self.ssh_manager.disconnect()
+        # Disconnect all SSH (from mixin)
+        self.disconnect_all_ssh()
 
     def close(self):
         """Alias for disconnect()."""
         self.disconnect()
+
+    def _map_ssh_hosts_to_nodes(self):
+        """Cassandra-specific logic to map SSH hosts to node IP addresses."""
+        try:
+            # Discover all nodes in the cluster
+            nodes = self._discover_nodes()
+            self.cluster_nodes = nodes
+            
+            # Build host-to-node mapping
+            # For Cassandra, the node IP is the identifier
+            host_node_mapping = {}
+            for node_ip in nodes:
+                host_node_mapping[node_ip] = node_ip
+            
+            # Use mixin's mapping method
+            self.map_ssh_hosts_to_nodes(host_node_mapping)
+                    
+        except Exception as e:
+            logger.warning(f"Could not map SSH hosts to Cassandra nodes: {e}")
+
+    def _discover_nodes(self):
+        """
+        Discover all nodes in the cluster using the driver's metadata API.
+
+        This is more reliable than querying system tables because the driver
+        round-robins queries across contact points, which can lead to
+        inconsistent results when querying system.local and system.peers_v2.
+
+        Returns:
+            list[str]: List of node IP addresses in the cluster
+        """
+        nodes = []
+
+        try:
+            # Use Cassandra driver's cluster metadata (more reliable than system tables)
+            # The metadata is already populated when we connect
+            if self.cluster and self.cluster.metadata:
+                all_hosts = self.cluster.metadata.all_hosts()
+                for host in all_hosts:
+                    # host.address is the broadcast_address or rpc_address
+                    nodes.append(str(host.address))
+
+                logger.info(f"Discovered {len(nodes)} nodes via cluster metadata: {nodes}")
+            else:
+                logger.warning("Cluster metadata not available, falling back to system tables")
+
+                # Fallback to system tables (less reliable due to round-robin)
+                local = self.session.execute("SELECT broadcast_address, listen_address FROM system.local")
+                local_row = list(local)
+
+                if local_row:
+                    local_addr = (
+                        local_row[0].get('broadcast_address') or
+                        local_row[0].get('listen_address')
+                    )
+                    if local_addr:
+                        nodes.append(str(local_addr))
+
+                # Get peer nodes
+                major_version = self.version_info.get('major_version', 0)
+                if major_version >= 4:
+                    peers = self.session.execute("SELECT peer FROM system.peers_v2")
+                else:
+                    peers = self.session.execute("SELECT peer FROM system.peers")
+
+                for peer in list(peers):
+                    peer_addr = peer.get('peer')
+                    if peer_addr:
+                        nodes.append(str(peer_addr))
+
+                # Remove duplicates
+                nodes = list(dict.fromkeys(nodes))
+                logger.info(f"Discovered {len(nodes)} nodes via system tables: {nodes}")
+
+        except Exception as e:
+            logger.error(f"Failed to discover cluster nodes: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+        return nodes
 
     def _get_version_info(self):
         """Fetches Cassandra version via CQL."""
@@ -167,7 +301,7 @@ class CassandraConnector(SSHSupportMixin):
             version_string = list(rows)[0]['release_version'] if rows else 'Unknown'
             parts = version_string.split('.')
             major = int(parts[0]) if len(parts) > 0 and parts[0].isdigit() else 0
-            
+
             return {
                 'version_string': version_string,
                 'major_version': major
@@ -176,12 +310,57 @@ class CassandraConnector(SSHSupportMixin):
             logger.warning(f"Could not fetch version: {e}")
             return {'version_string': 'Unknown', 'major_version': 0}
 
+    def _detect_environment(self):
+        """
+        Detect the hosting environment (Instaclustr managed vs self-hosted)
+
+        Detection logic:
+        1. Instaclustr: If instaclustr_cluster_id is configured
+        2. Self-hosted: Otherwise
+
+        Updates self.environment and self.environment_details
+        """
+        try:
+            # Check for Instaclustr configuration
+            cluster_id = self.settings.get('instaclustr_cluster_id')
+            api_username = self.settings.get('instaclustr_api_username')
+            api_key = self.settings.get('instaclustr_api_key')
+
+            if cluster_id:
+                self.environment = 'instaclustr_managed'
+                self.environment_details = {
+                    'provider': 'Instaclustr',
+                    'cluster_id': cluster_id,
+                    'api_configured': bool(api_username and api_key),
+                    'api_available': bool(api_username and api_key),
+                    'ssh_available': self.has_ssh_support(),
+                    'monitoring_via': 'API' if (api_username and api_key) else 'CQL only'
+                }
+                logger.info(f"Detected Instaclustr managed environment: {cluster_id}")
+                return
+
+            # Default to self-hosted
+            self.environment = 'self_hosted'
+            self.environment_details = {
+                'ssh_available': self.has_ssh_support(),
+                'node_count': len(self.cluster_nodes) if self.cluster_nodes else 0,
+                'datacenter': self.settings.get('local_dc') or self.settings.get('datacenter', 'unknown')
+            }
+            logger.info("Detected self-hosted Cassandra environment")
+
+        except Exception as e:
+            logger.warning(f"Could not detect environment: {e}")
+            self.environment = 'unknown'
+            self.environment_details = {}
+
     def get_db_metadata(self):
-        """Fetches basic database metadata."""
+        """Fetches basic database metadata including environment context."""
         keyspace = self.session.keyspace if self.session else 'system'
         return {
             'version': self.version_info.get('version_string', 'N/A'),
-            'db_name': keyspace
+            'db_name': keyspace,
+            'environment': self.environment or 'unknown',
+            'environment_details': self.environment_details or {}
         }
 
     def execute_query(self, query, params=None, return_raw=False):
@@ -212,321 +391,104 @@ class CassandraConnector(SSHSupportMixin):
                     raise ValueError("Operation requires a 'command' field")
                 
                 # Route to appropriate handler
-                if operation == 'nodetool_cluster':
-                    return self._execute_nodetool_cluster_command(command, return_raw)
-                elif operation == 'nodetool':
+                if operation == 'nodetool':
                     return self._execute_nodetool_command(command, return_raw)
+                elif operation == 'nodetool_cluster':
+                    return self._execute_nodetool_cluster_command(command, return_raw)
                 elif operation == 'shell':
                     return self._execute_shell_command(command, return_raw)
                 else:
-                    raise ValueError(
-                        f"Unknown operation: {operation}. "
-                        f"Supported operations: 'nodetool', 'nodetool_cluster', 'shell'"
-                    )
-    
-            # Standard CQL execution
-            if params:
-                rows = self.session.execute(query, params)
-            else:
-                rows = self.session.execute(query)
+                    raise ValueError(f"Unsupported operation: {operation}")
             
-            raw_results = list(rows)
-            formatted = self.formatter.format_table(raw_results)
+            # Otherwise, treat as CQL query
+            return self._execute_cql_query(query, params, return_raw)
             
-            return (formatted, raw_results) if return_raw else formatted
-            
-        except json.JSONDecodeError as e:
-            error_msg = self.formatter.format_error(f"Invalid JSON in query: {str(e)}")
-            logger.error(error_msg)
-            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+        except json.JSONDecodeError:
+            # Not JSON, treat as CQL query
+            return self._execute_cql_query(query, params, return_raw)
         except Exception as e:
-            logger.error(f"Query execution failed: {e}", exc_info=True)
-            error_msg = self.formatter.format_error(f"Query failed: {str(e)}")
+            logger.error(f"Query execution failed: {e}")
+            error_msg = self.formatter.format_error(f"Query failed: {e}")
             return (error_msg, {'error': str(e)}) if return_raw else error_msg
- 
-    def _execute_shell_command(self, command, return_raw=False):
-        """
-        Executes a shell command on a remote node via SSH.
-        
-        Args:
-            command: Shell command to execute (e.g., 'df -h', 'free -m')
-            return_raw: If True, returns tuple (formatted, raw_data)
-        
-        Returns:
-            str or tuple: Formatted output or (formatted, raw) if return_raw=True
-        """
-        if not self.ssh_manager:
-            raise ConnectionError(
-                "SSH not configured. Required settings: ssh_host, ssh_user, "
-                "and ssh_key_file or ssh_password"
-            )
-        
+
+    def _execute_cql_query(self, query, params=None, return_raw=False):
+        """Execute a standard CQL query."""
         try:
-            self.ssh_manager.ensure_connected()
-            stdout, stderr, exit_code = self.ssh_manager.execute_command(command)
+            if params:
+                result = self.session.execute(query, params)
+            else:
+                result = self.session.execute(query)
             
-            if exit_code != 0 and not stdout:
-                raise RuntimeError(f"Shell command failed (exit code {exit_code}): {stderr}")
+            rows = list(result)
             
-            # Commands that may legitimately return empty results
-            empty_ok_commands = ['find', 'grep', 'locate', 'ls']
-            command_parts = command.split()
-            base_cmd = command_parts[0] if command_parts else ''
-            is_empty_ok = base_cmd in empty_ok_commands
+            if not rows:
+                note = self.formatter.format_note("Query returned no results.")
+                return (note, []) if return_raw else note
             
-            if not stdout or not stdout.strip():
-                # Only log warning if this is NOT an expected empty result
-                if not is_empty_ok:
-                    logger.warning(f"Empty output from shell command: {command}")
-                else:
-                    logger.debug(f"Empty output from {base_cmd} (expected): {command}")
-                
-                # Provide appropriate message
-                if is_empty_ok:
-                    note_msg = self.formatter.format_note(
-                        "No results found (this may be normal - e.g., no matching files)."
-                    )
-                else:
-                    note_msg = self.formatter.format_note("No output from shell command.")
-                
-                raw_data = {
-                    'command': command,
-                    'output': '',
-                    'stderr': stderr if stderr else None,
-                    'exit_code': exit_code
-                }
-                
-                return (note_msg, raw_data) if return_raw else note_msg
+            formatted = self.formatter.format_table(rows)
+            return (formatted, rows) if return_raw else formatted
             
-            # Format the output
-            formatted_output = self.formatter.format_shell_output(command, stdout)
-            
-            raw_data = {
-                'command': command,
-                'output': stdout,
-                'stderr': stderr if stderr else None,
-                'exit_code': exit_code
-            }
-            
-            return (formatted_output, raw_data) if return_raw else formatted_output
-    
         except Exception as e:
-            error_msg = self.formatter.format_error(f"Shell command failed: {str(e)}")
-            logger.error(error_msg, exc_info=True)
+            logger.error(f"CQL query failed: {e}")
+            error_msg = self.formatter.format_error(f"CQL query failed: {e}")
             return (error_msg, {'error': str(e)}) if return_raw else error_msg
-                   
+
     def _execute_nodetool_command(self, command, return_raw=False):
         """
-        Executes a nodetool command on a remote node via SSH.
+        Execute nodetool command on the primary SSH host.
         
         Args:
-            command: Nodetool command to execute (e.g., 'status', 'tpstats')
+            command: Nodetool command to execute (e.g., 'status', 'info')
             return_raw: If True, returns tuple (formatted, parsed_data)
         
         Returns:
             str or tuple: Formatted output or (formatted, parsed) if return_raw=True
         """
-        if not self.ssh_manager:
-            raise ConnectionError(
-                "SSH not configured. Required settings: ssh_host, ssh_user, "
-                "and ssh_key_file or ssh_password"
-            )
+        if not self.has_ssh_support():
+            error_msg = self.formatter.format_error("SSH not configured - cannot execute nodetool commands")
+            return (error_msg, {'error': 'SSH not configured'}) if return_raw else error_msg
         
         try:
-            # Ensure connection is active
-            self.ssh_manager.ensure_connected()
+            # Execute on primary SSH host (first host in the list)
+            ssh_hosts = self.get_ssh_hosts()
+            if not ssh_hosts:
+                error_msg = self.formatter.format_error("No SSH hosts configured")
+                return (error_msg, {'error': 'No SSH hosts'}) if return_raw else error_msg
+            
+            primary_host = ssh_hosts[0]
+            ssh_manager = self.get_ssh_manager(primary_host)
+            
+            if not ssh_manager or not ssh_manager.is_connected():
+                error_msg = self.formatter.format_error(f"No SSH connection available for {primary_host}")
+                return (error_msg, {'error': 'No SSH connection'}) if return_raw else error_msg
             
             # Execute nodetool command
-            stdout, stderr, exit_code = self.ssh_manager.execute_command(f"nodetool {command}")
+            stdout, stderr, exit_code = ssh_manager.execute_command(f"nodetool {command}")
             
             if exit_code != 0:
-                raise RuntimeError(f"Nodetool command failed: {stderr}")
+                error_msg = self.formatter.format_error(f"Nodetool command failed: {stderr}")
+                return (error_msg, {'error': stderr}) if return_raw else error_msg
             
             if not stdout or not stdout.strip():
-                logger.warning(f"Empty output from nodetool {command}")
-                note_msg = self.formatter.format_note("No output from nodetool command.")
-                return (note_msg, {}) if return_raw else note_msg
+                note = self.formatter.format_note("Nodetool command returned no output.")
+                return (note, []) if return_raw else note
             
             # Parse the output
             parsed_data = self.parser.parse(command, stdout)
             
-            # Format the structured data
-            formatted_output = self._format_nodetool_output(command, parsed_data)
+            # Format the output
+            formatted = self._format_nodetool_output(command, parsed_data)
             
-            return (formatted_output, parsed_data) if return_raw else formatted_output
-
+            return (formatted, parsed_data) if return_raw else formatted
+            
         except Exception as e:
-            error_msg = self.formatter.format_error(f"Nodetool command failed: {str(e)}")
-            logger.error(error_msg, exc_info=True)
+            logger.error(f"Nodetool command failed: {e}")
+            error_msg = self.formatter.format_error(f"Nodetool command failed: {e}")
             return (error_msg, {'error': str(e)}) if return_raw else error_msg
-
-    def _format_nodetool_output(self, command, parsed_data):
-        """
-        Formats parsed nodetool data into appropriate AsciiDoc output.
-        
-        Args:
-            command: The nodetool command that was executed
-            parsed_data: Structured data from parser
-        
-        Returns:
-            str: Formatted AsciiDoc output
-        """
-        if command == 'compactionstats':
-            # Special handling for compactionstats which returns a dict
-            pending = parsed_data.get('pending_tasks', 0)
-            active = parsed_data.get('active_compactions', [])
-            
-            output = [f"Pending Tasks: {pending}\n"]
-            if active:
-                output.append("Active Compactions:\n")
-                output.append(self.formatter.format_table(active))
-            else:
-                output.append(self.formatter.format_note("No active compactions."))
-            
-            return '\n'.join(output)
-        
-        elif command == 'gcstats':
-            # Special handling for gcstats which returns a single dict
-            if not parsed_data:
-                return self.formatter.format_note("No GC statistics available.")
-            
-            # Helper to format values (handle None for NaN)
-            def format_value(value):
-                if value is None:
-                    return "N/A"
-                if isinstance(value, int) and value >= 0:
-                    return f"{value:,}"
-                if isinstance(value, int) and value < 0:
-                    return "N/A"
-                return str(value)
-            
-            # Format as a vertical table
-            output = [
-                "GC Statistics:\n",
-                "|===",
-                "|Metric|Value",
-                f"|Interval (ms)|{format_value(parsed_data.get('interval_ms'))}",
-                f"|Max GC Elapsed (ms)|{format_value(parsed_data.get('max_gc_elapsed_ms'))}",
-                f"|Total GC Elapsed (ms)|{format_value(parsed_data.get('total_gc_elapsed_ms'))}",
-                f"|Stdev GC Elapsed (ms)|{format_value(parsed_data.get('stdev_gc_elapsed_ms'))}",
-                f"|GC Reclaimed (MB)|{format_value(parsed_data.get('gc_reclaimed_mb'))}",
-                f"|Collections|{format_value(parsed_data.get('collections'))}",
-                f"|Direct Memory Bytes|{format_value(parsed_data.get('direct_memory_bytes'))}",
-                "|==="
-            ]
-            
-            return '\n'.join(output)
-        
-        else:
-            # For other commands that return list[dict], use standard table format
-            if isinstance(parsed_data, list):
-                return self.formatter.format_table(parsed_data)
-            else:
-                return self.formatter.format_note(str(parsed_data))
-
-    def _discover_nodes(self):
-        """
-        Discover all nodes in the cluster from system tables.
-        
-        Returns:
-            list[str]: List of node IP addresses in the cluster
-        """
-        nodes = []
-        
-        try:
-            # Get local node
-            local = self.session.execute("SELECT broadcast_address, listen_address FROM system.local")
-            local_row = list(local)
-            if local_row:
-                local_addr = (
-                    local_row[0].get('broadcast_address') or 
-                    local_row[0].get('listen_address')
-                )
-                if local_addr:
-                    nodes.append(str(local_addr))
-            
-            # Get peer nodes (use peers_v2 for Cassandra 4.x+)
-            if self.version_info.get('major_version', 0) >= 4:
-                peers = self.session.execute("SELECT peer FROM system.peers_v2")
-            else:
-                peers = self.session.execute("SELECT peer FROM system.peers")
-            
-            for peer in peers:
-                peer_addr = peer.get('peer')
-                if peer_addr:
-                    nodes.append(str(peer_addr))
-
-            # Remove duplicates while preserving order
-            nodes = list(dict.fromkeys(nodes))
-                    
-            logger.info(f"Discovered {len(nodes)} nodes in cluster: {nodes}")
-            
-        except Exception as e:
-            logger.error(f"Failed to discover cluster nodes: {e}")
-        
-        return nodes
-
-    def _get_ssh_manager_for_node(self, node_ip):
-        """
-        Get or create SSH manager for a specific node.
-        
-        Args:
-            node_ip: IP address of the node
-        
-        Returns:
-            SSHConnectionManager or None if SSH not configured
-        """
-        # Check if we already have a manager for this node
-        if node_ip in self.ssh_managers:
-            mgr = self.ssh_managers[node_ip]
-            if mgr.is_connected():
-                return mgr
-            else:
-                # Connection is dead, remove it
-                try:
-                    mgr.disconnect()
-                except:
-                    pass
-                del self.ssh_managers[node_ip]
-        
-        # Get SSH credentials
-        ssh_user = self.settings.get('ssh_user')
-        ssh_key_file = self.settings.get('ssh_key_file')
-        ssh_password = self.settings.get('ssh_password')
-        ssh_timeout = self.settings.get('ssh_timeout', 10)
-        
-        if not ssh_user:
-            logger.warning(f"No SSH user configured for node {node_ip}")
-            return None
-        
-        if not ssh_key_file and not ssh_password:
-            logger.warning(f"No SSH credentials configured for node {node_ip}")
-            return None
-        
-        try:
-            # Create settings dict for this specific node
-            node_settings = {
-                'ssh_host': node_ip,
-                'ssh_user': ssh_user,
-                'ssh_key_file': ssh_key_file,
-                'ssh_password': ssh_password,
-                'ssh_timeout': ssh_timeout,
-                'ssh_port': self.settings.get('ssh_port', 22)
-            }
-            
-            mgr = SSHConnectionManager(node_settings)
-            mgr.connect()
-            self.ssh_managers[node_ip] = mgr
-            logger.info(f"SSH connection established to {node_ip}")
-            return mgr
-            
-        except Exception as e:
-            logger.error(f"Failed to establish SSH connection to {node_ip}: {e}")
-            return None
 
     def _execute_nodetool_cluster_command(self, command, return_raw=False):
         """
-        Execute nodetool command on all cluster nodes.
+        Execute nodetool command on all cluster nodes using mixin's SSH support.
         
         Args:
             command: Nodetool command to execute (e.g., 'status', 'tpstats')
@@ -535,6 +497,10 @@ class CassandraConnector(SSHSupportMixin):
         Returns:
             str or tuple: Formatted output or (formatted, parsed) if return_raw=True
         """
+        if not self.has_ssh_support():
+            error_msg = self.formatter.format_error("SSH not configured - cannot execute cluster-wide nodetool commands")
+            return (error_msg, {'error': 'SSH not configured'}) if return_raw else error_msg
+        
         # Discover nodes if not already done
         if not self.cluster_nodes:
             self.cluster_nodes = self._discover_nodes()
@@ -547,10 +513,10 @@ class CassandraConnector(SSHSupportMixin):
         
         for node_ip in self.cluster_nodes:
             try:
-                # Get SSH manager for this node
-                ssh_mgr = self._get_ssh_manager_for_node(node_ip)
+                # Get SSH manager for this node (from mixin's ssh_managers dict)
+                ssh_manager = self.get_ssh_manager(node_ip)
                 
-                if not ssh_mgr:
+                if not ssh_manager or not ssh_manager.is_connected():
                     results[node_ip] = {
                         'success': False,
                         'error': 'SSH connection not available'
@@ -558,7 +524,7 @@ class CassandraConnector(SSHSupportMixin):
                     continue
                 
                 # Execute nodetool command
-                stdout, stderr, exit_code = ssh_mgr.execute_command(f"nodetool {command}")
+                stdout, stderr, exit_code = ssh_manager.execute_command(f"nodetool {command}")
                 
                 if exit_code != 0:
                     results[node_ip] = {
@@ -621,3 +587,96 @@ class CassandraConnector(SSHSupportMixin):
             formatted = error_msg + self.formatter.format_note("No data returned from any node.")
         
         return (formatted, all_nodes_data) if return_raw else formatted
+
+    def _execute_shell_command(self, command, return_raw=False):
+        """
+        Execute shell command on the primary SSH host.
+        
+        Args:
+            command: Shell command to execute
+            return_raw: If True, returns tuple (formatted, raw_output)
+        
+        Returns:
+            str or tuple: Formatted output or (formatted, raw) if return_raw=True
+        """
+        if not self.has_ssh_support():
+            error_msg = self.formatter.format_error("SSH not configured - cannot execute shell commands")
+            return (error_msg, {'error': 'SSH not configured'}) if return_raw else error_msg
+        
+        try:
+            # Execute on primary SSH host
+            ssh_hosts = self.get_ssh_hosts()
+            if not ssh_hosts:
+                error_msg = self.formatter.format_error("No SSH hosts configured")
+                return (error_msg, {'error': 'No SSH hosts'}) if return_raw else error_msg
+            
+            primary_host = ssh_hosts[0]
+            ssh_manager = self.get_ssh_manager(primary_host)
+            
+            if not ssh_manager or not ssh_manager.is_connected():
+                error_msg = self.formatter.format_error(f"No SSH connection available for {primary_host}")
+                return (error_msg, {'error': 'No SSH connection'}) if return_raw else error_msg
+            
+            # Execute shell command
+            stdout, stderr, exit_code = ssh_manager.execute_command(command)
+            
+            if exit_code != 0:
+                error_msg = self.formatter.format_error(f"Shell command failed: {stderr}")
+                return (error_msg, {'error': stderr, 'stdout': stdout}) if return_raw else error_msg
+            
+            if not stdout or not stdout.strip():
+                note = self.formatter.format_note("Shell command returned no output.")
+                return (note, {'stdout': '', 'stderr': stderr}) if return_raw else note
+            
+            # Format as code block
+            formatted = f"[source,bash]\n----\n{stdout}\n----"
+            
+            raw_output = {
+                'stdout': stdout,
+                'stderr': stderr,
+                'exit_code': exit_code
+            }
+            
+            return (formatted, raw_output) if return_raw else formatted
+            
+        except Exception as e:
+            logger.error(f"Shell command failed: {e}")
+            error_msg = self.formatter.format_error(f"Shell command failed: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+
+    def _format_nodetool_output(self, command, parsed_data):
+        """
+        Format nodetool command output for display.
+        
+        Special formatting for certain commands like gcstats.
+        """
+        # Special handling for gcstats
+        if command == 'gcstats':
+            def format_value(val):
+                if val is None or val == '':
+                    return 'N/A'
+                return str(val)
+            
+            output = [
+                "[cols=\"1,1\"]",
+                "|===",
+                "|Metric|Value",
+                "",
+                f"|Interval (ms)|{format_value(parsed_data.get('interval_ms'))}",
+                f"|Max GC Elapsed (ms)|{format_value(parsed_data.get('max_gc_elapsed_ms'))}",
+                f"|Total GC Elapsed (ms)|{format_value(parsed_data.get('total_gc_elapsed_ms'))}",
+                f"|Stdev GC Elapsed (ms)|{format_value(parsed_data.get('stdev_gc_elapsed_ms'))}",
+                f"|GC Reclaimed (MB)|{format_value(parsed_data.get('gc_reclaimed_mb'))}",
+                f"|Collections|{format_value(parsed_data.get('collections'))}",
+                f"|Direct Memory Bytes|{format_value(parsed_data.get('direct_memory_bytes'))}",
+                "|==="
+            ]
+            
+            return '\n'.join(output)
+        
+        else:
+            # For other commands that return list[dict], use standard table format
+            if isinstance(parsed_data, list):
+                return self.formatter.format_table(parsed_data)
+            else:
+                return self.formatter.format_note(str(parsed_data))

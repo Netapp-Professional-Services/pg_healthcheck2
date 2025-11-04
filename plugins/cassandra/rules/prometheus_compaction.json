@@ -1,0 +1,80 @@
+{
+  "critical_compaction_backlog_node": {
+    "metric_keywords": ["prometheus_compaction", "per_node_compaction", "data"],
+    "rules": [
+      {
+        "expression": "data.get('value', 0) >= 50",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has severe compaction backlog: {data.get('value', 0):.0f} pending tasks. Risk of read amplification and performance degradation.",
+        "recommendations": [
+          "URGENT: Severe compaction backlog detected",
+          "Increase compaction throughput (compaction_throughput_mb_per_sec)",
+          "Check disk I/O capacity - may be saturated",
+          "Review write workload - may be overwhelming compaction",
+          "Consider throttling writes temporarily to allow catch-up",
+          "Monitor for increasing read latencies"
+        ]
+      },
+      {
+        "expression": "data.get('value', 0) >= 20",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has significant compaction backlog: {data.get('value', 0):.0f} pending tasks.",
+        "recommendations": [
+          "Significant compaction backlog - monitor closely",
+          "Review compaction strategy effectiveness",
+          "Check for large partitions that slow compaction",
+          "Verify disk I/O is not bottlenecked"
+        ]
+      }
+    ]
+  },
+  "high_compaction_backlog_node": {
+    "metric_keywords": ["prometheus_compaction", "per_node_compaction", "data"],
+    "rules": [
+      {
+        "expression": "5 < data.get('value', 0) < 20",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has elevated compaction backlog: {data.get('value', 0):.0f} pending tasks.",
+        "recommendations": [
+          "Monitor compaction progress",
+          "Check if backlog is growing or stable",
+          "Review compaction throughput settings",
+          "Ensure adequate disk I/O capacity"
+        ]
+      }
+    ]
+  },
+  "cluster_compaction_pressure": {
+    "metric_keywords": ["prometheus_compaction", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_pending_tasks', 0) >= 100",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Cluster has {data.get('total_pending_tasks', 0):.0f} total pending compaction tasks across {data.get('node_count', 0)} nodes. Cluster-wide compaction pressure detected.",
+        "recommendations": [
+          "Cluster experiencing widespread compaction backlog",
+          "Review write workload and distribution",
+          "Consider increasing compaction throughput cluster-wide",
+          "Check for systemic I/O constraints",
+          "Review compaction strategy suitability for workload"
+        ]
+      },
+      {
+        "expression": "data.get('average_pending_tasks', 0) >= 10",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Cluster average of {data.get('average_pending_tasks', 0):.1f} pending tasks per node indicates cluster-wide compaction load.",
+        "recommendations": [
+          "Cluster-wide compaction activity elevated",
+          "Monitor for trend increase",
+          "Review overall write throughput",
+          "Consider compaction tuning"
+        ]
+      }
+    ]
+  }
+}

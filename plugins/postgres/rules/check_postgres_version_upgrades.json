@@ -1,0 +1,131 @@
+{
+  "minor_version_upgrade_available": {
+    "metric_keywords": [
+      "available_minor_upgrades"
+    ],
+    "rules": [
+      {
+        "expression": "len(data) >= 3",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Your PostgreSQL instance is {len(data)} minor version(s) behind the latest release. Minor version upgrades include important security patches and bug fixes.",
+        "recommendations": [
+          "HIGH PRIORITY: Plan to upgrade to the latest minor version as soon as possible.",
+          "Minor version upgrades are typically low-risk and include critical security updates.",
+          "Use your package manager to upgrade PostgreSQL packages.",
+          "Test the upgrade in a staging environment first to validate application compatibility.",
+          "Review the PostgreSQL release notes for any behavioral changes.",
+          "Backup your database before performing the upgrade."
+        ]
+      },
+      {
+        "expression": "len(data) >= 1",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Your PostgreSQL instance has {len(data)} minor version upgrade(s) available. Staying current with minor versions ensures you have the latest security patches.",
+        "recommendations": [
+          "Plan to upgrade to the latest minor version during your next maintenance window.",
+          "Review the release notes to understand what fixes and improvements are included.",
+          "Test in staging before applying to production.",
+          "Minor version upgrades typically have minimal risk of breaking changes.",
+          "Use package manager for easy upgrade process."
+        ]
+      }
+    ]
+  },
+  "major_version_upgrade_available": {
+    "metric_keywords": [
+      "available_major_upgrades"
+    ],
+    "rules": [
+      {
+        "expression": "len(data) >= 2",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Your PostgreSQL instance is {len(data)} major version(s) behind. Major version upgrades provide significant performance improvements, new features, and extended support timelines.",
+        "recommendations": [
+          "Evaluate upgrading to a newer major version to benefit from performance improvements and new features.",
+          "IMPORTANT: Major version upgrades require thorough testing and planning.",
+          "Review all breaking changes and deprecated features in the PostgreSQL release notes.",
+          "Use pg_upgrade utility for major version upgrades to minimize downtime.",
+          "Test application compatibility extensively in staging environment.",
+          "Plan for extended testing window (2-4 weeks recommended).",
+          "Consider that older major versions will eventually reach end-of-life and lose support.",
+          "Ensure you have tested backup and rollback procedures."
+        ]
+      },
+      {
+        "expression": "len(data) == 1",
+        "level": "low",
+        "score": 3,
+        "reasoning": "A newer major version of PostgreSQL is available. Consider upgrading for improved performance and new features.",
+        "recommendations": [
+          "Evaluate the benefits of upgrading to the newer major version.",
+          "Review release notes for new features and performance improvements.",
+          "Plan for comprehensive testing before upgrading major versions.",
+          "Use pg_upgrade for efficient major version upgrades.",
+          "Consider upgrade timing based on your application development cycle."
+        ]
+      }
+    ]
+  },
+  "current_version_info": {
+    "metric_keywords": [
+      "current_version"
+    ],
+    "rules": [
+      {
+        "expression": "data.get('postgresql_major', 0) < 13",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Your PostgreSQL instance is running version {data.get('postgresql_major')}.{data.get('postgresql_minor')}, which is approaching or past its end-of-life date. This version no longer receives security updates and bug fixes.",
+        "recommendations": [
+          "CRITICAL: Upgrade immediately to avoid security vulnerabilities and lack of support.",
+          "Plan for a major version upgrade to a currently supported version (14+).",
+          "Review PostgreSQL version support policy: https://www.postgresql.org/support/versioning/",
+          "Older versions have known security issues that are only fixed in newer releases.",
+          "Test thoroughly in staging, but prioritize this upgrade for production.",
+          "Use pg_upgrade to minimize downtime during major version upgrade."
+        ]
+      },
+      {
+        "expression": "data.get('postgresql_major', 0) < 15",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Your PostgreSQL instance is running version {data.get('postgresql_major')}.{data.get('postgresql_minor')}, which is an older major version. Consider upgrading to benefit from performance improvements and extended support.",
+        "recommendations": [
+          "Plan for a major version upgrade to PostgreSQL 15+ for better performance and features.",
+          "PostgreSQL 15+ includes significant performance improvements, especially for large workloads.",
+          "Review your application for compatibility with newer PostgreSQL versions.",
+          "Check the EOL date for your current version: {data.get('eol_date', 'Unknown')}",
+          "Plan the upgrade before your version reaches end-of-life."
+        ]
+      }
+    ]
+  },
+  "os_not_detected": {
+    "metric_keywords": [
+      "os_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "os_type",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('os_type') == 'unknown'",
+        "level": "low",
+        "score": 2,
+        "reasoning": "Could not detect the operating system or package manager. Unable to query for available PostgreSQL versions.",
+        "recommendations": [
+          "Ensure SSH access is properly configured.",
+          "Verify that standard Linux commands are available (uname, cat /etc/os-release).",
+          "Manually check for available PostgreSQL versions using your package manager.",
+          "Visit https://www.postgresql.org/download/ for download and installation instructions."
+        ]
+      }
+    ]
+  }
+}
