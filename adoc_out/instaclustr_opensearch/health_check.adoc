@@ -1,0 +1,542 @@
+= Opensearch Health Check
+Instaclustr Professional Services
+:doctype: book
+:encoding: utf-8
+:lang: en
+:toc: left
+:numbered:
+
+
+== Cluster Overview
+
+=== OpenSearch Cluster Health
+
+[NOTE]
+====
+✅ **Cluster status is GREEN**
+
+All primary and replica shards are allocated. The cluster is fully operational.
+====
+
+==== Cluster Health Metrics
+
+|===
+|Metric|Value
+|Cluster Name|opensearch-test
+|Status|**GREEN** ✅
+|Total Nodes|7
+|Data Nodes|3
+|Active Primary Shards|21
+|Active Shards|49
+|Relocating Shards|0
+|Initializing Shards|0
+|Unassigned Shards|0
+|Delayed Unassigned Shards|0
+|Pending Tasks|0
+|In-Flight Fetches|0
+|Max Task Wait Time (ms)|0
+|Active Shards %|100.0
+|Timed Out|False
+|Discovered Master|True
+|Discovered Cluster Manager|True
+|===
+
+
+=== Cluster Settings Audit
+
+Review of critical cluster configuration settings and production readiness.
+
+==== Cluster Topology
+
+|===
+|Setting|Value
+|Total Nodes|7
+|Data Nodes|3
+|Master-Eligible Nodes|3
+|===
+
+==== Shard Configuration
+
+|===
+|Metric|Value
+|Total Shards|49
+|Primary Shards|21
+|Replica Shards|28
+|Unassigned Shards|0
+|Shards per Node (avg)|16.3
+|===
+
+==== Index Statistics
+
+|===
+|Metric|Value
+|Total Indices|15
+|Total Documents|5,989,537
+|Total Store Size|2.71 GB
+|===
+
+==== Production Readiness Checklist
+
+|===
+|Check|Status|Recommendation
+|Master Nodes|✅ OK|3+ master-eligible nodes
+|Data Node Redundancy|✅ OK|2+ data nodes minimum
+|Shards per Node|✅ OK|< 1000 shards/node
+|Index Count|✅ OK|< 500 indices ideal
+|Unassigned Shards|✅ OK|0 unassigned shards
+|===
+
+[NOTE]
+====
+✅ Cluster settings are well-configured for production use.
+====
+
+==== Recommendations
+
+[TIP]
+====
+**📋 General Best Practices:**
+
+* Regularly review cluster settings as workload changes
+* Monitor shard count trends - plan consolidation if growing
+* Set up automated snapshots for disaster recovery
+* Review and tune JVM heap sizes (typically 50% of RAM, max 32GB)
+* Implement monitoring and alerting on key metrics
+====
+
+
+== Index Health & Management
+
+=== Index Health & Shard Distribution
+
+Analysis of index health status, shard allocation across nodes, and storage efficiency metrics.
+
+==== Cluster Index Summary
+
+|===
+|Metric|Value
+|Total Indices|10
+|Green Indices|10 ✅
+|Yellow Indices|0
+|Red Indices|0
+|Unassigned Shards|0
+|===
+
+
+==== Top 10 Largest Indices
+
+|===
+|Index|Health|Size|Documents|Primary Shards|Replicas
+|test-orders|✅ green|2.6gb|5,818,680|1|1
+|test-logs-2025.10.31|✅ green|54.8mb|116,000|1|1
+|instaclustr_sla_2025-44|✅ green|5.3mb|9,693|3|2
+|sample-host-health|✅ green|2.6mb|40,320|1|1
+|test-metrics-2025.10.31|✅ green|1.9mb|4,500|1|1
+|.opendistro_security|✅ green|115.4kb|8|1|2
+|.opendistro-job-scheduler-lock|✅ green|47.1kb|1|1|1
+|.kibana_1|✅ green|10.7kb|1|1|1
+|.opensearch-observability|✅ green|624b|0|1|2
+|.ql-datasources|✅ green|624b|0|1|2
+|===
+
+==== Shard Distribution Analysis
+
+**Shards per Node:**
+
+|===
+|Node|Shard Count
+|ip-10-0-8-216|17
+|ip-10-0-66-9|16
+|ip-10-0-160-158|16
+|===
+
+
+**Shard States:**
+
+|===
+|State|Count
+|STARTED|49
+|===
+
+[NOTE]
+====
+✅ All indices are healthy with proper shard allocation.
+====
+
+
+== Node & Resource Health
+
+=== Node Health Metrics
+
+Comprehensive health monitoring of all OpenSearch nodes including JVM performance, heap usage, garbage collection activity, and system resource utilization.
+
+**Monitoring Mode:** REST API Only
+
+
+==== Node Health Summary
+
+|===
+|Status|Node|Heap Usage|Heap (GB)|CPU %|Load (1m)
+|✅|ip-10-0-134-17|34.4%|0.34 / 0.98|1|0.06
+|✅|ip-10-0-19-201|63.6%|0.62 / 0.98|3|0.05
+|✅|ip-10-0-86-128|50.0%|0.49 / 0.98|0|0.06
+|✅|ip-10-0-8-216|61.8%|0.6 / 0.98|1|0.64
+|✅|ip-10-0-160-158|62.5%|0.61 / 0.98|2|0.0
+|✅|ip-10-0-66-9|23.8%|0.23 / 0.98|3|0.04
+|✅|ip-10-0-106-98|28.6%|0.28 / 0.98|0|0.01
+|===
+
+==== JVM Heap Usage Details
+
+|===
+|Node|Used (GB)|Max (GB)|Usage %
+|ip-10-0-134-17|0.34|0.98|34.4%
+|ip-10-0-19-201|0.62|0.98|63.6%
+|ip-10-0-86-128|0.49|0.98|50.0%
+|ip-10-0-8-216|0.6|0.98|61.8%
+|ip-10-0-160-158|0.61|0.98|62.5%
+|ip-10-0-66-9|0.23|0.98|23.8%
+|ip-10-0-106-98|0.28|0.98|28.6%
+|===
+
+==== Garbage Collection Statistics
+
+|===
+|Node|Old Gen Collections|Old Gen Time (s)|Old Gen Avg (ms)|Young Gen Collections|Young Gen Time (s)
+|ip-10-0-134-17|0|0.00|0.0|42|4.09
+|ip-10-0-19-201|0|0.00|0.0|61|4.83
+|ip-10-0-86-128|0|0.00|0.0|62|8.63
+|ip-10-0-8-216|0|0.00|0.0|242|15.54
+|ip-10-0-160-158|0|0.00|0.0|85|4.90
+|ip-10-0-66-9|0|0.00|0.0|274|19.02
+|ip-10-0-106-98|0|0.00|0.0|42|3.91
+|===
+
+==== Thread Pool Status
+
+|===
+|Node|Pool|Status|Active|Queue|Rejected
+|ip-10-0-134-17|search|✅|0|0|0
+|ip-10-0-134-17|write|✅|0|0|0
+|ip-10-0-134-17|get|✅|0|0|0
+|ip-10-0-19-201|search|✅|0|0|0
+|ip-10-0-19-201|write|✅|0|0|0
+|ip-10-0-19-201|get|✅|0|0|0
+|ip-10-0-86-128|search|✅|0|0|0
+|ip-10-0-86-128|write|✅|0|0|0
+|ip-10-0-86-128|get|✅|0|0|0
+|ip-10-0-8-216|search|✅|0|0|0
+|ip-10-0-8-216|write|✅|0|0|0
+|ip-10-0-8-216|get|✅|0|0|0
+|ip-10-0-160-158|search|✅|0|0|0
+|ip-10-0-160-158|write|✅|0|0|0
+|ip-10-0-160-158|get|✅|0|0|0
+|ip-10-0-66-9|search|✅|0|0|0
+|ip-10-0-66-9|write|✅|0|0|0
+|ip-10-0-66-9|get|✅|0|0|0
+|ip-10-0-106-98|search|✅|0|0|0
+|ip-10-0-106-98|write|✅|0|0|0
+|ip-10-0-106-98|get|✅|0|0|0
+|===
+
+==== Circuit Breaker Status
+
+|===
+|Node|Breaker|Status|Usage %|Tripped
+|ip-10-0-134-17|request|✅|0.0|0
+|ip-10-0-134-17|fielddata|✅|0.0|0
+|ip-10-0-134-17|in_flight_requests|✅|0.0|0
+|ip-10-0-134-17|parent|✅|36.3|0
+|ip-10-0-19-201|request|✅|0.0|0
+|ip-10-0-19-201|fielddata|✅|0.0|0
+|ip-10-0-19-201|in_flight_requests|✅|0.0|0
+|ip-10-0-19-201|parent|✅|67.0|0
+|ip-10-0-86-128|request|✅|0.0|0
+|ip-10-0-86-128|fielddata|✅|0.0|0
+|ip-10-0-86-128|in_flight_requests|✅|0.0|0
+|ip-10-0-86-128|parent|✅|52.6|0
+|ip-10-0-8-216|request|✅|0.0|0
+|ip-10-0-8-216|fielddata|✅|0.0|0
+|ip-10-0-8-216|in_flight_requests|✅|0.0|0
+|ip-10-0-8-216|parent|✅|65.2|0
+|ip-10-0-160-158|request|✅|0.0|0
+|ip-10-0-160-158|fielddata|✅|0.0|0
+|ip-10-0-160-158|in_flight_requests|✅|0.0|0
+|ip-10-0-160-158|parent|✅|67.2|0
+|ip-10-0-66-9|request|✅|0.0|0
+|ip-10-0-66-9|fielddata|✅|0.0|0
+|ip-10-0-66-9|in_flight_requests|✅|0.0|0
+|ip-10-0-66-9|parent|✅|25.7|0
+|ip-10-0-106-98|request|✅|0.0|0
+|ip-10-0-106-98|fielddata|✅|0.0|0
+|ip-10-0-106-98|in_flight_requests|✅|0.0|0
+|ip-10-0-106-98|parent|✅|30.1|0
+|===
+
+[NOTE]
+====
+✅ All nodes are healthy. No issues detected.
+====
+
+
+[IMPORTANT]
+====
+This check requires SSH access for Disk usage check.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+== Performance Metrics
+
+=== Cluster Performance Metrics
+
+Analysis of search/indexing performance, thread pool utilization, and cache hit ratios.
+
+==== Cluster Performance Summary
+
+|===
+|Metric|Value
+|Total Search Queries|31,523
+|Avg Search Latency|0.33 ms
+|Total Indexing Operations|3,260,383
+|Avg Indexing Latency|0.20 ms
+|Query Cache Hit Ratio|0.0%
+|Request Cache Hit Ratio|96.5%
+|===
+
+[NOTE]
+====
+✅ Cluster performance is healthy with no significant issues detected.
+====
+
+
+== AWS OpenSearch Service
+
+=== AWS OpenSearch Service Software
+
+[NOTE]
+====
+This check is only applicable for AWS OpenSearch Service domains.
+
+Current environment is self-hosted OpenSearch.
+====
+
+
+== Advanced Diagnostics
+
+=== Advanced Diagnostics
+
+Detailed diagnostic information for troubleshooting performance issues, identifying bottlenecks, and understanding cluster behavior.
+
+==== Hot Threads Analysis
+
+Identifies threads consuming the most CPU time (useful for performance troubleshooting).
+
+[NOTE]
+====
+✅ No significant hot threads detected
+====
+
+==== Pending Cluster Tasks Detail
+
+Shows cluster state update tasks waiting to be processed by the master node.
+
+[NOTE]
+====
+✅ No pending cluster tasks
+====
+
+==== Index Segment Analysis
+
+Segment counts and merge activity - high segment counts can impact search performance.
+
+[NOTE]
+====
+✅ Segment counts healthy (total: 173 across all indices)
+====
+
+==== Shard Recovery Status
+
+Shows ongoing shard recovery operations (relocations, replications, snapshots).
+
+[NOTE]
+====
+✅ No active shard recoveries
+====
+
+==== Long-Running Tasks
+
+Identifies tasks that have been running for an extended period.
+
+[NOTE]
+====
+✅ No long-running tasks detected
+====
+
+==== Installed Plugins
+
+Lists OpenSearch plugins installed on the cluster.
+
+|===
+|Plugin|Nodes|Version
+|mapper-size|1|3.2.0
+|opensearch-anomaly-detection|1|3.2.0
+|opensearch-custom-codecs|1|3.2.0
+|opensearch-geospatial|1|3.2.0
+|opensearch-index-management|1|3.2.0
+|opensearch-job-scheduler|1|3.2.0
+|opensearch-observability|1|3.2.0
+|opensearch-reports-scheduler|1|3.2.0
+|opensearch-search-relevance|1|3.2.0
+|opensearch-security|1|3.2.0
+|opensearch-sql|1|3.2.0
+|opensearch-ubi|1|3.2.0
+|repository-azure|1|3.2.0
+|repository-gcs|1|3.2.0
+|repository-s3|1|3.2.0
+|===
+
+==== Field Data Memory Usage
+
+Memory used by field data structures - high usage can indicate inefficient queries.
+
+|===
+|Node|Memory Used|Evictions|Status
+|ip-10-0-66-9|0.00 GB|0|OK
+|===
+
+==== Diagnostic Summary
+
+==== Recommendations
+
+[TIP]
+====
+**📋 General Best Practices:**
+
+* Review hot threads during high CPU periods to identify bottlenecks
+* Monitor segment counts - force merge read-only indices if segments > 100
+* Check recovery operations during high I/O periods
+* Use tasks API to identify long-running operations during performance issues
+* Review field data usage if heap pressure is high
+====
+
+
+=== AI-Generated Recommendations
+Provides intelligent, context-aware recommendations based on dynamic analysis of database metrics.
+
+==== AI Analysis Details
+[options="header"]
+|===
+| Parameter | Value
+| AI Provider | xAI
+| AI Model | grok-4
+| Prompt Size | 10,503 characters (~2,625 tokens)
+| AI Processing Time | 81.17 seconds
+|===
+=== AI-Generated Recommendations
+
+==== Executive Summary
+
+The OpenSearch cluster "opensearch-test" (version 3.2.0, self-hosted) exhibits overall healthy status with a green cluster health, all shards assigned, and strong performance metrics including low search latency (0.33 ms average) and indexing latency (0.2 ms average). There are 7 nodes (3 data nodes) managing 15 indices and 49 shards, with no unassigned shards, pending tasks, or active recoveries. Resource utilization is generally low, with CPU under 3% across nodes and disk usage well below watermark thresholds (all nodes >70% available disk). However, JVM health shows moderate heap usage (up to 63.6%) and frequent young generation garbage collections (up to 274 collections per node), indicating potential memory pressure from indexing activity (3.26 million operations recorded). Query cache hit ratio is 0%, suggesting opportunities for query optimization. No critical or high-severity issues are present; the most urgent items are medium-severity JVM monitoring and low-severity performance tweaks. Prioritize JVM heap monitoring to prevent future GC overhead, especially correlating with nodes handling higher indexing loads.
+
+==== Issue Correlations
+
+Analyzing the full findings reveals several correlations across metrics:
+
+- **JVM Heap Usage and GC Activity:** Nodes with higher heap usage (e.g., 63.6% on ip-10-0-19-201 and 62.5% on ip-10-0-160-158) correlate with elevated young generation GC collections (61-85) and collection times (4.8-4.9 seconds). Conversely, nodes with even higher GC counts (e.g., 274 on ip-10-0-66-9 with only 23.8% heap) suggest bursty indexing activity rather than sustained pressure, aligning with the cluster's 3.26 million indexing operations. This could lead to minor latency spikes if heap approaches 75%, though current search latency remains low (0.33 ms).
+
+- **Resource Utilization and Shard Distribution:** Shard distribution averages 16.3 shards per data node across 3 data nodes, with all 49 shards active and assigned. Low CPU (0-3%) and disk usage (all nodes <30% used, far below 85% low watermark) show no immediate strain, but nodes with slightly lower available disk (e.g., ip-10-0-8-216 at 3.6 GB available out of 5.19 GB total) have higher open file descriptors (687) and young GC activity (242 collections), potentially linked to shard I/O during indexing. No unassigned shards or relocating activity mitigates risks here.
+
+- **Search Performance and Cache Metrics:** Excellent request cache hit ratio (96.5%) correlates with low search latency, but 0% query cache hit ratio may indicate non-cacheable queries or suboptimal configurations, especially in a cluster with 31,523 search queries. This does not yet impact throughput, as there are no thread pool rejections or hot threads detected.
+
+- **Cluster Stability and Diagnostics:** Green status with 3 master nodes reduces split-brain risks, and zero pending tasks or long-running tasks align with stable metrics. The presence of 15 plugins (e.g., opensearch-index-management, opensearch-security) may contribute to baseline heap usage but shows no correlation with issues like high segment counts (173 total, no outliers) or field data memory (only 300 bytes).
+
+These correlations suggest a stable but active cluster; proactive JVM tuning could prevent escalations if indexing volume increases.
+
+==== Critical Issues
+
+No critical issues identified. The cluster health is green with no unassigned shards, node failures, circuit breaker trips, or active recoveries that could indicate imminent downtime or data loss.
+
+==== High Issues
+
+No high issues identified. Resource utilization remains well within safe thresholds, with no evidence of disk watermark breaches, thread pool rejections, or performance degradation.
+
+==== Medium Issues
+
+===== JVM Heap Usage Approaching Moderate Levels
+
+**Operational Impact:** Heap usage ranges from 23.8% to 63.6% across nodes, with no old generation GCs but frequent young GCs (up to 274 collections, 19 seconds total time). This indicates memory churn from indexing, potentially leading to increased CPU overhead and minor latency if usage exceeds 70%, correlating with nodes showing higher young GC activity.
+
+**Action Steps:**
+- Monitor heap usage via OpenSearch APIs or tools like Prometheus; set alerts for >70% usage.
+- Consider increasing JVM heap size if sustained (e.g., adjust `-Xmx` to 1.5 GB per node, based on current max of 0.98 GB).
+- Optimize application queries to reduce object creation during indexing.
+
+[CAUTION]
+----
+Increasing JVM heap may require a rolling restart of nodes, potentially causing brief shard relocation. Perform during low-traffic periods.
+----
+
+===== Frequent Young Generation GC Collections
+
+**Operational Impact:** High young GC counts (e.g., 274 on ip-10-0-66-9) and times (up to 19 seconds) suggest frequent minor collections, which could correlate with indexing throughput (3.26 million ops) and slightly elevate CPU usage, though current impact is minimal with low overall CPU (0-3%).
+
+**Action Steps:**
+- Tune JVM parameters, such as increasing young generation size via `-XX:NewRatio` or `-XX:NewSize`.
+- Analyze indexing patterns using `_cat/tasks` API to identify bursty workloads.
+- If persistent, profile with hot threads API during peak times.
+
+[CAUTION]
+----
+JVM parameter changes require node restarts, which may trigger shard relocation. Test in a staging environment first.
+----
+
+==== Low Issues
+
+===== Low Query Cache Hit Ratio
+
+**Operational Impact:** Query cache hit ratio is 0%, meaning no benefit from caching despite 31,523 searches. This does not currently affect latency (0.33 ms avg) but represents missed optimization, especially for repetitive queries in a plugin-heavy environment (15 plugins installed).
+
+**Action Steps:**
+- Review index mappings and queries for cacheable patterns; enable query caching explicitly if disabled.
+- Use `_stats` API to monitor cache evictions and adjust `indices.queries.cache.size` in cluster settings.
+- No downtime required; apply via dynamic updates.
+
+===== Suboptimal Disk Availability on Select Nodes
+
+**Operational Impact:** While all nodes are below disk watermarks (e.g., ip-10-0-8-216 has 3.6 GB available out of 5.19 GB total, ~30% used), lower availability correlates with higher open file descriptors (687) and GC activity. In a small-disk test cluster, this could approach thresholds with data growth, though no current shard allocation issues.
+
+**Action Steps:**
+- Monitor disk trends with `_nodes/stats/fs` API; set alerts for <20% available.
+- Consider adding storage or optimizing indices via force merge for segments (total 173, no high outliers).
+- Enable Index State Management (ISM) policies for retention and deletion if not already configured (plugin is installed).
+- No downtime required unless expanding storage. 
+
+===== High Number of Installed Plugins
+
+**Operational Impact:** 15 plugins (e.g., opensearch-security, opensearch-anomaly-detection) are installed, which may increase baseline memory and CPU usage but shows no current correlation with issues like high field data (300 bytes) or performance degradation.
+
+**Action Steps:**
+- Audit plugins with `_cat/plugins` API; remove unused ones to reduce overhead.
+- Ensure plugins are up-to-date via package manager.
+- No downtime required; plugin removal may need node restarts in some cases.
+
+[CAUTION]
+----
+Removing plugins like opensearch-security could impact cluster access. Backup configurations before changes.
+----

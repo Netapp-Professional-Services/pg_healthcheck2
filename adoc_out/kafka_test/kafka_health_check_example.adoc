@@ -1,0 +1,261 @@
+== Default Section
+
+== Kafka Cluster Health
+
+[ERROR]
+====
+Module plugins.kafka.checks.under_replicated_partitions.run_under_replicated_partitions failed: No module named 'plugins.kafka.checks.under_replicated_partitions'
+====
+
+
+=== Partition Balance Across Brokers
+
+[NOTE]
+====
+No brokers found in the cluster.
+====
+
+
+== Topic Configurations
+
+== Topic Management
+
+=== Topic Count and Naming Conventions
+
+[WARNING]
+====
+**Action Required:** Issues detected in topic count or naming conventions.
+====
+
+**Naming Violations:** 2 topics do not follow naming conventions.
+
+
+**Contain Hyphens** (2 topics):
+
+*Best practice: Use underscores instead of hyphens*
+
+
+  - bad-name-with-hyphens
+
+  - test-topic
+
+
+
+==== All Topics
+
+User Topics (9):
+
+  - bad-name-with-hyphens
+  - high_throughput_topic
+  - imbalanced_data_topic
+  - large_message_topic
+  - short_retention_topic
+  - test-topic
+  - transactions_topic
+  - under_replicated_topic
+  - user_profiles_topic
+
+==== Recommendations
+[TIP]
+====
+
+* **Naming Standards:** Use lowercase letters, digits, underscores, and dots only. Start with a letter.
+
+* **Avoid Hyphens:** Use underscores instead (hyphens can cause issues with metrics systems).
+
+* **Lowercase Only:** Maintain consistency and avoid case-sensitivity issues.
+
+* **Monitoring:** Regularly review topic list for compliance and implement automated naming validation.
+
+====
+
+
+== Performance Monitoring
+
+== Replication and ISR Health
+
+=== In-Sync Replicas (ISR) Health Check
+
+[NOTE]
+====
+All partitions have healthy ISR status. No under-replicated partitions or ISR shrinks detected.
+====
+
+[NOTE]
+====
+No topics found.
+====
+
+
+==== Recommendations
+[TIP]
+====
+
+* Ensure all Kafka brokers are operational and can communicate for replication.
+* Verify network connectivity and resolve any latency issues between brokers.
+* Monitor broker logs for replication errors or disk-related problems.
+* For production environments, maintain a replication factor of at least 3.
+====
+
+
+== Kafka Storage Health
+
+=== Storage Health Analysis
+
+==== Broker Storage Summary
+
+
+|===
+|broker_id|log_dir|topic|partition|size_bytes|offset_lag|is_future
+|0|/data/kafka|test-topic|2|0|0|False
+|0|/data/kafka|test-topic|0|150|0|False
+|0|/data/kafka|test-topic|1|0|0|False
+|0|/data/kafka|short_retention_topic|1|0|0|False
+|0|/data/kafka|short_retention_topic|2|0|0|False
+|0|/data/kafka|short_retention_topic|0|0|0|False
+|0|/data/kafka|high_throughput_topic|0|41920926|0|False
+|0|/data/kafka|high_throughput_topic|4|41845146|0|False
+|0|/data/kafka|high_throughput_topic|2|41846658|0|False
+|0|/data/kafka|high_throughput_topic|5|41808007|0|False
+|0|/data/kafka|high_throughput_topic|3|41881173|0|False
+|0|/data/kafka|high_throughput_topic|1|41922123|0|False
+|0|/data/kafka|imbalanced_data_topic|1|0|0|False
+|0|/data/kafka|imbalanced_data_topic|0|1117642|0|False
+|0|/data/kafka|imbalanced_data_topic|2|0|0|False
+|0|/data/kafka|__consumer_offsets|11|0|0|False
+|0|/data/kafka|__consumer_offsets|21|0|0|False
+|0|/data/kafka|__consumer_offsets|32|0|0|False
+|0|/data/kafka|__consumer_offsets|28|0|0|False
+|0|/data/kafka|__consumer_offsets|26|0|0|False
+|0|/data/kafka|__consumer_offsets|7|0|0|False
+|0|/data/kafka|__consumer_offsets|40|0|0|False
+|0|/data/kafka|__consumer_offsets|47|0|0|False
+|0|/data/kafka|__consumer_offsets|16|0|0|False
+|0|/data/kafka|__consumer_offsets|14|0|0|False
+|0|/data/kafka|__consumer_offsets|43|0|0|False
+|0|/data/kafka|__consumer_offsets|20|0|0|False
+|0|/data/kafka|__consumer_offsets|37|0|0|False
+|0|/data/kafka|__consumer_offsets|35|0|0|False
+|0|/data/kafka|__consumer_offsets|4|0|0|False
+|0|/data/kafka|__consumer_offsets|2|0|0|False
+|0|/data/kafka|transactions_topic|4|20926|0|False
+|0|/data/kafka|transactions_topic|0|21059|0|False
+|0|/data/kafka|transactions_topic|2|20823|0|False
+|0|/data/kafka|transactions_topic|3|19895|0|False
+|0|/data/kafka|transactions_topic|5|21096|0|False
+|0|/data/kafka|transactions_topic|1|20065|0|False
+|0|/data/kafka|large_message_topic|1|0|0|False
+|0|/data/kafka|large_message_topic|0|0|0|False
+|0|/data/kafka|large_message_topic|2|0|0|False
+|0|/data/kafka|user_profiles_topic|2|89384|0|False
+|0|/data/kafka|user_profiles_topic|0|58731|0|False
+|0|/data/kafka|user_profiles_topic|1|64880|0|False
+|0|/data/kafka|under_replicated_topic|2|0|0|False
+|===
+
+
+[NOTE]
+====
+
+✅ Storage usage is within healthy limits across all brokers.
+
+====
+
+
+== Broker Availability
+
+=== Broker Availability
+
+==== Analysis Results
+
+[NOTE]
+====
+No issues detected. All configured brokers are available.
+====
+
+
+|===
+|Broker ID|Host|Port|Status
+|===
+
+==== Recommendations
+[TIP]
+====
+* **Immediate Action:** Check logs on unavailable brokers for errors.
+* **Common Causes:** Process crashed, out of memory, disk full, network issues.
+* **Verify:** SSH to the broker and check `systemctl status kafka` or process status.
+* **Logs:** Check Kafka server logs (usually in /var/log/kafka or kafka/logs/).
+* **Restart:** If necessary, restart the broker service.
+* **Monitoring:** Set up alerts for broker status changes to catch issues early.
+====
+
+
+== Consumer Groups
+
+=== Consumer Group Health
+
+[WARNING]
+====
+⚠️  **Action Required:** Issues detected in consumer group health.
+====
+
+
+==== Consumer Group Summary
+
+|===
+|group_id|state|protocol_type|members
+|console-consumer-41450|Stable|consumer|1
+|===
+
+==== Low Member Count
+
+[WARNING]
+====
+The following 1 consumer group(s) have fewer than 2 member(s):
+
+
+* **console-consumer-41450**: Members = 1
+
+
+**Impact:** Low member count reduces redundancy and increases risk of processing delays.
+====
+
+
+==== Recommendations
+
+[TIP]
+====
+
+1. **Low Member Count:** Consider scaling up consumer groups to at least 2 members for redundancy and better throughput.
+
+
+**Monitoring:** Set up alerts for consumer lag thresholds and group state changes.
+
+====
+
+
+== [Consumer Group Health]
+
+[ERROR]
+====
+Module plugins.kafka.checks.down_members.run_down_members failed: No module named 'plugins.kafka.utils.qrylib.consumer_group_queries'
+====
+
+
+== [Consumer Health]
+
+=== Consumer Lag Analysis
+
+[NOTE]
+====
+No consumer groups or lag data available.
+====
+
+
+=== AI-Generated Recommendations
+Provides intelligent, context-aware recommendations based on dynamic analysis of database metrics.
+
+[NOTE]
+====
+Online AI analysis is disabled (`ai_run_integrated: false`).
+====
