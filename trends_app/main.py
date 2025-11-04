@@ -633,3 +633,148 @@ def update_report_metadata(report_id):
         return jsonify({"error": "DB error occurred."}), 500
     finally:
         if conn: conn.close()
+
+
+# ============================================================================
+# TREND ANALYSIS ROUTES
+# ============================================================================
+
+@bp.route('/trend-analysis')
+@login_required
+def trend_analysis_page():
+    """Trend analysis page."""
+    if not current_user.has_privilege('ViewTrendAnalysis'):
+        abort(403)
+    
+    config = load_trends_config()
+    db_settings = config.get('database')
+    accessible_company_ids = [c['id'] for c in current_user.accessible_companies]
+    
+    from . import trends_analysis
+    recent_analyses = trends_analysis.get_trend_analyses_history(db_settings, accessible_company_ids)
+    
+    return render_template(
+        'trend_analysis.html',
+        recent_analyses=recent_analyses
+    )
+
+
+@bp.route('/api/trend-analysis/companies')
+@login_required
+def get_companies_for_trend_analysis():
+    """API endpoint to get accessible companies."""
+    if not current_user.has_privilege('ViewTrendAnalysis'):
+        abort(403)
+    
+    config = load_trends_config()
+    db_settings = config.get('database')
+    accessible_company_ids = [c['id'] for c in current_user.accessible_companies]
+    
+    from . import trends_analysis
+    companies = trends_analysis.get_accessible_companies_list(db_settings, accessible_company_ids)
+    return jsonify(companies)
+
+
+@bp.route('/api/trend-analysis/templates')
+@login_required
+def get_trend_analysis_templates():
+    """API endpoint to get trend analysis templates only."""
+    if not current_user.has_privilege('ViewTrendAnalysis'):
+        abort(403)
+    
+    config = load_trends_config()
+    db_settings = config.get('database')
+    
+    conn = None
+    try:
+        conn = psycopg2.connect(**db_settings)
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT id, template_name as name
+            FROM prompt_templates
+            WHERE technology = 'trend_analysis'
+            ORDER BY template_name;
+        """
+        cursor.execute(query)
+        templates = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+        return jsonify(templates)
+        
+    except psycopg2.Error as e:
+        current_app.logger.error(f"Error fetching trend templates: {e}")
+        return jsonify([]), 500
+    finally:
+        if conn:
+            conn.close()
+
+@bp.route('/api/trend-analysis/preview', methods=['POST'])
+@login_required
+def get_trend_preview():
+    """API endpoint to preview trend data before AI generation."""
+    if not current_user.has_privilege('ViewTrendAnalysis'):
+        abort(403)
+    
+    data = request.get_json()
+    company_id = data.get('company_id')
+    days = data.get('days')
+    
+    if not company_id or not days:
+        return jsonify({'error': 'Missing required parameters'}), 400
+    
+    config = load_trends_config()
+    db_settings = config.get('database')
+    accessible_company_ids = [c['id'] for c in current_user.accessible_companies]
+    
+    from . import trends_analysis
+    trend_data = trends_analysis.get_trend_data(
+        db_config=db_settings,
+        company_id=company_id,
+        days=days,
+        accessible_company_ids=accessible_company_ids
+    )
+    
+    if not trend_data:
+        return jsonify({'error': 'No trend data available or access denied'}), 403
+    
+    return jsonify(trend_data)
+
+
+@bp.route('/api/generate-trend-analysis', methods=['POST'])
+@login_required
+def generate_trend_analysis_api():
+    """Generate trend analysis."""
+    if not current_user.has_privilege('ViewTrendAnalysis'):
+        abort(403)
+    
+    data = request.get_json()
+    company_id = data.get('company_id')
+    days = data.get('days', 90)
+    profile_id = data.get('profile_id')
+    template_id = data.get('template_id')
+    
+    if not all([company_id, profile_id, template_id]):
+        return jsonify({"error": "Missing required parameters"}), 400
+    
+    config = load_trends_config()
+    db_settings = config.get('database')
+    accessible_company_ids = [c['id'] for c in current_user.accessible_companies]
+    
+    from . import trends_analysis
+    success, result = trends_analysis.generate_trend_analysis(
+        db_config=db_settings,
+        company_id=company_id,
+        days=days,
+        profile_id=profile_id,
+        template_id=template_id,
+        accessible_company_ids=accessible_company_ids,
+        user_id=current_user.id
+    )
+    
+    if success:
+        return jsonify({
+            "status": "success",
+            "analysis_id": result['analysis_id'],
+            "view_url": url_for('profile.view_report', report_type='trend_analysis', report_id=result['analysis_id'])
+        })
+    else:
+        return jsonify({"error": result}), 500

@@ -1,0 +1,93 @@
+{
+  "consumer_lag_critical": {
+    "metric_keywords": ["consumer_groups", "production_data"],
+    "rules": [
+      {
+        "expression": "data.get('total_lag', 0) > 10000 and data.get('has_offsets', False) and not data.get('is_test_consumer', False)",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Consumer group '{data.get('group_id')}' has critical lag of {data.get('total_lag'):,} messages (max partition lag: {data.get('max_lag'):,}). This poses a risk of data loss if retention expires before messages are consumed.",
+        "recommendations": [
+          "Immediately investigate consumer performance and processing bottlenecks",
+          "Check for consumer failures - verify all consumer instances are running",
+          "Review processing logic for slow operations or blocking calls",
+          "Consider scaling - add more consumer instances to catch up",
+          "Check retention settings - ensure messages aren't expiring before consumption",
+          "Monitor JVM metrics if using Java consumers (GC pauses, heap usage)"
+        ]
+      }
+    ]
+  },
+  "consumer_lag_warning": {
+    "metric_keywords": ["consumer_groups", "production_data"],
+    "rules": [
+      {
+        "expression": "data.get('total_lag', 0) > 5000 and data.get('total_lag', 0) <= 10000 and data.get('has_offsets', False) and not data.get('is_test_consumer', False)",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Consumer group '{data.get('group_id')}' has elevated lag of {data.get('total_lag'):,} messages (max partition lag: {data.get('max_lag'):,}). Consumers are falling behind producers.",
+        "recommendations": [
+          "Monitor lag trends - set up alerts if lag continues to grow",
+          "Optimize consumer processing - profile and improve message handling performance",
+          "Review consumer configuration - tune fetch.min.bytes and fetch.max.wait.ms",
+          "Consider adding more consumer instances if consistently high",
+          "Check for network latency or broker performance issues"
+        ]
+      }
+    ]
+  },
+  "consumer_unstable_state": {
+    "metric_keywords": ["consumer_groups", "production_data"],
+    "rules": [
+      {
+        "expression": "data.get('state', 'Unknown') != 'Stable' and not data.get('is_test_consumer', False)",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Consumer group '{data.get('group_id')}' is in '{data.get('state')}' state with {data.get('members')} member(s). Unstable states indicate rebalancing, startup, or consumer failures.",
+        "recommendations": [
+          "Investigate consumer logs for errors, rebalancing events, or network issues",
+          "Check if rebalancing frequency is excessive - may indicate unstable consumers",
+          "Tune session.timeout.ms and heartbeat.interval.ms to reduce unnecessary rebalancing",
+          "Verify all consumer instances have stable network connectivity to Kafka brokers",
+          "Monitor for repeated state transitions which indicate ongoing instability"
+        ]
+      }
+    ]
+  },
+  "consumer_low_members": {
+    "metric_keywords": ["consumer_groups", "production_data"],
+    "rules": [
+      {
+        "expression": "data.get('members', 0) < 2 and not data.get('is_test_consumer', False)",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Consumer group '{data.get('group_id')}' has only {data.get('members')} member(s) (state: {data.get('state')}). Low member count reduces redundancy and increases risk of processing delays if the consumer fails.",
+        "recommendations": [
+          "Scale up to at least 2 members for redundancy and better throughput",
+          "Document scaling procedures and minimum member requirements for each consumer group",
+          "Implement health checks and auto-restart for consumer instances",
+          "Consider if this is intentionally a single-consumer group (e.g., ordered processing requirement)",
+          "Set up alerts for member count dropping below minimum threshold"
+        ]
+      }
+    ]
+  },
+  "consumer_no_offsets": {
+    "metric_keywords": ["consumer_groups", "production_data"],
+    "rules": [
+      {
+        "expression": "not data.get('has_offsets', False) and data.get('state') == 'Stable' and not data.get('is_test_consumer', False)",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Consumer group '{data.get('group_id')}' is in Stable state with {data.get('members')} member(s) but has no committed offsets. This may be normal for new consumers or those with auto-commit disabled.",
+        "recommendations": [
+          "Verify this is expected behavior (new consumer, auto-commit disabled, or first poll not completed)",
+          "If persistent, check consumer logs to ensure polling is working correctly",
+          "Monitor to ensure offsets appear after first poll cycle completes",
+          "Verify consumers are successfully connecting to Kafka and subscribing to topics",
+          "Check consumer configuration for enable.auto.commit setting"
+        ]
+      }
+    ]
+  }
+}

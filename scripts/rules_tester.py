@@ -90,16 +90,24 @@ def main():
     dummy_settings = {'row_limit': 10, 'is_aurora': True}
     if args.prompt_template:
         dummy_settings['prompt_template'] = Path(args.prompt_template).name
-    
+
+    # Extract database metadata for prompt generation
     db_version = all_structured_findings.get("postgres_overview", {}).get("version_info", {}).get("data", [{}])[0].get("version", "N/A")
     db_name = all_structured_findings.get("postgres_overview", {}).get("database_size", {}).get("data", [{}])[0].get("database", "N/A")
-    
+
+    # Create metadata dict for offline analysis (no environment detection available)
+    db_metadata = {
+        'version': db_version,
+        'db_name': db_name,
+        'environment': 'unknown',
+        'environment_details': {}
+    }
+
     analysis_output = generate_dynamic_prompt(
         all_structured_findings,
         dummy_settings,
         analysis_rules,
-        db_version,
-        db_name,
+        db_metadata,
         active_plugin,
         verbose=args.verbose
     )

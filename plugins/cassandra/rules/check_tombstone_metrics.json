@@ -1,0 +1,35 @@
+{
+  "high_tombstone_count": {
+    "metric_keywords": ["cassandra", "tombstones", "performance", "nodetool", "tablestats", "read_latency"],
+    "rules": [
+      {
+        "expression": "data.get('problematic_count', 0) > 0 and data.get('status') == 'warning'",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Tombstone analysis detected {data.get('problematic_count', 0)} table(s) with excessive tombstone counts across the cluster. High tombstones lead to increased read latency (Cassandra must scan through deleted data), memory pressure during reads, and potential OOM errors. Thresholds: avg tombstones > {data.get('thresholds', {}).get('mean', 1000)}, max per slice > {data.get('thresholds', {}).get('max', 100000)}.",
+        "recommendations": [
+          "Review application delete patterns to reduce unnecessary tombstones",
+          "Consider enabling tombstone_compaction_interval for affected tables",
+          "For high-delete tables, tune gc_grace_seconds to a lower value (e.g., 1-2 days)",
+          "Run targeted compaction: 'nodetool compact keyspace table'",
+          "For time-series data, evaluate TimeWindowCompactionStrategy (TWCS)",
+          "Monitor regularly with 'nodetool tablestats' or 'nodetool tablehistograms'"
+        ]
+      },
+      {
+        "expression": "data.get('problematic_count', 0) >= 5",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Critical: {data.get('problematic_count', 0)} tables across the cluster have dangerous tombstone levels. This indicates a systemic issue with delete patterns or compaction strategy. Multiple tables with high tombstones can severely degrade cluster performance and risk cascading failures.",
+        "recommendations": [
+          "URGENT: Investigate application delete patterns immediately",
+          "Review compaction strategies cluster-wide - may need to switch to TWCS for time-series workloads",
+          "Check if gc_grace_seconds is set too high (default is 10 days, consider 1-2 days)",
+          "Run 'nodetool tablestats' to identify worst offenders and prioritize remediation",
+          "Consider rewriting heavily affected tables to purge tombstones",
+          "Set up monitoring alerts for tombstone thresholds to catch future issues early"
+        ]
+      }
+    ]
+  }
+}

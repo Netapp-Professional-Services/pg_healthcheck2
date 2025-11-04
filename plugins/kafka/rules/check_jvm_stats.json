@@ -1,0 +1,142 @@
+{
+  "critical_heap_usage": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('heap_util_percent', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} has critical heap usage: {data.get('heap_util_percent'):.1f}%. Risk of OutOfMemoryError.",
+        "recommendations": [
+          "Immediate: Increase heap size (-Xmx) to prevent OOM",
+          "Review broker workload and consider scaling",
+          "Check for memory leaks in application code",
+          "Monitor Full GC frequency - may indicate insufficient memory"
+        ]
+      },
+      {
+        "expression": "data.get('heap_util_percent', 0) >= 75",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has high heap usage: {data.get('heap_util_percent'):.1f}%.",
+        "recommendations": [
+          "Plan to increase heap size before reaching critical levels",
+          "Monitor heap usage trends",
+          "Review GC settings and consider G1GC tuning"
+        ]
+      }
+    ]
+  },
+  "old_generation_pressure": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('old_util_percent', 0) >= 90",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} has critical Old Generation usage: {data.get('old_util_percent'):.1f}%. Risk of Full GC storms.",
+        "recommendations": [
+          "Increase heap size immediately",
+          "Check for memory leaks - Old Gen should not grow continuously",
+          "Review object allocation patterns",
+          "Consider heap dump analysis if issue persists"
+        ]
+      },
+      {
+        "expression": "data.get('old_util_percent', 0) >= 80",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has high Old Generation usage: {data.get('old_util_percent'):.1f}%.",
+        "recommendations": [
+          "Monitor Old Gen growth rate",
+          "Tune GC to promote objects faster or slower as needed",
+          "Review long-lived object creation"
+        ]
+      }
+    ]
+  },
+  "excessive_full_gc": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('full_gc_count', 0) >= 50",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} has excessive Full GC count: {data.get('full_gc_count')} with average {data.get('avg_full_gc_time_ms'):.1f}ms per GC.",
+        "recommendations": [
+          "Frequent Full GCs indicate severe memory pressure",
+          "Increase heap size significantly",
+          "Investigate memory leaks or excessive object creation",
+          "Consider application-level optimization"
+        ]
+      },
+      {
+        "expression": "data.get('full_gc_count', 0) >= 10",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} has elevated Full GC count: {data.get('full_gc_count')}.",
+        "recommendations": [
+          "Monitor Full GC frequency - should be rare",
+          "Review heap size adequacy",
+          "Check Old Gen usage patterns"
+        ]
+      },
+      {
+        "expression": "data.get('avg_full_gc_time_ms', 0) >= 1000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has slow Full GC performance: {data.get('avg_full_gc_time_ms'):.1f}ms average.",
+        "recommendations": [
+          "Full GC pauses over 1 second cause noticeable latency",
+          "Consider G1GC if using CMS/Parallel",
+          "Tune GC pause time goals",
+          "Review heap size - very large heaps cause long GC pauses"
+        ]
+      }
+    ]
+  },
+  "metaspace_issues": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('metaspace_util_percent', 0) >= 95",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has critical Metaspace usage: {data.get('metaspace_util_percent'):.1f}%.",
+        "recommendations": [
+          "Increase MaxMetaspaceSize if frequently hitting limit",
+          "Check for classloader leaks or excessive class loading",
+          "Review plugin or library usage"
+        ]
+      }
+    ]
+  },
+  "cluster_wide_memory_issues": {
+    "metric_keywords": ["jvm_summary"],
+    "rules": [
+      {
+        "expression": "data.get('critical_broker_count', 0) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({data.get('critical_broker_count')}) have critical memory issues. Cluster-wide memory pressure.",
+        "recommendations": [
+          "Cluster-wide memory problem detected",
+          "Increase heap size across all brokers",
+          "Review overall cluster workload and capacity",
+          "Consider adding more brokers to distribute load"
+        ]
+      },
+      {
+        "expression": "data.get('total_fgc_count', 0) >= 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Total Full GC count across cluster: {data.get('total_fgc_count')}. Indicates cluster-wide memory pressure.",
+        "recommendations": [
+          "Cluster is experiencing memory pressure",
+          "Review and increase heap sizes cluster-wide",
+          "Analyze workload patterns for optimization opportunities"
+        ]
+      }
+    ]
+  }
+}

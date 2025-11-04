@@ -1,0 +1,187 @@
+{
+  "patroni_ttl_too_low": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('parameters', {}).get('ttl', 30) < 20",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Patroni TTL is set to {data.get('analysis', {}).get('parameters', {}).get('ttl', 30)} seconds, which is very low. This can cause unnecessary failovers due to false timeouts.",
+        "recommendations": [
+          "A low TTL means the leader lock expires quickly, making the cluster sensitive to temporary issues.",
+          "Network hiccups, brief CPU spikes, or DCS latency can trigger false failovers.",
+          "Increase TTL to at least 20-30 seconds to reduce false positives.",
+          "Balance between fast failure detection and stability.",
+          "Edit configuration: patronictl edit-config and update the 'ttl' value."
+        ]
+      }
+    ]
+  },
+  "patroni_ttl_too_high": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('parameters', {}).get('ttl', 30) > 60",
+        "level": "warning",
+        "score": 4,
+        "reasoning": "Patroni TTL is set to {data.get('analysis', {}).get('parameters', {}).get('ttl', 30)} seconds, which is quite high. This will slow down failure detection.",
+        "recommendations": [
+          "A high TTL means it takes longer to detect leader failures.",
+          "This increases downtime during unplanned outages.",
+          "Consider reducing TTL to 20-30 seconds for faster failover.",
+          "High TTL is acceptable if your environment has frequent network issues.",
+          "Edit configuration: patronictl edit-config and update the 'ttl' value."
+        ]
+      }
+    ]
+  },
+  "patroni_loop_wait_too_low": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('parameters', {}).get('loop_wait', 10) < 5",
+        "level": "warning",
+        "score": 5,
+        "reasoning": "Patroni loop_wait is set to {data.get('analysis', {}).get('parameters', {}).get('loop_wait', 10)} seconds. This causes frequent DCS queries and increases load.",
+        "recommendations": [
+          "Loop wait determines how often Patroni checks cluster state in the DCS.",
+          "Very low values increase DCS load unnecessarily.",
+          "Increase to 5-10 seconds to reduce overhead while maintaining responsiveness.",
+          "Lower values don't significantly improve failover speed.",
+          "Edit configuration: patronictl edit-config and update the 'loop_wait' value."
+        ]
+      }
+    ]
+  },
+  "patroni_max_lag_high_data_loss_risk": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('parameters', {}).get('maximum_lag_on_failover', 1048576) > 104857600",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Maximum lag on failover is set to {data.get('analysis', {}).get('parameters', {}).get('maximum_lag_on_failover', 0)/(1024*1024):.0f} MB. This creates HIGH RISK of data loss during failover.",
+        "recommendations": [
+          "This setting controls the maximum replication lag a replica can have to become the new leader.",
+          "High values mean a lagging replica could be promoted, losing that lag amount of data.",
+          "URGENT: Reduce to 1-10 MB (1048576 to 10485760 bytes) to minimize data loss risk.",
+          "Test failover procedures after changing this critical setting.",
+          "Edit configuration: patronictl edit-config and update 'maximum_lag_on_failover'.",
+          "Consider enabling synchronous_mode for zero data loss (RPO=0)."
+        ]
+      }
+    ]
+  },
+  "patroni_synchronous_mode_disabled": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "not data.get('analysis', {}).get('parameters', {}).get('synchronous_mode', False)",
+        "level": "warning",
+        "score": 5,
+        "reasoning": "Synchronous replication mode is disabled. There is a risk of data loss during failover (RPO > 0).",
+        "recommendations": [
+          "Asynchronous replication means writes are acknowledged before replicas confirm receipt.",
+          "If the leader fails before replicas catch up, that data is lost.",
+          "Enable synchronous_mode to guarantee zero data loss (RPO=0) on failover.",
+          "Trade-off: Synchronous mode slightly increases write latency.",
+          "Decide based on your requirements: consistency vs. performance.",
+          "Edit configuration: patronictl edit-config and set 'synchronous_mode: true'.",
+          "Also configure 'synchronous_node_count' appropriately (typically 1)."
+        ]
+      }
+    ]
+  },
+  "patroni_configuration_score_low": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('config_score', 100) < 70",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Patroni configuration health score is {data.get('analysis', {}).get('config_score', 100)}/100. Multiple configuration issues need attention.",
+        "recommendations": [
+          "Review the configuration analysis output for specific issues.",
+          "Address high-severity issues first (data loss risks, false failovers).",
+          "Validate changes in a test environment before applying to production.",
+          "Document all configuration changes and their rationale.",
+          "Re-run this check after making changes to verify improvements.",
+          "Consider consulting Patroni documentation or a PostgreSQL DBA for guidance."
+        ]
+      },
+      {
+        "expression": "data.get('analysis', {}).get('config_score', 100) < 90",
+        "level": "warning",
+        "score": 3,
+        "reasoning": "Patroni configuration health score is {data.get('analysis', {}).get('config_score', 100)}/100. Some configuration optimizations are recommended.",
+        "recommendations": [
+          "Review the configuration analysis output for optimization opportunities.",
+          "These are typically not critical but can improve cluster behavior.",
+          "Consider addressing recommendations during your next maintenance window.",
+          "Test changes in a non-production environment first."
+        ]
+      }
+    ]
+  },
+  "patroni_configuration_issues_detected": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "len(data.get('analysis', {}).get('issues', [])) > 0 and any(issue.get('severity') == 'high' for issue in data.get('analysis', {}).get('issues', []))",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{len([i for i in data.get('analysis', {}).get('issues', []) if i.get('severity') == 'high'])} high-severity configuration issue(s) detected.",
+        "recommendations": [
+          "Review each high-severity issue in the configuration analysis output.",
+          "High-severity issues typically involve data loss risks or stability concerns.",
+          "Address these issues as soon as possible, ideally during the next maintenance window.",
+          "Test configuration changes in a non-production environment first.",
+          "Use 'patronictl edit-config' to update dynamic configuration.",
+          "Monitor the cluster closely after making changes."
+        ]
+      }
+    ]
+  },
+  "patroni_retry_timeout_too_low": {
+    "metric_keywords": ["patroni_configuration"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('parameters', {}).get('retry_timeout', 10) < 5",
+        "level": "warning",
+        "score": 4,
+        "reasoning": "Patroni retry_timeout is set to {data.get('analysis', {}).get('parameters', {}).get('retry_timeout', 10)} seconds, which is very low.",
+        "recommendations": [
+          "Retry timeout controls how long Patroni waits for DCS and PostgreSQL operations.",
+          "Very low values can cause false failures if operations take slightly longer than expected.",
+          "Increase to at least 5-10 seconds for more reliable operation.",
+          "Consider your network latency and DCS performance when setting this value.",
+          "Edit configuration: patronictl edit-config and update the 'retry_timeout' value."
+        ]
+      }
+    ]
+  }
+}

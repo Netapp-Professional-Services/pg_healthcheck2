@@ -37,6 +37,58 @@ def get_replication_slots_query(connector):
         FROM pg_replication_slots;
     """
 
+def get_wal_receiver_query(connector):
+    """
+    Returns a query to check WAL receiver status on standby nodes.
+    Shows incoming replication from the primary.
+    """
+    if connector.version_info.get('is_pg10_or_newer'):
+        return """
+            SELECT
+                status,
+                receive_start_lsn,
+                receive_start_tli,
+                written_lsn,
+                flushed_lsn,
+                received_tli,
+                last_msg_send_time,
+                last_msg_receipt_time,
+                latest_end_lsn,
+                latest_end_time,
+                slot_name,
+                sender_host,
+                sender_port,
+                conninfo,
+                CASE
+                    WHEN last_msg_receipt_time IS NULL THEN NULL
+                    ELSE EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))
+                END AS last_msg_age_seconds
+            FROM pg_stat_wal_receiver;
+        """
+    else:
+        # Fallback for legacy versions (PG 9.x)
+        return """
+            SELECT
+                status,
+                receive_start_lsn,
+                receive_start_tli,
+                written_lsn,
+                flushed_lsn,
+                received_tli,
+                last_msg_send_time,
+                last_msg_receipt_time,
+                latest_end_lsn,
+                latest_end_time,
+                slot_name,
+                conninfo,
+                CASE
+                    WHEN last_msg_receipt_time IS NULL THEN NULL
+                    ELSE EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))
+                END AS last_msg_age_seconds
+            FROM pg_stat_wal_receiver;
+        """
+
+
 def get_subscription_stats_query(connector):
     """
     Returns a query for logical replication subscription stats.

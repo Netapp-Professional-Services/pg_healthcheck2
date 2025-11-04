@@ -1,0 +1,66 @@
+{
+  "pgbouncer_not_detected_when_expected": {
+    "metric_keywords": ["pgbouncer_detection"],
+    "data_conditions": [
+      { "key": "detected", "equals": false }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('detected') == False and 'pgbouncer' in data.get('error', '').lower()",
+        "level": "info",
+        "score": 2,
+        "reasoning": "PgBouncer detection attempted but failed. This is informational if PgBouncer is not expected in this environment.",
+        "recommendations": [
+          "If PgBouncer should be present, verify:",
+          "  • PgBouncer is installed and running",
+          "  • Correct host and port configured (default: 6432)",
+          "  • Admin credentials are correct",
+          "  • Firewall allows connections to PgBouncer port"
+        ]
+      }
+    ]
+  },
+  "pgbouncer_detected_indirect": {
+    "metric_keywords": ["pgbouncer_detection"],
+    "data_conditions": [
+      { "key": "detected", "equals": true },
+      { "key": "access_level", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('access_level') in ['indirect', 'unknown']",
+        "level": "info",
+        "score": 1,
+        "reasoning": "PgBouncer detected but admin console access not available. Monitoring capabilities are limited.",
+        "recommendations": [
+          "Full PgBouncer monitoring requires admin console access.",
+          "Configure admin credentials in your config file:",
+          "  pgbouncer_host: <host>",
+          "  pgbouncer_port: 6432",
+          "  pgbouncer_admin_user: <user>",
+          "  pgbouncer_admin_password: <password>",
+          "Test admin access: psql -h <host> -p 6432 -U <user> -d pgbouncer"
+        ]
+      }
+    ]
+  },
+  "pgbouncer_detected_full_admin": {
+    "metric_keywords": ["pgbouncer_detection"],
+    "data_conditions": [
+      { "key": "detected", "equals": true },
+      { "key": "access_level", "equals": "full_admin" }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('detected') == True and data.get('access_level') == 'full_admin'",
+        "level": "info",
+        "score": 0,
+        "reasoning": "PgBouncer detected with full admin access. Complete monitoring is available.",
+        "recommendations": [
+          "PgBouncer monitoring is fully enabled.",
+          "Review the PgBouncer Health Status section for pool statistics and recommendations."
+        ]
+      }
+    ]
+  }
+}

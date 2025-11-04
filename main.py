@@ -127,7 +127,13 @@ class HealthCheck:
 
         try:
             print("\n--- Handing off findings to Trend Shipper ---")
-            trend_shipper.run(self.all_structured_findings, self.settings, self.adoc_content)
+            # Pass analysis_output to store triggered rules for trend analysis
+            trend_shipper.run(
+                self.all_structured_findings, 
+                self.settings, 
+                self.adoc_content,
+                analysis_results=self.analysis_output  # NEW: Pass analysis results for rule tracking
+            )
         except Exception as e:
             print(f"CRITICAL: The trend shipper module failed with an unexpected error: {e}")
 
@@ -140,9 +146,7 @@ class HealthCheck:
             print("\n--- Generating Summarized Findings for Historical Record ---")
             analysis_rules = self.active_plugin.get_rules_config()
             db_metadata = self.connector.get_db_metadata()
-            db_version = db_metadata.get('version', 'N/A')
-            db_name = db_metadata.get('db_name', self.settings.get('database', 'N/A'))
-            self.analysis_output = generate_dynamic_prompt(self.all_structured_findings, self.settings, analysis_rules, db_version, db_name, self.active_plugin)
+            self.analysis_output = generate_dynamic_prompt(self.all_structured_findings, self.settings, analysis_rules, db_metadata, self.active_plugin)
         
         self.all_structured_findings['summarized_findings'] = self.analysis_output.get('summarized_findings', {})
         self.all_structured_findings['prompt_template_name'] = self.settings.get('prompt_template', 'default_prompt.j2')

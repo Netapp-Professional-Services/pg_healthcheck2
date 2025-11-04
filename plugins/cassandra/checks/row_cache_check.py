@@ -49,8 +49,9 @@ def run_row_cache_check(connector, settings):
         tables_with_row_cache = []
         for table in user_tables:
             caching = table.get('caching', {})
-            rows_per_partition = caching.get('rows_per_partition', 'None')
-            if rows_per_partition != 'None':
+            rows_per_partition = caching.get('rows_per_partition', 'NONE')
+            # Row cache is disabled when rows_per_partition is 'NONE', 'None', or None
+            if rows_per_partition not in ['NONE', 'None', None]:
                 tables_with_row_cache.append({
                     'keyspace_name': table['keyspace_name'],
                     'table_name': table['table_name'],

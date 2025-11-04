@@ -1,0 +1,170 @@
+{
+  "patroni_no_leader": {
+    "metric_keywords": ["patroni_topology"],
+    "data_conditions": [
+      { "key": "leader", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('leader') is None or data.get('leader') == ''",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "No Patroni leader detected in the cluster. The cluster is in a split-brain or election failure state.",
+        "recommendations": [
+          "Immediately investigate the Patroni DCS (etcd/Consul/ZooKeeper) connectivity and health.",
+          "Check Patroni logs on all nodes for election failures or network issues.",
+          "Verify quorum in the DCS cluster.",
+          "Manual intervention may be required to recover the cluster."
+        ]
+      }
+    ]
+  },
+  "patroni_no_replicas": {
+    "metric_keywords": ["patroni_topology"],
+    "data_conditions": [
+      { "key": "replica_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('replica_count', 0)) == 0",
+        "level": "warning",
+        "score": 5,
+        "reasoning": "No replicas detected in the Patroni cluster. This is a single point of failure - if the leader fails, there will be no automatic failover.",
+        "recommendations": [
+          "Deploy at least one replica node for high availability.",
+          "Configure streaming replication between leader and replica.",
+          "Ensure Patroni is monitoring all nodes in the cluster.",
+          "For production systems, a minimum of 3 nodes (1 leader + 2 replicas) is recommended."
+        ]
+      }
+    ]
+  },
+  "patroni_high_replication_lag": {
+    "metric_keywords": ["patroni_topology"],
+    "data_conditions": [
+      { "key": "members", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(member.get('role') == 'replica' and float(member.get('lag_mb', 0)) > 1000 for member in data.get('members', []))",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "One or more replicas have critical replication lag (>1GB). This indicates severe replication issues that could prevent successful failover.",
+        "recommendations": [
+          "Identify the lagging replica(s) and investigate the cause immediately.",
+          "Check network connectivity and bandwidth between leader and replica.",
+          "Review disk I/O performance on the replica node - slow disks can cause lag.",
+          "Consider increasing wal_sender_timeout if network is slow but stable.",
+          "If lag cannot be resolved, consider rebuilding the replica from a fresh backup."
+        ]
+      },
+      {
+        "expression": "any(member.get('role') == 'replica' and float(member.get('lag_mb', 0)) > 100 for member in data.get('members', []))",
+        "level": "high",
+        "score": 6,
+        "reasoning": "One or more replicas have high replication lag (>100MB). This should be monitored closely as it may impact failover time and data loss in case of leader failure.",
+        "recommendations": [
+          "Monitor the lagging replica(s) for increasing lag.",
+          "Check for network issues or slow queries on the replica.",
+          "Review replica performance metrics (CPU, memory, disk I/O).",
+          "Verify that the replica has sufficient resources to keep up with leader write rate."
+        ]
+      }
+    ]
+  },
+  "patroni_replica_offline": {
+    "metric_keywords": ["patroni_topology"],
+    "data_conditions": [
+      { "key": "members", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any(member.get('role') == 'replica' and member.get('state', '').lower() in ['stopped', 'crashed', 'failed', 'down'] for member in data.get('members', []))",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "One or more replicas are in a failed state (stopped/crashed/down). This reduces cluster redundancy and increases risk of data loss.",
+        "recommendations": [
+          "Identify the failed replica(s) and check system logs immediately.",
+          "Check PostgreSQL logs for crash reports or errors.",
+          "Verify that the replica node has sufficient resources (disk space, memory).",
+          "Restart Patroni and PostgreSQL services on the failed node.",
+          "If the replica cannot be recovered, consider rebuilding it from the leader."
+        ]
+      }
+    ]
+  },
+  "patroni_low_health_score": {
+    "metric_keywords": ["patroni_topology"],
+    "data_conditions": [
+      { "key": "health_score", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('health_score', 100)) < 70",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Patroni cluster health score is {data.get('health_score')}/100, indicating significant cluster issues. The cluster may not be able to handle failover properly.",
+        "recommendations": [
+          "Review the Patroni topology check output for specific issues.",
+          "Check all nodes for connectivity and service status.",
+          "Verify DCS (etcd/Consul/ZooKeeper) is healthy and accessible from all nodes.",
+          "Investigate replication lag and resolve any network or performance issues.",
+          "Ensure all nodes can reach each other on the Patroni API port (default 8008)."
+        ]
+      },
+      {
+        "expression": "int(data.get('health_score', 100)) < 90",
+        "level": "warning",
+        "score": 4,
+        "reasoning": "Patroni cluster health score is {data.get('health_score')}/100. Some nodes or replication may be experiencing minor issues.",
+        "recommendations": [
+          "Review the Patroni topology check output for specific issues.",
+          "Monitor the cluster for any degrading conditions.",
+          "Check replication lag and node connectivity."
+        ]
+      }
+    ]
+  },
+  "patroni_timeline_mismatch": {
+    "metric_keywords": ["patroni_topology"],
+    "data_conditions": [
+      { "key": "timeline_divergence", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('timeline_divergence') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Timeline divergence detected between cluster members ({data.get('unique_timeline_count')} different timelines). This indicates a split-brain condition or incomplete failover where nodes are on different WAL timelines.",
+        "recommendations": [
+          "This is a CRITICAL situation requiring immediate action.",
+          "Stop all write traffic to the database immediately.",
+          "Identify which timeline is correct (usually the leader's timeline: {data.get('leader_timeline')}).",
+          "Nodes on incorrect timelines must be rebuilt using pg_rewind or from a fresh backup.",
+          "DO NOT attempt to manually fix this without understanding PostgreSQL timelines.",
+          "Consider engaging PostgreSQL DBA support for recovery."
+        ]
+      }
+    ]
+  },
+  "patroni_single_node_cluster": {
+    "metric_keywords": ["patroni_topology"],
+    "data_conditions": [
+      { "key": "total_nodes", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('total_nodes', 0)) == 1",
+        "level": "warning",
+        "score": 5,
+        "reasoning": "Patroni cluster has only 1 node. This provides no high availability - there will be downtime if this node fails.",
+        "recommendations": [
+          "Deploy additional nodes to achieve high availability.",
+          "Minimum recommended setup is 3 nodes (1 leader + 2 replicas).",
+          "Configure DCS (etcd/Consul/ZooKeeper) with proper quorum.",
+          "Test failover procedures once replicas are deployed."
+        ]
+      }
+    ]
+  }
+}

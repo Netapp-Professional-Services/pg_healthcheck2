@@ -1,0 +1,170 @@
+{
+  "multiple_critical_config_issues": {
+    "metric_keywords": [
+      "recommendations"
+    ],
+    "data_conditions": [
+      {
+        "key": "shared_buffers",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "sum(1 for k, v in data.items() if v.get('needs_change') and k in ['shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem']) >= 3",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple critical memory settings are not optimally configured for your system resources. Tuning these settings can significantly improve performance.",
+        "recommendations": [
+          "Review the recommended memory settings (shared_buffers, effective_cache_size, work_mem, maintenance_work_mem) in the Configuration Analysis section",
+          "These settings are calculated based on your system's {data.get('_system_ram_gb', 'available')} GB of RAM",
+          "Apply changes during a maintenance window as some settings require a PostgreSQL restart",
+          "Test configuration changes in a non-production environment first",
+          "Monitor performance metrics after applying changes to verify improvements"
+        ]
+      },
+      {
+        "expression": "sum(1 for k, v in data.items() if v.get('needs_change') and k in ['shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem']) >= 1",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Some memory settings could be better tuned for your system resources to improve query performance.",
+        "recommendations": [
+          "Review the recommended memory configuration changes",
+          "Consider applying these changes during your next maintenance window",
+          "Settings like work_mem and maintenance_work_mem can be adjusted without a restart"
+        ]
+      }
+    ]
+  },
+  "suboptimal_io_settings": {
+    "metric_keywords": [
+      "recommendations"
+    ],
+    "data_conditions": [
+      {
+        "key": "random_page_cost",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('random_page_cost', {}).get('needs_change') and data.get('effective_io_concurrency', {}).get('needs_change')",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "I/O related settings (random_page_cost, effective_io_concurrency) are not optimized for your storage type. Adjusting these can improve query planner decisions.",
+        "recommendations": [
+          "Your storage type is {data.get('_storage_type', 'SSD')} - the random_page_cost should be adjusted accordingly",
+          "For SSD storage, random_page_cost should typically be around 1.1 (vs default 4.0 for HDD)",
+          "For SSD storage, effective_io_concurrency should be 200 (vs 2 for HDD)",
+          "These settings help the query planner make better decisions about index usage",
+          "Apply changes with pg_reload_conf() - no restart required"
+        ]
+      }
+    ]
+  },
+  "insufficient_parallel_query_config": {
+    "metric_keywords": [
+      "recommendations"
+    ],
+    "data_conditions": [
+      {
+        "key": "max_worker_processes",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('max_worker_processes', {}).get('needs_change') or data.get('max_parallel_workers_per_gather', {}).get('needs_change')",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Parallel query settings are not optimized for your CPU resources ({data.get('_cpu_cores', 'N')} cores detected). Enabling more parallel workers can speed up large queries.",
+        "recommendations": [
+          "Increase max_worker_processes to match your CPU core count for better parallelism",
+          "Adjust max_parallel_workers_per_gather to utilize available cores for large queries",
+          "Note: max_worker_processes requires a PostgreSQL restart to apply",
+          "Parallel queries are especially beneficial for analytical/reporting workloads",
+          "Monitor query performance after changes using pg_stat_statements"
+        ]
+      }
+    ]
+  },
+  "wal_checkpoint_tuning_needed": {
+    "metric_keywords": [
+      "recommendations"
+    ],
+    "data_conditions": [
+      {
+        "key": "max_wal_size",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('max_wal_size', {}).get('needs_change') or data.get('checkpoint_completion_target', {}).get('needs_change')",
+        "level": "low",
+        "score": 3,
+        "reasoning": "WAL and checkpoint settings could be adjusted based on your workload type to reduce checkpoint I/O spikes.",
+        "recommendations": [
+          "Increase max_wal_size to reduce checkpoint frequency for write-heavy workloads",
+          "Set checkpoint_completion_target to 0.9 to spread checkpoint I/O over more time",
+          "These changes can reduce I/O spikes that affect query latency",
+          "Apply with pg_reload_conf() - no restart required",
+          "Monitor checkpoint statistics in pg_stat_bgwriter after changes"
+        ]
+      }
+    ]
+  },
+  "work_mem_too_low": {
+    "metric_keywords": [
+      "recommendations"
+    ],
+    "data_conditions": [
+      {
+        "key": "work_mem",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('work_mem', {}).get('needs_change') and data.get('work_mem', {}).get('recommended_value', 0) > float(data.get('work_mem', {}).get('current_value', '999999'))",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "work_mem is set too low for your available RAM. This can cause queries to use disk-based sorts and hashes, significantly slowing down complex queries.",
+        "recommendations": [
+          "Increase work_mem to the recommended value based on your RAM and connection count",
+          "This setting controls per-operation memory for sorts, hashes, and other query operations",
+          "Higher values reduce disk I/O for complex queries with sorts and aggregations",
+          "Can be applied with pg_reload_conf() or even per-session with SET work_mem",
+          "Monitor temp file usage (temp_files_analysis check) to verify the impact"
+        ]
+      }
+    ]
+  },
+  "shared_buffers_undersized": {
+    "metric_keywords": [
+      "recommendations"
+    ],
+    "data_conditions": [
+      {
+        "key": "shared_buffers",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('shared_buffers', {}).get('needs_change') and data.get('shared_buffers', {}).get('recommended_value', 0) > float(data.get('shared_buffers', {}).get('current_value', '999999'))",
+        "level": "high",
+        "score": 6,
+        "reasoning": "shared_buffers is significantly undersized for your available RAM. This is the most important PostgreSQL memory setting and directly affects cache hit ratio.",
+        "recommendations": [
+          "IMPORTANT: Increasing shared_buffers requires a PostgreSQL restart - plan accordingly",
+          "shared_buffers should typically be 25% of RAM (up to 8-16GB depending on workload)",
+          "This is PostgreSQL's main data cache - higher values improve read performance",
+          "Schedule this change during a maintenance window",
+          "After restart, monitor cache hit ratio in cache_analysis check to verify improvement",
+          "Ensure you have enough system memory available (not fully utilized by other processes)"
+        ]
+      }
+    ]
+  }
+}

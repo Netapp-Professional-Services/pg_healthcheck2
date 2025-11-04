@@ -1,0 +1,141 @@
+{
+  "search_latency_ms": {
+    "critical": {
+      "threshold": 2000,
+      "reasoning": "Search latency above 2 seconds indicates severe performance degradation affecting user experience",
+      "recommendations": [
+        "Review slow query log to identify problematic queries",
+        "Use _profile API to analyze query performance",
+        "Check for expensive aggregations or wildcard queries",
+        "Review JVM heap usage and GC activity",
+        "Consider scaling cluster by adding data nodes",
+        "Optimize index mappings and analyzer settings"
+      ]
+    },
+    "high": {
+      "threshold": 1000,
+      "reasoning": "Search latency above 1 second is noticeable to users and may indicate performance issues",
+      "recommendations": [
+        "Enable slow query logging for detailed analysis",
+        "Review query patterns for optimization opportunities",
+        "Check cache hit ratios and consider increasing cache sizes",
+        "Monitor CPU and disk I/O on data nodes",
+        "Consider implementing query result caching at application layer"
+      ]
+    },
+    "medium": {
+      "threshold": 500,
+      "reasoning": "Search latency above 500ms should be monitored for degradation trends",
+      "recommendations": [
+        "Monitor latency trends over time",
+        "Establish baseline performance metrics",
+        "Review index refresh intervals"
+      ]
+    }
+  },
+  "indexing_latency_ms": {
+    "critical": {
+      "threshold": 500,
+      "reasoning": "High indexing latency can cause bulk request failures and indexing backlog",
+      "recommendations": [
+        "Review bulk request sizes - too large may cause memory pressure",
+        "Check disk I/O performance on data nodes",
+        "Review refresh interval settings (consider increasing for bulk loads)",
+        "Monitor merge activity - excessive merges impact indexing",
+        "Check for slow storage or disk watermark issues",
+        "Consider using bulk API with optimal batch sizes"
+      ]
+    },
+    "high": {
+      "threshold": 200,
+      "reasoning": "Indexing latency above 200ms may indicate bottlenecks in ingestion pipeline",
+      "recommendations": [
+        "Optimize refresh interval for write-heavy workloads",
+        "Review number of replicas during bulk indexing",
+        "Check for disk I/O bottlenecks",
+        "Monitor merge policies and segment counts",
+        "Consider using async replication if consistency allows"
+      ]
+    }
+  },
+  "thread_pool_write_rejections": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Write thread pool rejections indicate the cluster cannot keep up with indexing requests",
+      "recommendations": [
+        "Scale cluster immediately by adding data nodes",
+        "Review bulk request sizes and reduce if too large",
+        "Increase write thread pool queue size if appropriate",
+        "Implement request throttling at application layer",
+        "Check for slow disk I/O or JVM issues on nodes",
+        "Consider increasing thread pool size if CPU allows"
+      ]
+    }
+  },
+  "thread_pool_search_rejections": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Search thread pool rejections mean search requests are being dropped",
+      "recommendations": [
+        "Scale cluster by adding nodes to distribute load",
+        "Review and optimize expensive search queries",
+        "Increase search thread pool size if CPU capacity available",
+        "Implement query rate limiting at application layer",
+        "Review cache settings to reduce query processing",
+        "Check for JVM heap pressure and GC activity"
+      ]
+    }
+  },
+  "query_cache_hit_ratio_percent": {
+    "medium": {
+      "threshold": 50,
+      "reasoning": "Low query cache hit ratio indicates queries are not benefiting from caching",
+      "recommendations": [
+        "Review query patterns - filter context queries are cacheable",
+        "Increase query cache size if memory allows",
+        "Analyze query variety - too diverse queries reduce cache effectiveness",
+        "Consider using filter context instead of query context where appropriate",
+        "Review cache eviction rates and adjust sizes accordingly"
+      ]
+    }
+  },
+  "request_cache_hit_ratio_percent": {
+    "medium": {
+      "threshold": 30,
+      "reasoning": "Low request cache hit ratio suggests aggregations are not being reused effectively",
+      "recommendations": [
+        "Review aggregation query patterns",
+        "Increase request cache size if memory is available",
+        "Consider pre-computing common aggregations",
+        "Use size=0 for aggregation-only queries to enable caching",
+        "Check cache invalidation patterns (caches are invalidated on index refresh)"
+      ]
+    }
+  },
+  "search_query_total": {
+    "high": {
+      "threshold": 1000000,
+      "reasoning": "Very high query volume may indicate need for additional capacity or optimization",
+      "recommendations": [
+        "Review query efficiency and optimize where possible",
+        "Consider implementing application-level caching",
+        "Monitor for query patterns that could be optimized",
+        "Plan for cluster scaling based on query growth trends",
+        "Implement rate limiting if queries appear excessive"
+      ]
+    }
+  },
+  "thread_pool_queue_depth": {
+    "high": {
+      "threshold": 100,
+      "reasoning": "High thread pool queue depth indicates cluster is approaching capacity",
+      "recommendations": [
+        "Monitor queue depth trends - increasing queues indicate growing load",
+        "Plan cluster scaling before queues fill completely",
+        "Review workload patterns for spikes or sustained high load",
+        "Consider implementing request throttling",
+        "Check if specific nodes have higher queue depths (imbalance)"
+      ]
+    }
+  }
+}

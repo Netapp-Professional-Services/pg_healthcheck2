@@ -1,0 +1,27 @@
+{
+  "imbalanced_replicas": {
+    "metric_keywords": ["partition_balance", "distribution", "deviation"],
+    "rules": [
+      {
+        "expression": "data.get('deviation', 0) > 20",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Broker '{data.get('broker_id')}' has {data.get('deviation'):.1f}% deviation from average replica count, indicating severe imbalance.",
+        "recommendations": [
+          "Rebalance partitions using the kafka-reassign-partitions tool to distribute load evenly.",
+          "Investigate if recent broker additions or failures caused the imbalance."
+        ]
+      },
+      {
+        "expression": "data.get('deviation', 0) > 10",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Broker '{data.get('broker_id')}' has {data.get('deviation'):.1f}% deviation from average replica count, which may cause uneven resource usage.",
+        "recommendations": [
+          "Monitor broker loads and consider rebalancing if deviation persists.",
+          "Ensure all brokers have similar hardware capacity for balanced distribution."
+        ]
+      }
+    ]
+  }
+}

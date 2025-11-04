@@ -1,0 +1,20 @@
+{
+  "schema_version_inconsistency": {
+    "metric_keywords": ["cassandra", "schema", "version", "consistency", "nodetool", "cluster"],
+    "rules": [
+      {
+        "expression": "data.get('inconsistent_count', 0) > 0",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Schema version inconsistency detected across the cluster. {data.get('inconsistent_count')} different versions found among {data.get('total_nodes')} nodes. This critical issue indicates that nodes have divergent table structures, which can cause read/write errors, application failures, and potential data loss during queries.",
+        "recommendations": [
+          "Immediately identify nodes with mismatched schema versions using 'nodetool describecluster'.",
+          "On nodes with older versions, execute 'nodetool schema-pull' to sync the latest schema.",
+          "After schema synchronization, run 'nodetool repair --full system_schema' to ensure metadata consistency.",
+          "Investigate the root cause: recent schema alterations may not have propagated correctly due to network issues or node failures.",
+          "Implement monitoring alerts for schema version changes and automate schema deployment across the cluster."
+        ]
+      }
+    ]
+  }
+}

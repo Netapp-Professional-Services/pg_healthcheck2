@@ -1,0 +1,156 @@
+{
+  "service_software_update_available": {
+    "high": {
+      "threshold": 1,
+      "reasoning": "AWS service software updates often include critical security patches and performance improvements",
+      "recommendations": [
+        "Review service software update details in AWS Console",
+        "Check if update is optional or required",
+        "Schedule update during maintenance window if required",
+        "Review update changelog for breaking changes",
+        "Test update in non-production environment first if possible",
+        "Plan update within required timeframe for mandatory updates"
+      ]
+    }
+  },
+  "service_software_update_required": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Required service software updates must be applied - AWS may force update if not done in time",
+      "recommendations": [
+        "URGENT: Schedule required service software update immediately",
+        "Review update impact and plan maintenance window",
+        "AWS will automatically apply update if not done within timeframe",
+        "Plan for potential cluster impact during update",
+        "Review AWS documentation for update specifics",
+        "Consider snapshot before update for safety"
+      ]
+    }
+  },
+  "autotune_disabled": {
+    "high": {
+      "threshold": 1,
+      "reasoning": "Auto-Tune automatically optimizes cluster performance based on workload - recommended by AWS",
+      "recommendations": [
+        "Enable Auto-Tune for automatic performance optimization",
+        "Auto-Tune adjusts JVM heap, memory buffers, and queue sizes",
+        "Review Auto-Tune recommendations in AWS Console",
+        "Schedule Auto-Tune changes during maintenance windows",
+        "Monitor performance improvements after enabling",
+        "No cost impact - included with AWS OpenSearch Service"
+      ]
+    }
+  },
+  "dedicated_masters_disabled": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Dedicated master nodes are essential for production cluster stability and preventing split-brain",
+      "recommendations": [
+        "URGENT: Enable dedicated master nodes for production workloads",
+        "AWS recommends 3 dedicated master nodes for production",
+        "Use m5.large.search or larger for master nodes",
+        "Dedicated masters prevent cluster instability from data node load",
+        "Plan blue/green deployment to add dedicated masters",
+        "This is a critical production best practice"
+      ]
+    }
+  },
+  "multi_az_disabled": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Multi-AZ deployment is essential for high availability and disaster recovery in production",
+      "recommendations": [
+        "URGENT: Enable Multi-AZ deployment for production workloads",
+        "Multi-AZ distributes nodes across 2-3 availability zones",
+        "Protects against AZ-level failures",
+        "Requires at least 2 nodes (3+ recommended)",
+        "Plan blue/green deployment to enable Multi-AZ",
+        "Essential for production SLA requirements"
+      ]
+    }
+  },
+  "https_not_enforced": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Unencrypted HTTP traffic exposes sensitive data and authentication credentials",
+      "recommendations": [
+        "URGENT: Enable HTTPS enforcement immediately",
+        "All traffic should be encrypted in transit",
+        "Security best practice and compliance requirement",
+        "No performance impact with modern TLS",
+        "Update clients to use HTTPS URLs",
+        "Verify TLS policy is up to date (TLS 1.2 minimum)"
+      ]
+    }
+  },
+  "not_in_vpc": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Public OpenSearch domains are exposed to internet and harder to secure properly",
+      "recommendations": [
+        "URGENT: Deploy domain in VPC for production workloads",
+        "VPC deployment provides network isolation and security",
+        "Prevents direct internet exposure",
+        "Enables security group and network ACL controls",
+        "Required for most compliance standards",
+        "Plan migration to VPC deployment (requires new domain)"
+      ]
+    }
+  },
+  "outdated_tls_policy": {
+    "high": {
+      "threshold": 1,
+      "reasoning": "Outdated TLS policies may have known vulnerabilities and fail compliance requirements",
+      "recommendations": [
+        "Update to latest TLS security policy",
+        "Minimum TLS 1.2 required for PCI DSS compliance",
+        "TLS 1.3 recommended for best security",
+        "Review client compatibility before updating",
+        "Update policy during maintenance window",
+        "Verify all clients support chosen TLS version"
+      ]
+    }
+  },
+  "insufficient_instance_count": {
+    "high": {
+      "threshold": 2,
+      "reasoning": "Less than 3 instances reduces high availability and limits replica distribution",
+      "recommendations": [
+        "Increase instance count to at least 3 for production",
+        "Enables proper replica distribution across nodes",
+        "Provides redundancy for node failures",
+        "Required for effective Multi-AZ deployment",
+        "Plan gradual scale-up during low-traffic period",
+        "Consider data node count for replica requirements"
+      ]
+    }
+  },
+  "master_instance_undersized": {
+    "high": {
+      "threshold": 1,
+      "reasoning": "Undersized master nodes can cause cluster instability and state management issues",
+      "recommendations": [
+        "Use m5.large.search minimum for production master nodes",
+        "m6g.large.search or larger recommended for large clusters",
+        "Master node sizing depends on cluster complexity",
+        "Monitor master node CPU and memory usage",
+        "Plan master instance upgrade if utilization high",
+        "AWS recommends specific sizing based on cluster size"
+      ]
+    }
+  },
+  "data_instance_undersized": {
+    "high": {
+      "threshold": 1,
+      "reasoning": "Undersized data nodes can cause performance issues and capacity problems",
+      "recommendations": [
+        "Review data node sizing recommendations from AWS",
+        "Consider workload type (search-heavy vs indexing-heavy)",
+        "Monitor CPU, memory, and disk utilization",
+        "Plan instance type upgrade if resources constrained",
+        "Use CloudWatch metrics to inform sizing decisions",
+        "Consider graviton instances (m6g) for cost efficiency"
+      ]
+    }
+  }
+}

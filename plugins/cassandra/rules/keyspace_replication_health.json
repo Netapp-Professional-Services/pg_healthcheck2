@@ -13,7 +13,7 @@
         ]
       },
       {
-        "expression": "'NetworkTopologyStrategy' in data.get('replication', {}).get('class', '') and min([v for k,v in data.get('replication', {}).items() if k != 'class' and isinstance(v, int)]) < 2",
+        "expression": "'NetworkTopologyStrategy' in data.get('replication', {}).get('class', '') and len([v for k,v in data.get('replication', {}).items() if k != 'class' and isinstance(v, int)]) > 0 and min([v for k,v in data.get('replication', {}).items() if k != 'class' and isinstance(v, int)]) < 2",
         "level": "high",
         "score": 7,
         "reasoning": "Keyspace '{data.get('keyspace_name')}' has replication factor < 2 in at least one datacenter, insufficient for fault tolerance in production environments.",

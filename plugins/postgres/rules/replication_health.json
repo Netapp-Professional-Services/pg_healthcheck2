@@ -7,11 +7,66 @@
         "expression": "int(data.get('inactive_slots_count', 0)) > 0",
         "level": "critical",
         "score": 5,
-        "reasoning": "{data.get('inactive_slots_count')} inactive replication slot(s) were found. Inactive slots prevent the primary from recycling WAL files.",
-        "recommendations": ["This is a critical issue that will eventually lead to disk exhaustion and a database outage. Identify and drop any unused replication slots immediately using 'SELECT pg_drop_replication_slot(\"slot_name\");'."]
+        "reasoning": "{data.get('inactive_slots_count')} inactive replication slot(s) detected. Inactive slots prevent PostgreSQL from removing old WAL files, which will eventually fill the disk and cause an outage.",
+        "recommendations": [
+          "Review the Replication Health check report to determine if these are Patroni-managed slots or user-created slots.",
+          "For non-Patroni slots: Drop any unused replication slots immediately using 'SELECT pg_drop_replication_slot(\"slot_name\");'.",
+          "For Patroni-managed slots (prefixed with 'patroni_'): Check the Patroni Topology and DCS Health checks to determine why the slot is inactive (e.g., node removed, network issue, standby rebuilding).",
+          "Monitor disk usage closely until inactive slots are resolved."
+        ]
+      }
+    ]
+  },
+  "replication_lag_detected": {
+    "metric_keywords": ["physical_replication_status"],
+    "data_conditions": [{"key": "data", "exists": true}],
+    "rules": [
+      {
+        "expression": "isinstance(data.get('data'), list) and len(data.get('data', [])) > 0",
+        "level": "info",
+        "score": 1,
+        "reasoning": "Physical replication is active with {len(data.get('data', []))} standby node(s) connected.",
+        "recommendations": [
+          "Review the Replication Health check for detailed lag metrics.",
+          "If using Patroni, see the Patroni Topology check for comprehensive cluster-wide replication analysis.",
+          "Monitor replication lag regularly to detect potential issues before they impact RPO/RTO."
+        ]
+      }
+    ]
+  },
+  "no_replication_standbys": {
+    "metric_keywords": ["physical_replication_status"],
+    "data_conditions": [{"key": "status", "equals": "success"}],
+    "rules": [
+      {
+        "expression": "data.get('status') == 'success' and not data.get('data')",
+        "level": "warning",
+        "score": 3,
+        "reasoning": "No active physical replication standbys are connected to this node. The database is running without high availability.",
+        "recommendations": [
+          "If high availability is required, configure at least one streaming replication standby.",
+          "For Patroni clusters, verify the cluster topology using the Patroni Topology check to ensure all nodes are functioning.",
+          "Consider using Patroni for automated failover and cluster management.",
+          "Ensure regular backups are in place as there is no real-time standby for failover."
+        ]
+      }
+    ]
+  },
+  "replication_check_on_standby": {
+    "metric_keywords": ["replication_slots_summary"],
+    "data_conditions": [{"key": "status", "equals": "skipped"}],
+    "rules": [
+      {
+        "expression": "data.get('status') == 'skipped' and data.get('reason') == 'standby_node'",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Replication slot queries were skipped because this node is a standby in recovery mode.",
+        "recommendations": [
+          "Replication slot queries are only available on the primary node.",
+          "To inspect replication slots, run the health check against the primary node.",
+          "If using Patroni, use the Patroni Topology check which queries all nodes in the cluster."
+        ]
       }
     ]
   }
 }
-
-

@@ -1,0 +1,112 @@
+Summary: Enhanced Cassandra JVM Check with Full GC Log Analysis
+
+  Enhanced the Cassandra JVM statistics check to detect and analyze Full GC events from actual GC log files,
+  Addresses the issue where Allocation Failure Full GCs cause latency and timeouts.
+
+  What Was Added:
+
+  1. GC Log File Parsing (check_jvm_stats.py)
+
+  New Function: parse_gc_log_events()
+  - Parses GC log entries to extract Full GC events
+  - Detects patterns like: [Full GC (Allocation Failure) 2019-10-30T11:13:00.920-0100: 6.399: [CMS: 43711K->43711K(43712K), 0.1417937
+   secs]
+  - Extracts:
+    - Cause: Allocation Failure, Metadata GC Threshold, System.gc(), etc.
+    - Timestamp: When the event occurred
+    - Pause Time: How long the application was frozen (in milliseconds)
+    - Heap Before→After: Memory usage before and after GC
+    - Reclaimed %: How much memory was freed
+
+  2. Enhanced SSH Command
+
+  - Automatically discovers GC log file location:
+    - Common paths: /var/log/cassandra/gc.log, /opt/cassandra/logs/gc.log
+    - Extracts from Java process command line (-Xloggc: parameter)
+  - Retrieves last N lines (configurable via cassandra_gc_log_lines setting, default 500)
+  - Filters for Full GC events
+
+  3. New Report Section: "Full GC Events (From Log Files)"
+
+  When Full GC events are detected, the report now shows:
+
+  - Critical Warning with event count and affected brokers
+  - Full GC Causes Summary: Breakdown by cause type
+  - Detailed Events Table (last 20 events):
+    - Broker ID
+    - Timestamp
+    - Cause (e.g., "Allocation Failure")
+    - Pause Time with color coding:
+        - 🔴 Red: >1 second (critical impact)
+      - ⚠️ Yellow: >500ms (noticeable latency)
+    - Heap Before→After (in MB)
+    - Memory Reclaimed %
+  - Educational Tips: Explains what each Full GC cause means:
+    - Allocation Failure: Most critical - heap is exhausted
+    - Metadata GC Threshold: Metaspace full
+    - System.gc(): Explicit GC call (usually unnecessary)
+    - Ergonomics: JVM adaptive sizing
+    - Heap Inspection: Diagnostic tool triggered GC
+
+  4. Enhanced Structured Data
+
+  Added to structured_data for rules engine:
+  - total_full_gc_events_from_logs: Total Full GC count from logs
+  - full_gc_allocation_failures: Count of critical Allocation Failure events
+  - full_gc_causes: Dictionary of causes and their counts
+  - full_gc_events: Detailed list of all events with metadata
+
+  5. New Automated Rules (check_jvm_stats.json)
+
+  full_gc_allocation_failures:
+  - Critical (score 10): ≥5 Allocation Failure Full GCs → Immediate heap increase required
+  - High (score 8): ≥1 Allocation Failure → Plan heap increase
+
+  full_gc_events_detected:
+  - High (score 7): ≥10 Full GC events → Investigate causes, tune GC
+  - Medium (score 5): ≥3 Full GC events → Monitor trends
+
+  full_gc_long_pauses:
+  - Critical (score 9): Pause time ≥2000ms → Severe application impact
+  - High (score 7): Pause time ≥1000ms → Noticeable latency
+
+  Key Benefits:
+
+  1. Real-Time Detection: Catches Full GC events as they happen in the logs (vs just cumulative counters from jstat)
+  2. Root Cause Analysis: Identifies why Full GCs are occurring:
+    - Allocation Failure = Insufficient heap
+    - System.gc() = Application calling GC explicitly
+    - Metadata GC = Metaspace issues
+  3. Impact Assessment: Shows pause times to quantify user impact
+  4. Automated Alerting: Rules engine triggers critical alerts for Allocation Failure events
+  5. Actionable Recommendations: Specific guidance based on Full GC cause
+
+  Configuration:
+
+  Add to your Cassandra config YAML:
+  cassandra_gc_log_lines: 500  # Number of GC log lines to analyze (default: 500)
+
+  Example Output:
+
+  ==== Full GC Events (From Log Files)
+
+  [IMPORTANT]
+  ====
+  ⚠️ Detected 12 Full GC event(s) in recent log history (last 500 lines)
+
+  Full GCs pause the entire application and can cause timeouts and latency spikes.
+
+  **Affected Brokers:** broker-1, broker-2
+
+  **Full GC Causes:**
+  * **Allocation Failure**: 8 event(s)
+  * **System.gc()**: 3 event(s)
+  * **Metadata GC Threshold**: 1 event(s)
+  ====
+
+  |===
+  |Broker|Timestamp|Cause|Pause Time (ms)|Heap Before→After|Reclaimed
+  |broker-1|2019-10-30T11:13:00|Allocation Failure|🔴 142|6045→4737 MB|21.6%
+  |broker-2|2019-10-30T11:12:45|Allocation Failure|⚠️ 651|5890→4512 MB|23.4%
+  ...
+  |===

@@ -1,0 +1,7 @@
+= Opensearch Health Check
+Instaclustr Professional Services
+:doctype: book
+:encoding: utf-8
+:lang: en
+:toc: left
+:numbered:

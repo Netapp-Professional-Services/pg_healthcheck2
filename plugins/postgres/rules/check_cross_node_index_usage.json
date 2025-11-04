@@ -1,0 +1,134 @@
+{
+  "unused_index_all_nodes": {
+    "metric_keywords": [
+      "unused_everywhere"
+    ],
+    "rules": [
+      {
+        "expression": "float(data.get('index_size_bytes', 0)) > 100 * 1024 * 1024",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "The index '{data.get('index_name')}' on table '{data.get('table_name')}' is unused on ALL nodes (primary and replicas) and consumes {data.get('index_size')} of disk space. Unused indexes add overhead to write operations and consume disk space without providing any query performance benefit.",
+        "recommendations": [
+          "CRITICAL: This index is confirmed unused across the entire cluster (primary and all replicas). It is safe to drop immediately.",
+          "Drop the index using `DROP INDEX CONCURRENTLY {data.get('index_name')};` to reclaim space and improve write performance.",
+          "Verify no application logic depends on the index existing (e.g., for EXPLAIN or monitoring queries)."
+        ]
+      },
+      {
+        "expression": "True",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "The index '{data.get('index_name')}' on table '{data.get('table_name')}' ({data.get('index_size')}) is unused on all cluster nodes.",
+        "recommendations": [
+          "This index is unused across the entire cluster (primary and replicas). Consider dropping it to reduce write overhead.",
+          "Use `DROP INDEX CONCURRENTLY {data.get('index_name')};` to avoid table locking."
+        ]
+      }
+    ]
+  },
+  "primary_only_index_usage": {
+    "metric_keywords": [
+      "used_on_primary"
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('primary_scans', 0)) > 10000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "The index '{data.get('index_name')}' on table '{data.get('table_name')}' has been scanned {data.get('primary_scans'):,} times on the PRIMARY node but is NOT used on any replicas. This indicates read queries are hitting the writer instance instead of being properly offloaded to read replicas.",
+        "recommendations": [
+          "HIGH PRIORITY: Review application connection strings and query routing logic for queries using this index.",
+          "Direct read queries to replica endpoints (e.g., Aurora reader endpoint) to reduce load on the primary writer.",
+          "Verify that connection pooling or load balancers are properly configured to use replica endpoints for read queries.",
+          "Consider using read/write split patterns in your application to automatically route reads to replicas."
+        ]
+      },
+      {
+        "expression": "int(data.get('primary_scans', 0)) > 1000",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "The index '{data.get('index_name')}' on table '{data.get('table_name')}' has been scanned {data.get('primary_scans'):,} times on the PRIMARY but not on replicas. Read queries may not be properly offloaded to read replicas.",
+        "recommendations": [
+          "Review queries using this index and verify they are being routed to reader endpoints when appropriate.",
+          "Consider implementing read/write split to offload read traffic from the primary writer to replicas."
+        ]
+      },
+      {
+        "expression": "True",
+        "level": "low",
+        "score": 2,
+        "reasoning": "The index '{data.get('index_name')}' is used only on the primary node ({data.get('primary_scans')} scans) and not on replicas.",
+        "recommendations": [
+          "Monitor this pattern. If read queries should be on replicas, verify routing configuration."
+        ]
+      }
+    ]
+  },
+  "multi_node_index_usage": {
+    "metric_keywords": [
+      "used_multi_node"
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('primary_scans', 0)) > int(data.get('replica_scans', 0)) and int(data.get('primary_scans', 0)) > 5000",
+        "level": "high",
+        "score": 6,
+        "reasoning": "The index '{data.get('index_name')}' on table '{data.get('table_name')}' is used on BOTH primary and replicas, but PRIMARY usage ({data.get('primary_scans'):,} scans) EXCEEDS replica usage ({data.get('replica_scans'):,} scans). This suggests read queries are hitting the writer instead of being properly distributed to read replicas.",
+        "recommendations": [
+          "Investigate why read queries are preferentially hitting the primary writer instead of replicas.",
+          "Review connection string configuration and ensure reader endpoints are being used for read queries.",
+          "Consider implementing or improving read/write split patterns in your application.",
+          "Verify load balancer or proxy configuration is properly distributing read traffic to replicas."
+        ]
+      },
+      {
+        "expression": "int(data.get('primary_scans', 0)) > 1000 and int(data.get('replica_scans', 0)) > 1000",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "The index '{data.get('index_name')}' on table '{data.get('table_name')}' is used on both primary ({data.get('primary_scans'):,} scans) and replicas ({data.get('replica_scans'):,} scans). Some multi-node usage is normal, but verify read routing is optimal.",
+        "recommendations": [
+          "Review the balance of primary vs. replica usage for this index.",
+          "If most queries using this index are reads, consider routing more traffic to replica endpoints.",
+          "Verify that write queries appropriately use the primary endpoint while reads use replica endpoints."
+        ]
+      },
+      {
+        "expression": "True",
+        "level": "low",
+        "score": 1,
+        "reasoning": "The index '{data.get('index_name')}' is used on both primary and replicas with relatively low scan counts.",
+        "recommendations": [
+          "Monitor usage patterns over time to ensure read traffic is appropriately distributed."
+        ]
+      }
+    ]
+  },
+  "optimal_replica_usage": {
+    "metric_keywords": [
+      "used_only_on_replicas"
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('replica_scans', 0)) > 10000",
+        "level": "info",
+        "score": 0,
+        "reasoning": "OPTIMAL PATTERN: The index '{data.get('index_name')}' on table '{data.get('table_name')}' is used exclusively on read replicas ({data.get('replica_scans'):,} scans), with NO usage on the primary. This is the ideal pattern for read-heavy indexes in a clustered environment.",
+        "recommendations": [
+          "This index demonstrates optimal usage - reads are properly offloaded to replicas.",
+          "Continue monitoring to ensure this pattern is maintained as workload evolves.",
+          "Consider using this as a reference pattern for other read-heavy queries."
+        ]
+      },
+      {
+        "expression": "True",
+        "level": "info",
+        "score": 0,
+        "reasoning": "GOOD PATTERN: The index '{data.get('index_name')}' is used only on replicas ({data.get('replica_scans')} scans), showing proper read offload.",
+        "recommendations": [
+          "This index shows optimal usage pattern with reads properly directed to replicas."
+        ]
+      }
+    ]
+  }
+}

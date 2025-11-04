@@ -18,28 +18,41 @@ class CassandraPlugin(BasePlugin):
     def get_rules_config(self):
         """
         Dynamically discovers and loads all .json rule files
-        from the 'rules' directory.
-        
+        from the 'rules' directory with validation.
+
         Returns:
-            dict: All rules merged into a single dictionary
+            dict: All rules merged into a single dictionary (only valid rules)
         """
+        from utils.rule_validator import validate_and_load_rules
+        import logging
+
+        logger = logging.getLogger(__name__)
         all_rules = {}
         rules_dir = Path(__file__).parent / 'rules'
 
         if not rules_dir.is_dir():
-            print(f"⚠️ Warning: Rules directory not found at {rules_dir}")
+            logger.warning(f"Rules directory not found at {rules_dir}")
             return {}
 
         for rule_file in rules_dir.glob('*.json'):
             try:
                 with open(rule_file, 'r') as f:
                     loaded_rules = json.load(f)
-                    all_rules.update(loaded_rules)
-            except json.JSONDecodeError as e:
-                print(f"⚠️ Warning: Could not parse rule file {rule_file.name}. Error: {e}")
-            except IOError as e:
-                print(f"⚠️ Warning: Could not read rule file {rule_file.name}. Error: {e}")
 
+                # Validate and filter rules
+                validated_rules = validate_and_load_rules(loaded_rules, str(rule_file))
+
+                if validated_rules:
+                    all_rules.update(validated_rules)
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Rule file {rule_file.name} has invalid JSON: {e}")
+            except IOError as e:
+                logger.error(f"Could not read rule file {rule_file.name}: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error loading rule file {rule_file.name}: {e}")
+
+        logger.info(f"Loaded {len(all_rules)} rule metric(s) from {rules_dir}")
         return all_rules
 
     def get_report_definition(self, report_config_file=None):
@@ -104,31 +117,32 @@ class CassandraPlugin(BasePlugin):
 
     def get_db_version_from_findings(self, findings: dict) -> str:
         """
-        Extracts database version from findings structure.
-        Override this to match your specific findings structure.
-        
-        Args:
-            findings: The structured_findings dictionary
-            
-        Returns:
-            str: Database version or "N/A"
+        Extracts the Cassandra version from the findings.
+        Looks in check_node_info check results.
         """
-        # TODO: Implement based on your findings structure
-        # Example patterns:
-        # return findings.get("system_info", {}).get("version", "N/A")
-        # return findings.get("cassandra_overview", {}).get("version", {}).get("data", [{}])[0].get("version", "N/A")
-        return "N/A"
+        try:
+            # Cassandra-specific path to version info
+            node_info = findings.get("check_node_info", {}).get("node_info", {})
+            if node_info.get("status") == "success":
+                data = node_info.get("data", [{}])
+                if data and len(data) > 0:
+                    return data[0].get("release_version", "N/A")
+            return "N/A"
+        except (IndexError, AttributeError, KeyError):
+            return "N/A"
 
     def get_db_name_from_findings(self, findings: dict) -> str:
         """
-        Extracts database name from findings structure.
-        Override this to match your specific findings structure.
-        
-        Args:
-            findings: The structured_findings dictionary
-            
-        Returns:
-            str: Database name or "N/A"
+        Extracts the Cassandra keyspace from findings.
+        For Cassandra, keyspace serves as the "database name".
         """
-        # TODO: Implement based on your findings structure
-        return "N/A"
+        try:
+            node_info = findings.get("check_node_info", {}).get("node_info", {})
+            if node_info.get("status") == "success":
+                data = node_info.get("data", [{}])
+                if data and len(data) > 0:
+                    keyspace = data[0].get("keyspace")
+                    return keyspace if keyspace else "system"
+            return "system"
+        except (IndexError, AttributeError, KeyError):
+            return "system"

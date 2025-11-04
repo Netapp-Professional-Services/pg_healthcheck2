@@ -52,10 +52,10 @@ def run_table_compression_settings(connector, settings):
             compression = table.get('compression', {})
             keyspace = table['keyspace_name']
             table_name = table['table_name']
-            
+
             if not compression or 'class' not in compression:
                 tables_without_compression.append(f"{keyspace}.{table_name}")
-            elif compression.get('class') != 'LZ4Compressor':
+            elif 'LZ4Compressor' not in compression.get('class', ''):
                 tables_not_lz4.append(f"{keyspace}.{table_name} ({compression.get('class')})")
         
         # Report results

@@ -1,0 +1,104 @@
+{
+  "unassigned_shards": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Unassigned shards indicate data that is not replicated or accessible, risking data loss and degraded cluster performance",
+      "recommendations": [
+        "Check cluster logs for shard allocation failures",
+        "Review disk watermark settings (low: 85%, high: 90%, flood: 95%)",
+        "Verify sufficient disk space on all data nodes",
+        "Check for node failures or network issues",
+        "Review shard allocation settings and routing rules",
+        "Consider adding data nodes if cluster is at capacity"
+      ]
+    }
+  },
+  "yellow_indices": {
+    "high": {
+      "threshold": 1,
+      "reasoning": "Yellow indices have unassigned replica shards, reducing redundancy and risking data availability during node failures",
+      "recommendations": [
+        "Identify which indices are yellow: _cat/indices?v&health=yellow",
+        "Check if replica count matches available nodes",
+        "Review shard allocation explain API: _cluster/allocation/explain",
+        "Consider reducing replica count if nodes are insufficient",
+        "Add data nodes to accommodate replica shards"
+      ]
+    }
+  },
+  "red_indices": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Red indices have unassigned primary shards, meaning data is inaccessible and queries will fail",
+      "recommendations": [
+        "URGENT: Red indices indicate data loss or inaccessible data",
+        "Identify red indices: _cat/indices?v&health=red",
+        "Check for failed nodes or disk failures",
+        "Review cluster allocation explain: _cluster/allocation/explain",
+        "Restore from snapshot if primary shards cannot be recovered",
+        "Check for corrupted shards in node logs"
+      ]
+    }
+  },
+  "large_index_shard_count": {
+    "high": {
+      "threshold": 50,
+      "reasoning": "Indices with excessive shards create overhead in cluster state management and can degrade performance",
+      "recommendations": [
+        "Review shard sizing strategy - aim for 10-50GB per shard",
+        "Consider using Rollover API for time-series indices",
+        "Implement Index State Management (ISM) policies",
+        "Consolidate small shards through reindex or shrink API",
+        "Plan index architecture to match data volume and retention"
+      ]
+    }
+  },
+  "index_size_gb": {
+    "high": {
+      "threshold": 100,
+      "reasoning": "Very large indices can impact performance and complicate maintenance operations like snapshots and recovery",
+      "recommendations": [
+        "Implement index lifecycle management with rollover",
+        "Consider time-based or size-based index partitioning",
+        "Review data retention policies",
+        "Force merge read-only indices to reduce segment count",
+        "Archive or delete old data according to retention policy"
+      ]
+    }
+  },
+  "total_indices": {
+    "high": {
+      "threshold": 500,
+      "reasoning": "Large number of indices increases cluster state size and can impact performance",
+      "recommendations": [
+        "Implement Index State Management (ISM) for automated lifecycle",
+        "Delete or close unused indices",
+        "Consolidate indices where possible",
+        "Review index naming and organization strategy",
+        "Consider using data streams for time-series data"
+      ]
+    },
+    "medium": {
+      "threshold": 200,
+      "reasoning": "Growing number of indices should be monitored to prevent cluster state bloat",
+      "recommendations": [
+        "Monitor index growth trends",
+        "Plan index lifecycle and retention policies",
+        "Set up automated cleanup for old indices"
+      ]
+    }
+  },
+  "shard_imbalance_percent": {
+    "high": {
+      "threshold": 30,
+      "reasoning": "Unbalanced shard distribution can lead to hotspots and uneven resource utilization",
+      "recommendations": [
+        "Enable automatic shard rebalancing if disabled",
+        "Review shard allocation awareness settings",
+        "Check for rack awareness or zone configuration",
+        "Manually reroute shards if necessary: _cluster/reroute",
+        "Ensure nodes have similar hardware specifications"
+      ]
+    }
+  }
+}

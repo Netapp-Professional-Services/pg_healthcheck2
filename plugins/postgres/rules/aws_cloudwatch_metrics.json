@@ -96,10 +96,10 @@
     "data_conditions": [],
     "rules": [
         {
-            "expression": "float(next((m['value'] for m in data if m['metric_name'] == 'DatabaseConnections'), '0')) > 0 and (float(next((m['value'] for m in data if m['metric_name'] == 'DatabaseConnections'), '0')) / float(next((m['value'] for m in data if m['metric_name'] == 'ClientConnections'), '1'))) * 100 > 80",
+            "expression": "data.get('metric_name') == 'DatabaseConnections' and isinstance(all_structured_findings.get('aws_cloudwatch_metrics_cloud_metrics'), dict) and isinstance(all_structured_findings['aws_cloudwatch_metrics_cloud_metrics'].get('data'), list) and len([m for m in all_structured_findings['aws_cloudwatch_metrics_cloud_metrics']['data'] if m.get('metric_name') == 'ClientConnections']) > 0 and float(next((m['value'] for m in all_structured_findings['aws_cloudwatch_metrics_cloud_metrics']['data'] if m.get('metric_name') == 'DatabaseConnections'), '0')) > 0 and (float(next((m['value'] for m in all_structured_findings['aws_cloudwatch_metrics_cloud_metrics']['data'] if m.get('metric_name') == 'DatabaseConnections'), '0')) / float(next((m['value'] for m in all_structured_findings['aws_cloudwatch_metrics_cloud_metrics']['data'] if m.get('metric_name') == 'ClientConnections'), '1'))) * 100 > 80",
             "level": "medium",
             "score": 3,
-            "reasoning": "The RDS Proxy is maintaining a high ratio of database connections to client connections, which may indicate low connection reuse.",
+            "reasoning": "The RDS Proxy is maintaining a high ratio of database connections to client connections at {(float(next((m['value'] for m in all_structured_findings['aws_cloudwatch_metrics_cloud_metrics']['data'] if m.get('metric_name') == 'DatabaseConnections'), '0')) / float(next((m['value'] for m in all_structured_findings['aws_cloudwatch_metrics_cloud_metrics']['data'] if m.get('metric_name') == 'ClientConnections'), '1'))) * 100:.1f}%, which may indicate low connection reuse.",
             "recommendations": ["A high ratio can suggest that the proxy is not effectively pooling and reusing connections. This could be due to connection pinning or short-lived connections from the application. Review application logic to ensure connections are long-lived enough to be reused."]
         }
     ]

@@ -1,0 +1,140 @@
+{
+  "master_node_count": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Single master node creates split-brain risk and no failover capability",
+      "recommendations": [
+        "URGENT: Add at least 2 more master-eligible nodes for quorum (total 3)",
+        "Configure minimum_master_nodes to (total/2 + 1)",
+        "For production, use dedicated master nodes separate from data nodes",
+        "Ensure master nodes have sufficient resources (CPU, memory)",
+        "Never use even number of master nodes (always use odd: 3, 5, 7)"
+      ]
+    },
+    "high": {
+      "threshold": 2,
+      "reasoning": "Two master nodes can still cause split-brain issues. Three is the minimum for production",
+      "recommendations": [
+        "Add at least one more master-eligible node (total 3 for quorum)",
+        "Review split-brain prevention settings",
+        "Plan for odd number of master nodes (3, 5, or 7)",
+        "Monitor master node health closely"
+      ]
+    }
+  },
+  "data_node_count": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Single data node means no data redundancy - any node failure causes data loss",
+      "recommendations": [
+        "URGENT: Add at least one more data node for replica protection",
+        "Configure replica count > 0 for all indices",
+        "Plan for at least 2 data nodes (3+ recommended for production)",
+        "Review backup and snapshot strategy",
+        "Consider impact of node failure on data availability"
+      ]
+    }
+  },
+  "shards_per_node": {
+    "critical": {
+      "threshold": 1000,
+      "reasoning": "Exceeding 1000 shards per node can cause cluster state bloat and performance degradation",
+      "recommendations": [
+        "URGENT: Reduce shard count by consolidating indices",
+        "Review index strategy - use larger shards (aim for 10-50GB each)",
+        "Delete or close unused indices",
+        "Use Shrink API to reduce shard count on existing indices",
+        "Implement Index State Management with rollover based on size/time",
+        "Add data nodes to distribute shards if consolidation isn't possible"
+      ]
+    },
+    "high": {
+      "threshold": 600,
+      "reasoning": "High shard count per node approaching recommended limits",
+      "recommendations": [
+        "Plan shard consolidation strategy",
+        "Review index creation patterns and shard allocation",
+        "Monitor shard growth trends",
+        "Consider adding nodes before reaching 1000 shards/node",
+        "Optimize shard sizing for your data volume"
+      ]
+    }
+  },
+  "index_count": {
+    "high": {
+      "threshold": 1000,
+      "reasoning": "Large number of indices increases cluster state size and management overhead",
+      "recommendations": [
+        "Implement Index State Management (ISM) for automated lifecycle",
+        "Set up rollover policies for time-series data",
+        "Delete or close unused indices",
+        "Consolidate indices where appropriate",
+        "Use data streams for time-series workloads",
+        "Review index naming and retention policies"
+      ]
+    },
+    "medium": {
+      "threshold": 500,
+      "reasoning": "Growing index count should be monitored and managed proactively",
+      "recommendations": [
+        "Monitor index growth rate",
+        "Plan lifecycle management policies",
+        "Review data retention requirements",
+        "Set up automated cleanup processes"
+      ]
+    }
+  },
+  "unassigned_shards": {
+    "critical": {
+      "threshold": 1,
+      "reasoning": "Unassigned shards indicate allocation failures and potential data availability issues",
+      "recommendations": [
+        "Check allocation explain API: _cluster/allocation/explain",
+        "Review disk watermark settings and available space",
+        "Check for node failures or network partitions",
+        "Review shard allocation awareness settings",
+        "Verify routing allocation rules aren't blocking assignment",
+        "Add nodes if cluster is at capacity"
+      ]
+    }
+  },
+  "pending_tasks": {
+    "high": {
+      "threshold": 10,
+      "reasoning": "High number of pending cluster tasks can indicate cluster state update bottleneck",
+      "recommendations": [
+        "Check master node CPU and memory usage",
+        "Review cluster state size and complexity",
+        "Reduce shard count if excessively high",
+        "Monitor task queue for task type patterns",
+        "Consider upgrading master node resources"
+      ]
+    }
+  },
+  "active_shards_percent": {
+    "critical": {
+      "threshold": 90,
+      "reasoning": "Less than 90% active shards indicates significant allocation issues",
+      "recommendations": [
+        "Immediate attention required - check cluster health",
+        "Review allocation explain for unassigned shards",
+        "Check disk space on all data nodes",
+        "Review recent cluster changes or failures",
+        "Verify shard allocation settings"
+      ]
+    }
+  },
+  "relocating_shards": {
+    "high": {
+      "threshold": 10,
+      "reasoning": "High number of relocating shards may indicate cluster instability or rebalancing issues",
+      "recommendations": [
+        "Check if rebalancing is intentional (node added/removed)",
+        "Review cluster rebalance settings",
+        "Monitor network bandwidth between nodes",
+        "Consider throttling rebalance if impacting performance",
+        "Check for node failures causing unexpected rebalancing"
+      ]
+    }
+  }
+}

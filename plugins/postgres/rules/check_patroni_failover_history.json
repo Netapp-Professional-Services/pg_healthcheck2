@@ -1,0 +1,147 @@
+{
+  "patroni_failover_flapping": {
+    "metric_keywords": ["patroni_failover_history"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('last_24h', 0) >= 3",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('analysis', {}).get('last_24h', 0)} failover events occurred in the last 24 hours. This indicates severe cluster instability or 'flapping' where the leader keeps failing over.",
+        "recommendations": [
+          "This is a CRITICAL situation requiring immediate investigation.",
+          "Check leader node health: CPU, memory, disk I/O, and network connectivity.",
+          "Verify DCS (etcd/Consul/ZooKeeper) cluster health and quorum.",
+          "Review Patroni logs on all nodes for errors or timeout messages.",
+          "Check network stability between nodes and to the DCS.",
+          "Consider if TTL settings are too aggressive (causing false failovers).",
+          "Look for split-brain conditions or network partitions."
+        ]
+      }
+    ]
+  },
+  "patroni_frequent_failovers": {
+    "metric_keywords": ["patroni_failover_history"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('last_7d', 0) >= 5",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('analysis', {}).get('last_7d', 0)} failover events occurred in the last 7 days. This frequency is unusually high and indicates cluster instability.",
+        "recommendations": [
+          "Review all recent failover events to identify patterns.",
+          "Check if failovers correlate with specific times (e.g., maintenance windows, backup jobs, high load).",
+          "Investigate leader node resource utilization during failover times.",
+          "Verify that DCS is accessible and performing well from all nodes.",
+          "Review Patroni configuration (TTL, timeouts) to ensure they're not too aggressive.",
+          "Consider implementing better monitoring and alerting for early issue detection."
+        ]
+      }
+    ]
+  },
+  "patroni_high_unplanned_failovers": {
+    "metric_keywords": ["patroni_failover_history"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('total_events', 0) > 0 and (data.get('analysis', {}).get('failovers', 0) * 100.0 / data.get('analysis', {}).get('total_events', 1)) > 70",
+        "level": "warning",
+        "score": 5,
+        "reasoning": "{int((data.get('analysis', {}).get('failovers', 0) * 100.0 / data.get('analysis', {}).get('total_events', 1)))}% of failover events are unplanned. A high ratio of unplanned failovers suggests underlying issues.",
+        "recommendations": [
+          "Unplanned failovers indicate unexpected leader failures rather than controlled switchovers.",
+          "Investigate the root cause of each unplanned failover.",
+          "Check for: leader crashes, resource exhaustion, network issues, or DCS connectivity problems.",
+          "Implement proactive monitoring to detect issues before they cause failovers.",
+          "Consider improving leader node stability (resources, network, software updates).",
+          "Use planned switchovers for maintenance instead of letting nodes fail."
+        ]
+      }
+    ]
+  },
+  "patroni_cluster_instability": {
+    "metric_keywords": ["patroni_failover_history"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('stability_score', 100) < 50",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster stability score is {data.get('analysis', {}).get('stability_score', 100)}/100. This indicates severe and persistent instability.",
+        "recommendations": [
+          "This low stability score requires immediate attention from senior DBAs.",
+          "Review the complete failover history to understand failure patterns.",
+          "Consider engaging Patroni support or PostgreSQL consultants.",
+          "Check if recent changes (config, infrastructure, application load) correlate with instability.",
+          "Verify that all nodes meet minimum resource requirements.",
+          "Test network latency and bandwidth between all nodes.",
+          "Consider rebuilding problematic nodes or redeploying the cluster if issues persist."
+        ]
+      },
+      {
+        "expression": "data.get('analysis', {}).get('stability_score', 100) < 70",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Cluster stability score is {data.get('analysis', {}).get('stability_score', 100)}/100. The cluster has experienced significant instability.",
+        "recommendations": [
+          "Investigate recent failover events to identify the root cause.",
+          "Check leader node health metrics (CPU, memory, disk, network).",
+          "Verify DCS cluster health and connectivity from all Patroni nodes.",
+          "Review Patroni configuration for any aggressive timeout settings.",
+          "Monitor cluster closely and address any issues proactively."
+        ]
+      }
+    ]
+  },
+  "patroni_recent_failover_activity": {
+    "metric_keywords": ["patroni_failover_history"],
+    "data_conditions": [
+      { "key": "analysis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('analysis', {}).get('last_24h', 0) > 0",
+        "level": "info",
+        "score": 2,
+        "reasoning": "{data.get('analysis', {}).get('last_24h', 0)} failover event(s) occurred in the last 24 hours.",
+        "recommendations": [
+          "Review the recent failover event(s) to understand what triggered them.",
+          "Check if it was a planned switchover or an unplanned failover.",
+          "Verify that the new leader is healthy and performing well.",
+          "Ensure all replicas have caught up with the new leader.",
+          "Document the event and any actions taken for future reference."
+        ]
+      }
+    ]
+  },
+  "patroni_no_failover_history": {
+    "metric_keywords": ["patroni_failover_history"],
+    "data_conditions": [
+      { "key": "total_events", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_events', 0) == 0",
+        "level": "info",
+        "score": 1,
+        "reasoning": "No failover history is recorded. This could indicate a newly deployed cluster or that history is not being retained.",
+        "recommendations": [
+          "If this is a new cluster, this is expected.",
+          "Consider testing your failover procedures with a planned switchover.",
+          "Verify that the Patroni /history endpoint is functioning correctly.",
+          "Document your failover and switchover procedures.",
+          "Implement regular failover testing as part of your HA validation."
+        ]
+      }
+    ]
+  }
+}

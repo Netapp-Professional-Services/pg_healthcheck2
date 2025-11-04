@@ -1,0 +1,116 @@
+{
+  "severe_connection_instability": {
+    "metric_keywords": ["connection_stability"],
+    "data_conditions": [
+      {
+        "key": "reconnection_count",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('reconnection_count', 0)) >= 20",
+        "level": "critical",
+        "score": 5,
+        "reasoning": "SEVERE connection instability detected: {data.get('reconnection_count', 0)} reconnections during health check execution. This indicates critical infrastructure problems.",
+        "recommendations": [
+          "IMMEDIATE ACTION REQUIRED: Connection is critically unstable.",
+          "Investigate PgBouncer/PostgreSQL SSL configuration immediately.",
+          "Check network stability between proxy and database server.",
+          "Review backend server health and resource utilization.",
+          "Check logs for connection errors and SSL handshake failures."
+        ]
+      }
+    ]
+  },
+  "significant_connection_instability": {
+    "metric_keywords": ["connection_stability"],
+    "data_conditions": [
+      {
+        "key": "reconnection_count",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('reconnection_count', 0)) >= 5 and int(data.get('reconnection_count', 0)) < 20",
+        "level": "high",
+        "score": 4,
+        "reasoning": "Significant connection instability detected: {data.get('reconnection_count', 0)} reconnections during health check execution.",
+        "recommendations": [
+          "Connection is unstable. Review PgBouncer logs for connection errors.",
+          "Check PostgreSQL logs for SSL-related errors.",
+          "Verify network stability between proxy and database server.",
+          "Review connection timeout settings and SSL configuration."
+        ]
+      }
+    ]
+  },
+  "minor_connection_instability": {
+    "metric_keywords": ["connection_stability"],
+    "data_conditions": [
+      {
+        "key": "reconnection_count",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('reconnection_count', 0)) >= 1 and int(data.get('reconnection_count', 0)) < 5",
+        "level": "warning",
+        "score": 2,
+        "reasoning": "Minor connection instability detected: {data.get('reconnection_count', 0)} reconnections during health check execution.",
+        "recommendations": [
+          "Monitor for recurring connection issues.",
+          "Review logs if problem persists.",
+          "Check for transient network issues or SSL certificate problems."
+        ]
+      }
+    ]
+  },
+  "connection_health_score_critical": {
+    "metric_keywords": ["connection_stability"],
+    "data_conditions": [
+      {
+        "key": "health_score",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('health_score', 100)) <= 40",
+        "level": "critical",
+        "score": 5,
+        "reasoning": "Connection health score critically low: {data.get('health_score', 0)}/100. Database connection is severely unstable.",
+        "recommendations": [
+          "CRITICAL: Database connection is severely unstable.",
+          "Immediate infrastructure investigation required.",
+          "Check connection pool health and backend server status.",
+          "Investigate network connectivity and SSL configuration."
+        ]
+      }
+    ]
+  },
+  "connection_health_score_warning": {
+    "metric_keywords": ["connection_stability"],
+    "data_conditions": [
+      {
+        "key": "health_score",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "int(data.get('health_score', 100)) <= 80 and int(data.get('health_score', 100)) > 40",
+        "level": "warning",
+        "score": 3,
+        "reasoning": "Connection health score below acceptable threshold: {data.get('health_score', 0)}/100.",
+        "recommendations": [
+          "Connection stability issues detected.",
+          "Review infrastructure logs and configurations.",
+          "Monitor connection pool metrics and SSL handshake success rate."
+        ]
+      }
+    ]
+  }
+}

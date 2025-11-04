@@ -1,0 +1,46 @@
+{
+  "critical_broker_storage": {
+    "metric_keywords": ["storage_health", "broker_storage", "total_size_gb"],
+    "rules": [
+      {
+        "expression": "data.get('total_size_gb', 0) > 500",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id', 'unknown')} has critical storage usage of {data.get('total_size_gb', 0):.1f}GB.",
+        "recommendations": [
+          "IMMEDIATE ACTION: Review topic retention policies and reduce retention where possible.",
+          "Check for topics with infinite retention (-1) and set reasonable limits.",
+          "Consider adding brokers to the cluster to distribute storage load.",
+          "Enable log compaction for topics that don't need full message history."
+        ]
+      },
+      {
+        "expression": "data.get('total_size_gb', 0) > 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id', 'unknown')} has high storage usage of {data.get('total_size_gb', 0):.1f}GB.",
+        "recommendations": [
+          "Monitor storage growth rate and plan for capacity expansion.",
+          "Review and optimize topic retention settings.",
+          "Consider archiving old data to external storage (S3, HDFS, etc.)."
+        ]
+      }
+    ]
+  },
+  "oversized_partitions": {
+    "metric_keywords": ["storage_health", "partition_storage", "size_gb"],
+    "rules": [
+      {
+        "expression": "data.get('size_gb', 0) > 50",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Partition {data.get('partition', 'unknown')} of topic '{data.get('topic', 'unknown')}' on broker {data.get('broker_id', 'unknown')} is {data.get('size_gb', 0):.1f}GB, indicating data skew.",
+        "recommendations": [
+          "Increase partition count for this topic to distribute data more evenly.",
+          "Review partition key selection to ensure even distribution.",
+          "Consider topic retention settings - this partition may be retaining too much data."
+        ]
+      }
+    ]
+  }
+}

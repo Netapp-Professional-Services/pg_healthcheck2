@@ -1,0 +1,111 @@
+{
+  "isr_health": {
+    "status": "success",
+    "summary": {
+      "total_topics": 15,
+      "total_partitions": 120,
+      "under_replicated_partitions": 8,
+      "topics_with_issues": 3,
+      "total_isr_shrinks": 45,
+      "has_critical_issues": true,
+      "has_warning_issues": true
+    },
+    "under_replicated_partitions": [
+      {
+        "topic": "critical_events",
+        "partition": 2,
+        "leader": 1,
+        "replicas": [1, 2, 3],
+        "isr": [1],
+        "missing_replicas": 2,
+        "replication_factor": 3
+      },
+      {
+        "topic": "critical_events",
+        "partition": 4,
+        "leader": 2,
+        "replicas": [2, 3, 1],
+        "isr": [2],
+        "missing_replicas": 2,
+        "replication_factor": 3
+      },
+      {
+        "topic": "order_processing",
+        "partition": 0,
+        "leader": 3,
+        "replicas": [3, 1, 2],
+        "isr": [3],
+        "missing_replicas": 2,
+        "replication_factor": 3
+      },
+      {
+        "topic": "critical_events",
+        "partition": 5,
+        "leader": 1,
+        "replicas": [1, 2, 3],
+        "isr": [1, 2],
+        "missing_replicas": 1,
+        "replication_factor": 3
+      },
+      {
+        "topic": "user_activity",
+        "partition": 3,
+        "leader": 2,
+        "replicas": [2, 3, 1],
+        "isr": [2, 3],
+        "missing_replicas": 1,
+        "replication_factor": 3
+      },
+      {
+        "topic": "user_activity",
+        "partition": 7,
+        "leader": 1,
+        "replicas": [1, 2, 3],
+        "isr": [1, 2],
+        "missing_replicas": 1,
+        "replication_factor": 3
+      },
+      {
+        "topic": "order_processing",
+        "partition": 1,
+        "leader": 2,
+        "replicas": [2, 3, 1],
+        "isr": [2, 3],
+        "missing_replicas": 1,
+        "replication_factor": 3
+      },
+      {
+        "topic": "order_processing",
+        "partition": 6,
+        "leader": 3,
+        "replicas": [3, 1, 2],
+        "isr": [3, 1],
+        "missing_replicas": 1,
+        "replication_factor": 3
+      }
+    ],
+    "affected_topics": [
+      {
+        "topic": "critical_events",
+        "under_replicated_count": 3,
+        "total_partitions": 6,
+        "isr_shrinks": 15
+      },
+      {
+        "topic": "user_activity",
+        "under_replicated_count": 2,
+        "total_partitions": 12,
+        "isr_shrinks": 8
+      },
+      {
+        "topic": "order_processing",
+        "under_replicated_count": 3,
+        "total_partitions": 8,
+        "isr_shrinks": 22
+      }
+    ],
+    "all_topics": [
+      "... full topic data for all 15 topics would be here ..."
+    ]
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "critical_io_utilization": {
+    "metric_keywords": ["iostat", "io_data"],
+    "rules": [
+      {
+        "expression": "data.get('util', 0) >= 95",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Device {data.get('device')} on broker {data.get('broker_id')} has critical utilization: {data.get('util'):.1f}% with {data.get('await'):.1f}ms average wait time.",
+        "recommendations": [
+          "Immediate action: Disk I/O is severely bottlenecked",
+          "Consider migrating to faster storage (SSD/NVMe)",
+          "Reduce write load or add additional brokers to distribute I/O",
+          "Check for disk hardware issues with SMART diagnostics"
+        ]
+      },
+      {
+        "expression": "data.get('util', 0) >= 85",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Device {data.get('device')} on broker {data.get('broker_id')} has high utilization: {data.get('util'):.1f}%.",
+        "recommendations": [
+          "Monitor I/O trends - approaching saturation",
+          "Plan for storage upgrade or load redistribution",
+          "Review and optimize Kafka flush settings"
+        ]
+      }
+    ]
+  },
+  "high_io_latency": {
+    "metric_keywords": ["iostat", "io_data"],
+    "rules": [
+      {
+        "expression": "data.get('await', 0) >= 50",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Device {data.get('device')} on broker {data.get('broker_id')} has critical I/O latency: {data.get('await'):.1f}ms average wait time.",
+        "recommendations": [
+          "Extremely high latency - investigate immediately",
+          "Check for failing disks or RAID degradation",
+          "Verify disk queue depths and I/O scheduler settings",
+          "Consider faster storage technology"
+        ]
+      },
+      {
+        "expression": "data.get('await', 0) >= 20",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Device {data.get('device')} on broker {data.get('broker_id')} has elevated I/O latency: {data.get('await'):.1f}ms.",
+        "recommendations": [
+          "Monitor latency trends over time",
+          "Review write patterns and batch configurations",
+          "Check if compaction is causing temporary spikes"
+        ]
+      }
+    ]
+  },
+  "high_cpu_iowait": {
+    "metric_keywords": ["iostat", "cpu_data"],
+    "rules": [
+      {
+        "expression": "data.get('iowait', 0) >= 25",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} has critical CPU I/O wait: {data.get('iowait'):.1f}%. CPU is spending too much time waiting for disk I/O.",
+        "recommendations": [
+          "Storage subsystem is severely bottlenecking performance",
+          "Upgrade to faster disks immediately",
+          "Reduce load or scale out brokers",
+          "Check for disk hardware failures"
+        ]
+      },
+      {
+        "expression": "data.get('iowait', 0) >= 10",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} has elevated CPU I/O wait: {data.get('iowait'):.1f}%.",
+        "recommendations": [
+          "Storage subsystem may be becoming a bottleneck",
+          "Monitor disk performance metrics",
+          "Consider storage upgrade or workload optimization"
+        ]
+      }
+    ]
+  },
+  "low_throughput_high_ops": {
+    "metric_keywords": ["iostat", "io_data"],
+    "rules": [
+      {
+        "expression": "data.get('r_s', 0) + data.get('w_s', 0) > 500 and (data.get('rkB_s', 0) + data.get('wkB_s', 0)) / (data.get('r_s', 0) + data.get('w_s', 0) + 1) < 32",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Device {data.get('device')} on broker {data.get('broker_id')} has high IOPS ({data.get('r_s'):.0f}+{data.get('w_s'):.0f}) but small average request size, indicating many small I/O operations.",
+        "recommendations": [
+          "Consider increasing batch sizes to reduce I/O operations",
+          "Review producer and consumer batch configurations",
+          "Small I/O operations are less efficient than larger batched writes"
+        ]
+      }
+    ]
+  },
+  "cluster_wide_io_issues": {
+    "metric_keywords": ["iostat_summary"],
+    "rules": [
+      {
+        "expression": "data.get('critical_broker_count', 0) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({data.get('critical_broker_count')}) have critical I/O issues. This is a cluster-wide performance problem.",
+        "recommendations": [
+          "Cluster-wide I/O bottleneck detected",
+          "Review overall workload and capacity planning",
+          "Consider cluster-wide storage infrastructure upgrade",
+          "Implement tiered storage if using Kafka 2.8+"
+        ]
+      },
+      {
+        "expression": "data.get('warning_broker_count', 0) >= 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple brokers ({data.get('warning_broker_count')}) have elevated I/O load. Monitor for cluster-wide capacity issues.",
+        "recommendations": [
+          "Multiple brokers showing I/O stress",
+          "Plan for capacity upgrades across the cluster",
+          "Review workload distribution and rebalancing"
+        ]
+      },
+      {
+        "expression": "data.get('max_iowait', 0) > 15",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Peak CPU I/O wait across cluster is {data.get('max_iowait'):.1f}%, indicating storage bottlenecks.",
+        "recommendations": [
+          "Storage subsystem is limiting cluster performance",
+          "Consider faster storage across all brokers",
+          "Review and optimize I/O patterns"
+        ]
+      }
+    ]
+  }
+}

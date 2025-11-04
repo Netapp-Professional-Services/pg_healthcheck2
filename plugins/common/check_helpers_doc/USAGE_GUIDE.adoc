@@ -1,0 +1,580 @@
+= CheckContentBuilder Usage Guide
+:toc:
+:toclevels: 3
+
+== Overview
+
+`CheckContentBuilder` is an **optional** helper class for constructing health check AsciiDoc content with minimal typing. It's purely additive - all existing checks continue to work unchanged.
+
+=== Key Benefits
+
+* ✅ **Minimal typing** - Short method names (`h3()`, `note()`, `recs()`)
+* ✅ **No list management** - No more `adoc_content = []`, `.append()`, `.extend()`
+* ✅ **No manual joins** - No more `"\n".join(adoc_content)`
+* ✅ **Fluent/chainable** - `builder.h3("Title").para("Text").note("Note")`
+* ✅ **Works with existing helpers** - `safe_execute_query()`, `format_check_header()`
+* ✅ **100% backward compatible** - Old pattern still works forever
+* ✅ **Optional** - Use only when you want cleaner code
+
+== Quick Start
+
+[source,python]
+----
+from plugins.common.check_helpers import CheckContentBuilder
+
+def run_my_check(connector, settings):
+    builder = CheckContentBuilder(connector.formatter)
+    structured_data = {}
+    
+    # Build content
+    builder.h3("My Check")
+    builder.para("Description of what this check does.")
+    
+    if problem_detected:
+        builder.critical("Critical issue found!")
+    
+    builder.h4("Summary")
+    builder.table(data)
+    builder.recs(["Fix this", "Do that"])
+    
+    return builder.build(), structured_data
+----
+
+== Method Reference
+
+=== Headers
+
+[source,python]
+----
+# Level 3 header (===)
+builder.h3("Check Title")
+
+# Level 4 header (====)
+builder.h4("Section Title")
+
+# Using existing helper (for requirements flags)
+builder.add_header(
+    "Disk Check",
+    "Monitors disk usage",
+    requires_ssh=True
+)
+----
+
+=== Text Content
+
+[source,python]
+----
+# Paragraph with trailing blank line
+builder.para("This is a paragraph.")
+
+# Text without trailing blank line
+builder.text("Inline text")
+
+# Blank line
+builder.blank()
+
+# Add pre-formatted content (from existing helpers)
+success, formatted, raw = safe_execute_query(...)
+builder.add(formatted)
+----
+
+=== Admonition Blocks
+
+==== Simple Admonitions
+
+[source,python]
+----
+# NOTE block
+builder.note("This is informational.")
+
+# TIP block
+builder.tip("Here's a helpful tip.")
+
+# WARNING block
+builder.warning("Be careful about this.")
+
+# IMPORTANT/CRITICAL block
+builder.critical("This is critical!")
+
+# CAUTION/ERROR block
+builder.error("An error occurred.")
+----
+
+==== Structured Issue Blocks
+
+For detailed issues with key-value pairs:
+
+[source,python]
+----
+# Generic issue with custom level
+builder.issue(
+    "Disk Usage Critical",
+    {
+        "Broker": "1 (192.168.1.113)",
+        "Usage": "95.3% (threshold: 90%)",
+        "Available": "512 MB"
+    },
+    level="IMPORTANT"
+)
+
+# Shortcut for critical
+builder.critical_issue(
+    "Heap Memory Critical",
+    {
+        "Broker": "2",
+        "Heap": "92% used",
+        "GC Count": "150"
+    }
+)
+
+# Shortcut for warning
+builder.warning_issue(
+    "High CPU Usage",
+    ["CPU at 85%", "Check system load"]
+)
+----
+
+=== Tables
+
+==== Simple Tables
+
+[source,python]
+----
+# Table from list of dicts
+data = [
+    {"Broker": 1, "Usage": "95%", "Status": "CRITICAL"},
+    {"Broker": 2, "Usage": "65%", "Status": "OK"}
+]
+builder.table(data)
+
+# Dictionary as two-column table
+config = {"heap_size": "8GB", "gc_type": "G1GC"}
+builder.dict_table(config, "Setting", "Value")
+----
+
+==== Tables with Status Indicators
+
+Automatically adds 🔴/⚠️ based on thresholds:
+
+[source,python]
+----
+builder.table_with_indicators(
+    headers=["Broker", "Host", "CPU %", "Memory %"],
+    rows=[
+        [1, "192.168.1.113", 95, 78],
+        [2, "192.168.1.114", 65, 82],
+        [3, "192.168.1.115", 72, 55]
+    ],
+    indicator_col=2,  # Add indicators to CPU % column
+    warning_threshold=70,
+    critical_threshold=90
+)
+----
+
+Output:
+----
+|===
+|Broker|Host|CPU %|Memory %
+|1|192.168.1.113|🔴 95|78
+|2|192.168.1.114|65|82
+|3|192.168.1.115|⚠️ 72|55
+|===
+----
+
+=== Recommendations
+
+==== Simple List
+
+[source,python]
+----
+builder.recs([
+    "Increase heap size to 8GB",
+    "Enable GC logging",
+    "Monitor full GC frequency"
+])
+
+# Alias for clarity
+builder.recommendations([...])
+----
+
+==== Structured by Priority
+
+[source,python]
+----
+builder.recs({
+    "critical": [
+        "**Immediate action:** Increase heap now",
+        "**Risk:** Application may crash"
+    ],
+    "high": [
+        "Plan heap increase in next maintenance window",
+        "Review GC settings"
+    ],
+    "general": [
+        "Set heap to 6-8GB for production",
+        "Use G1GC for better performance"
+    ]
+})
+----
+
+Output includes priority indicators:
+----
+==== Recommendations
+
+[TIP]
+====
+**🔴 Critical Priority (Immediate Action):**
+
+* **Immediate action:** Increase heap now
+* **Risk:** Application may crash
+
+**⚠️ High Priority (Plan Optimization):**
+
+* Plan heap increase in next maintenance window
+* Review GC settings
+
+**📋 General Best Practices:**
+
+* Set heap to 6-8GB for production
+* Use G1GC for better performance
+====
+----
+
+=== Code/Literal Blocks
+
+[source,python]
+----
+# Literal block
+builder.literal("Raw output text", language="text")
+
+# Code block (bash by default)
+builder.code("df -h /data", language="bash")
+
+# SQL code
+builder.code("SELECT * FROM table", language="sql")
+----
+
+=== Quick Status Messages
+
+[source,python]
+----
+# Success message
+builder.success()  # "✅ All checks passed..."
+builder.success("Custom success message")
+
+# Skip message
+builder.skip("SSH not configured")
+----
+
+== Common Patterns
+
+=== Pattern 1: Simple Check
+
+[source,python]
+----
+def run_simple_check(connector, settings):
+    builder = CheckContentBuilder(connector.formatter)
+    structured_data = {}
+    
+    builder.h3("Simple Check")
+    builder.para("Checking something...")
+    
+    # Do check logic
+    if all_good:
+        builder.success()
+    else:
+        builder.warning("Issue detected")
+    
+    return builder.build(), structured_data
+----
+
+=== Pattern 2: Check with SSH Requirement
+
+[source,python]
+----
+def run_ssh_check(connector, settings):
+    builder = CheckContentBuilder(connector.formatter)
+    structured_data = {}
+    
+    builder.add_header("SSH Check", "Uses SSH", requires_ssh=True)
+    
+    # Check SSH using existing helper
+    ssh_ok, skip_msg, skip_data = require_ssh(connector, "operation")
+    if not ssh_ok:
+        builder.add(skip_msg)  # Add pre-formatted skip message
+        return builder.build(), skip_data
+    
+    # Continue with check...
+    return builder.build(), structured_data
+----
+
+=== Pattern 3: Check with Query Execution
+
+[source,python]
+----
+def run_query_check(connector, settings):
+    builder = CheckContentBuilder(connector.formatter)
+    structured_data = {}
+    
+    builder.h3("Query Check")
+    
+    # Use existing safe_execute_query helper
+    success, formatted, raw = safe_execute_query(
+        connector,
+        "SELECT * FROM system.peers",
+        "Peers query"
+    )
+    
+    if not success:
+        builder.add(formatted)  # Add pre-formatted error
+        return builder.build(), structured_data
+    
+    # Add formatted table
+    builder.add(formatted)
+    
+    # Analyze results
+    if len(raw) == 0:
+        builder.warning("No peers found!")
+    
+    return builder.build(), structured_data
+----
+
+=== Pattern 4: Complex Check with Multiple Sections
+
+[source,python]
+----
+def run_complex_check(connector, settings):
+    builder = CheckContentBuilder(connector.formatter)
+    structured_data = {}
+    
+    builder.h3("Complex Check")
+    builder.para("Multi-section check with various content types.")
+    
+    # Section 1: Issues
+    if critical_issues:
+        builder.h4("Critical Issues")
+        for issue in critical_issues:
+            builder.critical_issue(issue['title'], issue['details'])
+    
+    # Section 2: Summary table
+    builder.h4("Summary")
+    builder.table(summary_data)
+    
+    # Section 3: Detailed analysis
+    builder.h4("Detailed Analysis")
+    builder.para("Analysis of results...")
+    builder.table_with_indicators(
+        headers=["Node", "Metric", "Status"],
+        rows=analysis_rows,
+        indicator_col=1,
+        warning_threshold=70,
+        critical_threshold=90
+    )
+    
+    # Section 4: Recommendations
+    if issues_found:
+        builder.recs({
+            "critical": critical_recommendations,
+            "high": high_priority_recommendations,
+            "general": general_best_practices
+        })
+    else:
+        builder.success()
+    
+    return builder.build(), structured_data
+----
+
+=== Pattern 5: Mixing with Existing Helpers
+
+Perfect for gradual adoption:
+
+[source,python]
+----
+def run_mixed_check(connector, settings):
+    builder = CheckContentBuilder(connector.formatter)
+    structured_data = {}
+    
+    # Use existing helper for header
+    header_lines = format_check_header("Check", "Desc", requires_ssh=True)
+    builder.add_lines(header_lines)
+    
+    # Use existing helper for query
+    success, formatted, raw = safe_execute_query(...)
+    builder.add(formatted)
+    
+    # Use builder for new content
+    builder.h4("Analysis")
+    builder.critical("Issue found!")
+    
+    # Use existing helper for recommendations
+    rec_lines = format_recommendations(["Fix this"])
+    builder.add_lines(rec_lines)
+    
+    return builder.build(), structured_data
+----
+
+== Migration Guide
+
+=== Don't Need to Migrate!
+
+**Important:** You do NOT need to migrate existing checks. They will continue to work forever. Only use CheckContentBuilder for:
+
+* New checks you're writing
+* Old checks you're refactoring anyway
+* Checks where you want cleaner code
+
+=== Quick Migration Steps (Optional)
+
+If you do want to migrate a check:
+
+1. **Add import:**
++
+[source,python]
+----
+from plugins.common.check_helpers import CheckContentBuilder
+----
+
+2. **Replace list with builder:**
++
+[source,python]
+----
+# OLD:
+adoc_content = ["=== Title", ""]
+
+# NEW:
+builder = CheckContentBuilder(connector.formatter)
+builder.h3("Title")
+----
+
+3. **Replace manual admonitions:**
++
+[source,python]
+----
+# OLD:
+adoc_content.append("[IMPORTANT]\n====\nMessage\n====\n")
+
+# NEW:
+builder.critical("Message")
+----
+
+4. **Replace manual tables:**
++
+[source,python]
+----
+# OLD:
+adoc_content.append("|===\n|Header1|Header2\n...")
+
+# NEW:
+builder.table(data)
+----
+
+5. **Replace return statement:**
++
+[source,python]
+----
+# OLD:
+return "\n".join(adoc_content), structured_data
+
+# NEW:
+return builder.build(), structured_data
+----
+
+== Best Practices
+
+=== 1. Use Existing Helpers
+
+Don't rewrite what already works:
+
+[source,python]
+----
+# GOOD: Use existing helpers with builder
+success, formatted, raw = safe_execute_query(...)
+builder.add(formatted)
+
+# AVOID: Recreating existing functionality
+# (unless you have a specific reason)
+----
+
+=== 2. Keep Methods Short
+
+Use builder methods for clarity:
+
+[source,python]
+----
+# GOOD:
+builder.h3("Title")
+builder.para("Description")
+builder.critical("Issue")
+
+# AVOID: Concatenating everything
+builder.add("=== Title\n\nDescription\n\n[IMPORTANT]\n...")
+----
+
+=== 3. Use Structured Issue Blocks
+
+For consistent formatting:
+
+[source,python]
+----
+# GOOD:
+builder.critical_issue(
+    "Heap Critical",
+    {"Broker": 1, "Usage": "95%"}
+)
+
+# AVOID: Manual formatting
+builder.critical("**Broker:** 1\n**Usage:** 95%")
+----
+
+=== 4. Use Fluent Chaining
+
+For simple sequential content:
+
+[source,python]
+----
+# Fluent style (optional)
+builder.h3("Title").para("Text").note("Note")
+
+# OR traditional style (also fine)
+builder.h3("Title")
+builder.para("Text")
+builder.note("Note")
+----
+
+== FAQ
+
+=== Q: Do I need to migrate existing checks?
+
+**A:** No! Existing checks work unchanged forever. Only use CheckContentBuilder when you want to.
+
+=== Q: Can I mix builder with existing helpers?
+
+**A:** Yes! That's the design. Use `builder.add()` to include pre-formatted content from existing helpers.
+
+=== Q: What if I need custom formatting?
+
+**A:** Use `builder.add()` to add any custom string. You have full control.
+
+=== Q: Is there a performance cost?
+
+**A:** Negligible. It's just a wrapper around list operations you're already doing.
+
+=== Q: Can I use this in all database plugins?
+
+**A:** Yes! It works with Postgres, Cassandra, Kafka, MongoDB, and any future plugins.
+
+=== Q: What about formatter parameter?
+
+**A:** Pass `connector.formatter` for table formatting. It's optional but recommended for consistency.
+
+== Summary
+
+CheckContentBuilder is designed to:
+
+* ✅ Reduce boilerplate in check modules
+* ✅ Maintain 100% backward compatibility
+* ✅ Work seamlessly with existing helpers
+* ✅ Make checks more readable and maintainable
+* ✅ Be completely optional - use only when you want
+
+**Start using it in your next check, or whenever you're refactoring an existing one!**

@@ -1,0 +1,236 @@
+{
+  "critical_heap_usage": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('heap_util_percent', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} has critical heap usage: {data.get('heap_util_percent'):.1f}%. Risk of OutOfMemoryError.",
+        "recommendations": [
+          "Immediate: Increase heap size (-Xmx) to prevent OOM",
+          "Review broker workload and consider scaling",
+          "Check for memory leaks in application code",
+          "Monitor Full GC frequency - may indicate insufficient memory"
+        ]
+      },
+      {
+        "expression": "data.get('heap_util_percent', 0) >= 75",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has high heap usage: {data.get('heap_util_percent'):.1f}%.",
+        "recommendations": [
+          "Plan to increase heap size before reaching critical levels",
+          "Monitor heap usage trends",
+          "Review GC settings and consider G1GC tuning"
+        ]
+      }
+    ]
+  },
+  "old_generation_pressure": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('old_util_percent', 0) >= 90",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} has critical Old Generation usage: {data.get('old_util_percent'):.1f}%. Risk of Full GC storms.",
+        "recommendations": [
+          "Increase heap size immediately",
+          "Check for memory leaks - Old Gen should not grow continuously",
+          "Review object allocation patterns",
+          "Consider heap dump analysis if issue persists"
+        ]
+      },
+      {
+        "expression": "data.get('old_util_percent', 0) >= 80",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has high Old Generation usage: {data.get('old_util_percent'):.1f}%.",
+        "recommendations": [
+          "Monitor Old Gen growth rate",
+          "Tune GC to promote objects faster or slower as needed",
+          "Review long-lived object creation"
+        ]
+      }
+    ]
+  },
+  "excessive_full_gc": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('full_gc_count', 0) >= 50",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} has excessive Full GC count: {data.get('full_gc_count')} with average {data.get('avg_full_gc_time_ms'):.1f}ms per GC.",
+        "recommendations": [
+          "Frequent Full GCs indicate severe memory pressure",
+          "Increase heap size significantly",
+          "Investigate memory leaks or excessive object creation",
+          "Consider application-level optimization"
+        ]
+      },
+      {
+        "expression": "data.get('full_gc_count', 0) >= 10",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} has elevated Full GC count: {data.get('full_gc_count')}.",
+        "recommendations": [
+          "Monitor Full GC frequency - should be rare",
+          "Review heap size adequacy",
+          "Check Old Gen usage patterns"
+        ]
+      },
+      {
+        "expression": "data.get('avg_full_gc_time_ms', 0) >= 1000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has slow Full GC performance: {data.get('avg_full_gc_time_ms'):.1f}ms average.",
+        "recommendations": [
+          "Full GC pauses over 1 second cause noticeable latency",
+          "Consider G1GC if using CMS/Parallel",
+          "Tune GC pause time goals",
+          "Review heap size - very large heaps cause long GC pauses"
+        ]
+      }
+    ]
+  },
+  "metaspace_issues": {
+    "metric_keywords": ["jvm_stats", "data"],
+    "rules": [
+      {
+        "expression": "data.get('metaspace_util_percent', 0) >= 95",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has critical Metaspace usage: {data.get('metaspace_util_percent'):.1f}%.",
+        "recommendations": [
+          "Increase MaxMetaspaceSize if frequently hitting limit",
+          "Check for classloader leaks or excessive class loading",
+          "Review plugin or library usage"
+        ]
+      }
+    ]
+  },
+  "cluster_wide_memory_issues": {
+    "metric_keywords": ["jvm_summary"],
+    "rules": [
+      {
+        "expression": "data.get('critical_broker_count', 0) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({data.get('critical_broker_count')}) have critical memory issues. Cluster-wide memory pressure.",
+        "recommendations": [
+          "Cluster-wide memory problem detected",
+          "Increase heap size across all brokers",
+          "Review overall cluster workload and capacity",
+          "Consider adding more brokers to distribute load"
+        ]
+      },
+      {
+        "expression": "data.get('total_fgc_count', 0) >= 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Total Full GC count across cluster: {data.get('total_fgc_count')}. Indicates cluster-wide memory pressure.",
+        "recommendations": [
+          "Cluster is experiencing memory pressure",
+          "Review and increase heap sizes cluster-wide",
+          "Analyze workload patterns for optimization opportunities"
+        ]
+      }
+    ]
+  },
+  "full_gc_allocation_failures": {
+    "metric_keywords": ["jvm_summary"],
+    "rules": [
+      {
+        "expression": "data.get('full_gc_allocation_failures', 0) >= 5",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "CRITICAL: Detected {data.get('full_gc_allocation_failures')} Full GC events caused by Allocation Failure in recent logs. This indicates the heap is completely full and unable to allocate new objects - risk of application failure and severe latency spikes.",
+        "recommendations": [
+          "IMMEDIATE ACTION REQUIRED: Increase heap size (-Xmx) significantly",
+          "Allocation Failure Full GCs are the most severe type - heap is exhausted",
+          "Monitor application behavior - users are experiencing timeouts",
+          "Review application memory usage and object allocation patterns",
+          "Consider scaling up instance size or adding more nodes",
+          "Check for memory leaks - heap should not constantly fill up"
+        ]
+      },
+      {
+        "expression": "data.get('full_gc_allocation_failures', 0) >= 1",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Detected {data.get('full_gc_allocation_failures')} Full GC event(s) caused by Allocation Failure. Heap memory is critically low.",
+        "recommendations": [
+          "Allocation Failure Full GCs indicate heap exhaustion",
+          "Plan to increase heap size before problem worsens",
+          "Monitor for additional Full GC events",
+          "Review heap usage trends - should not be constantly at capacity",
+          "Check application workload for memory-intensive operations"
+        ]
+      }
+    ]
+  },
+  "full_gc_events_detected": {
+    "metric_keywords": ["jvm_summary"],
+    "rules": [
+      {
+        "expression": "data.get('total_full_gc_events_from_logs', 0) >= 10",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Detected {data.get('total_full_gc_events_from_logs')} Full GC events in recent log history. Full GCs pause the entire application and cause latency spikes and timeouts.",
+        "recommendations": [
+          "Full GCs should be rare - frequent Full GCs indicate memory pressure",
+          "Review Full GC causes in the detailed events table",
+          "Increase heap size if caused by Allocation Failures",
+          "Disable explicit GC calls with -XX:+DisableExplicitGC if caused by System.gc()",
+          "Tune GC settings to reduce Full GC frequency",
+          "Monitor application latency during Full GC events"
+        ]
+      },
+      {
+        "expression": "data.get('total_full_gc_events_from_logs', 0) >= 3",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Detected {data.get('total_full_gc_events_from_logs')} Full GC events in recent logs. Monitor for increasing frequency.",
+        "recommendations": [
+          "Track Full GC frequency over time",
+          "Review causes in the Full GC Events table",
+          "Plan heap tuning if events increase",
+          "Check application workload patterns"
+        ]
+      }
+    ]
+  },
+  "full_gc_long_pauses": {
+    "metric_keywords": ["full_gc_events", "data"],
+    "rules": [
+      {
+        "expression": "data.get('pause_time_ms', 0) >= 2000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Full GC event on broker {data.get('broker_id')} had pause time of {data.get('pause_time_ms'):.0f}ms (>{2} seconds). This causes severe application timeouts.",
+        "recommendations": [
+          "Full GC pauses over 2 seconds cause critical application impact",
+          "Reduce heap size if using very large heaps (>32GB loses compressed oops)",
+          "Switch to G1GC if using CMS/Parallel GC",
+          "Tune GC pause time goals: -XX:MaxGCPauseMillis=200",
+          "Review heap size - may be too large for acceptable pause times",
+          "Consider off-heap storage to reduce heap pressure"
+        ]
+      },
+      {
+        "expression": "data.get('pause_time_ms', 0) >= 1000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Full GC event had pause time of {data.get('pause_time_ms'):.0f}ms (>1 second). Users experience noticeable latency.",
+        "recommendations": [
+          "Full GC pauses over 1 second impact user experience",
+          "Review GC algorithm choice - consider G1GC for large heaps",
+          "Tune GC settings for shorter pause times",
+          "Monitor application latency metrics"
+        ]
+      }
+    ]
+  }
+}

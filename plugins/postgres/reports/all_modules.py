@@ -23,10 +23,18 @@ REPORT_SECTIONS = [
         'title': 'System Overview',
         'actions': [
             {'type': 'module', 'module': 'plugins.postgres.checks.postgres_overview', 'function': 'run_postgres_overview'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_pgbouncer_detection', 'function': 'check_pgbouncer_detection'},
             {'type': 'module', 'module': 'plugins.postgres.checks.table_object_counts', 'function': 'run_table_object_counts'},
             {'type': 'module', 'module': 'plugins.postgres.checks.database_object_inventory', 'function': 'run_database_object_inventory_query'},
             {'type': 'module', 'module': 'plugins.postgres.checks.extensions_update_check', 'function': 'run_extensions_update_check'},
             {'type': 'module', 'module': 'plugins.postgres.checks.transaction_wraparound', 'function': 'run_transaction_wraparound'},
+        ]
+    },
+
+    {
+        'title': 'Database Structure',
+        'actions': [
+            {'type': 'module', 'module': 'plugins.postgres.checks.table_count', 'function': 'run_table_count'},
         ]
     },
 
@@ -35,6 +43,8 @@ REPORT_SECTIONS = [
         'title': 'Cloud-Specific Metrics (AWS)',
         'actions': [
             {'type': 'module', 'module': 'plugins.postgres.checks.aws_cloudwatch_metrics', 'function': 'run_aws_cloudwatch_metrics'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_aurora_version_upgrades', 'function': 'run_check_aurora_version_upgrades'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_postgres_version_upgrades', 'function': 'run_check_postgres_version_upgrades'},
             {'type': 'module', 'module': 'plugins.postgres.checks.aurora_stat_statements', 'function': 'run_aurora_stat_statements'},
         ]
     },
@@ -58,6 +68,11 @@ REPORT_SECTIONS = [
             {'type': 'module', 'module': 'plugins.postgres.checks.security_and_encryption', 'function': 'run_security_and_encryption'},
             {'type': 'module', 'module': 'plugins.postgres.checks.function_audit', 'function': 'run_function_audit'},
             {'type': 'module', 'module': 'plugins.postgres.checks.replication_health', 'function': 'run_replication_health'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_patroni_topology', 'function': 'check_patroni_topology'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_patroni_health_status', 'function': 'check_patroni_health_status'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_patroni_failover_history', 'function': 'check_patroni_failover_history'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_patroni_configuration', 'function': 'check_patroni_configuration'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_patroni_dcs_health', 'function': 'check_patroni_dcs_health'},
         ]
     },
 
@@ -65,6 +80,10 @@ REPORT_SECTIONS = [
     {
         'title': 'Connection Management',
         'actions': [
+            # pgbouncer detection moved higher under system overview.
+          #  {'type': 'module', 'module': 'plugins.postgres.checks.check_pgbouncer_detection', 'function': 'check_pgbouncer_detection'},
+            # Note: check_pgbouncer_health moved to final section to count all fallback events
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_connection_stability', 'function': 'check_connection_stability'},
             {'type': 'module', 'module': 'plugins.postgres.checks.connection_metrics', 'function': 'run_connection_metrics'},
             {'type': 'module', 'module': 'plugins.postgres.checks.superuser_reserved', 'function': 'run_superuser_reserved'},
         ]
@@ -102,12 +121,30 @@ REPORT_SECTIONS = [
             {'type': 'module', 'module': 'plugins.postgres.checks.vacuum_analysis', 'function': 'run_vacuum_analysis'},
             {'type': 'module', 'module': 'plugins.postgres.checks.table_health_analysis', 'function': 'run_table_health_analysis'},
             {'type': 'module', 'module': 'plugins.postgres.checks.index_bloat_analysis',  'function': 'run_index_bloat_analysis'},
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_cross_node_index_usage', 'function': 'run_check_cross_node_index_usage'},
             {'type': 'module', 'module': 'plugins.postgres.checks.missing_index_opportunities', 'function': 'run_missing_index_opportunities'},
             {'type': 'module', 'module': 'plugins.postgres.checks.missing_primary_keys', 'function': 'run_missing_primary_keys'},
             {'type': 'module', 'module': 'plugins.postgres.checks.foreign_key_audit', 'function': 'run_foreign_key_audit'},
             {'type': 'module', 'module': 'plugins.postgres.checks.primary_key_analysis', 'function': 'run_primary_key_analysis'},
             {'type': 'module', 'module': 'plugins.postgres.checks.data_checksums_analysis', 'function': 'run_data_checksums_analysis'},
             {'type': 'module', 'module': 'plugins.postgres.checks.high_insert_tables', 'function': 'run_high_insert_tables'},
+        ]
+    },
+
+    # --- Section 9: Schema Health ---
+    {
+        'title': 'Schema Health',
+        'actions': [
+            {'type': 'module', 'module': 'plugins.postgres.checks.table_count_check', 'function': 'run_table_count_check'},
+        ]
+    },
+
+    # --- Section 10: PgBouncer Health Summary (MUST BE LAST) ---
+    # This section MUST run last to count all fallback events from previous checks
+    {
+        'title': 'PgBouncer Health Summary',
+        'actions': [
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_pgbouncer_health', 'function': 'check_pgbouncer_health'},
         ]
     },
 ]

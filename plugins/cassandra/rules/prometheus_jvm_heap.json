@@ -1,0 +1,66 @@
+{
+  "critical_heap_usage_node": {
+    "metric_keywords": ["prometheus_jvm_heap", "per_node_heap_usage", "data"],
+    "rules": [
+      {
+        "expression": "data.get('heap_used_percent', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critical heap usage: {data.get('heap_used_percent', 0):.2f}%. Risk of OutOfMemoryError and node failure.",
+        "recommendations": [
+          "URGENT: Investigate heap usage immediately - node may crash",
+          "Check for memory leaks or excessive object allocation",
+          "Review GC logs for Full GC storms",
+          "Consider increasing heap size or adding capacity",
+          "Monitor for application pauses and query timeouts"
+        ]
+      },
+      {
+        "expression": "data.get('heap_used_percent', 0) >= 85",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critically high heap usage: {data.get('heap_used_percent', 0):.2f}%.",
+        "recommendations": [
+          "High heap pressure detected - monitor closely",
+          "Review GC activity and pause times",
+          "Check for unusual workload or query patterns",
+          "Plan heap tuning if sustained"
+        ]
+      }
+    ]
+  },
+  "high_heap_usage_node": {
+    "metric_keywords": ["prometheus_jvm_heap", "per_node_heap_usage", "data"],
+    "rules": [
+      {
+        "expression": "75 <= data.get('heap_used_percent', 0) < 85",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has high heap usage: {data.get('heap_used_percent', 0):.2f}%.",
+        "recommendations": [
+          "Monitor heap usage trends",
+          "Review GC settings and pause times",
+          "Check for memory-intensive operations",
+          "Plan capacity increase if trend continues"
+        ]
+      }
+    ]
+  },
+  "cluster_heap_pressure": {
+    "metric_keywords": ["prometheus_jvm_heap", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('cluster_heap_percent', 0) >= 80",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Cluster-wide heap usage is {data.get('cluster_heap_percent', 0):.2f}% across {data.get('node_count', 0)} nodes. Cluster-wide memory pressure detected.",
+        "recommendations": [
+          "Cluster experiencing overall memory pressure",
+          "Review cluster-wide workload and capacity",
+          "Consider adding nodes or increasing heap sizes",
+          "Check for application-level memory issues"
+        ]
+      }
+    ]
+  }
+}

@@ -127,6 +127,10 @@ def _get_config_from_env(plugin_name: str, plugin_upper: str) -> Optional[Dict]:
     
     elif plugin_name in ['redis', 'valkey']:
         config['db'] = int(os.environ.get(f'{plugin_upper}_TEST_DB', 0))
+
+    elif plugin_name == 'kafka':
+        config['sasl_mechanism'] = os.environ.get(f'{plugin_upper}_TEST_SASL_MECHANISM')
+        config['security_protocol'] = os.environ.get(f'{plugin_upper}_TEST_SECURITY_PROTOCOL', 'PLAINTEXT')
     
     return config
 
@@ -192,6 +196,11 @@ def _get_config_from_settings(plugin_name: str, plugin_config: dict) -> Optional
     
     elif plugin_name in ['redis', 'valkey']:
         config['db'] = plugin_config.get('db', 0)
+
+    elif plugin_name == 'kafka':
+        if 'sasl_mechanism' in plugin_config:
+            config['sasl_mechanism'] = plugin_config['sasl_mechanism']
+        config['security_protocol'] = plugin_config.get('security_protocol', 'PLAINTEXT')
     
     return config
 
@@ -313,7 +322,32 @@ def create_external_connector(plugin_name: str, external_config: dict):
         connector = ValkeyConnector(settings)
         connector.connect()
         return connector
-    
+
+    elif plugin_name == 'kafka':
+        from plugins.kafka.connector import KafkaConnector
+        
+        # Kafka expects bootstrap_servers as a list or comma-separated string
+        bootstrap_servers = f"{external_config['host']}:{external_config['port']}"
+        
+        settings = {
+            'bootstrap_servers': bootstrap_servers,
+            'client_id': 'pg_healthcheck_test'
+        }
+        
+        # Optional authentication settings if provided
+        if 'user' in external_config:
+            settings['sasl_plain_username'] = external_config['user']
+        if 'password' in external_config:
+            settings['sasl_plain_password'] = external_config['password']
+        if external_config.get('sasl_mechanism'):
+            settings['sasl_mechanism'] = external_config['sasl_mechanism']
+        if external_config.get('security_protocol'):
+            settings['security_protocol'] = external_config['security_protocol']
+        
+        connector = KafkaConnector(settings)
+        connector.connect()
+        return connector
+        
     else:
         raise NotImplementedError(f"External server support not implemented for {plugin_name}")
 

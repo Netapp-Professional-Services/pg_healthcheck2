@@ -1,0 +1,118 @@
+{
+  "critical_read_latency": {
+    "metric_keywords": ["prometheus_latency", "read_latency_p95", "data"],
+    "rules": [
+      {
+        "expression": "data.get('latency_ms', 0) >= 200",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critical read latency (p95): {data.get('latency_ms', 0):.2f}ms. Severe performance degradation detected.",
+        "recommendations": [
+          "URGENT: Read latency over 200ms indicates severe issues",
+          "Check disk I/O performance - may be saturated",
+          "Review GC pause times - may be causing stalls",
+          "Investigate query patterns for expensive operations",
+          "Check for compaction backlog",
+          "Monitor for client timeout errors"
+        ]
+      },
+      {
+        "expression": "data.get('latency_ms', 0) >= 100",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critically high read latency (p95): {data.get('latency_ms', 0):.2f}ms.",
+        "recommendations": [
+          "Very high read latency - investigate immediately",
+          "Check disk performance and I/O wait times",
+          "Review table design for anti-patterns",
+          "Monitor GC activity"
+        ]
+      }
+    ]
+  },
+  "high_read_latency": {
+    "metric_keywords": ["prometheus_latency", "read_latency_p95", "data"],
+    "rules": [
+      {
+        "expression": "50 <= data.get('latency_ms', 0) < 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has high read latency (p95): {data.get('latency_ms', 0):.2f}ms.",
+        "recommendations": [
+          "Read latency elevated above normal range",
+          "Monitor disk I/O metrics",
+          "Review query patterns and caching",
+          "Check for hot partitions or large partitions",
+          "Monitor trend - plan optimization if increasing"
+        ]
+      }
+    ]
+  },
+  "critical_write_latency": {
+    "metric_keywords": ["prometheus_latency", "write_latency_p95", "data"],
+    "rules": [
+      {
+        "expression": "data.get('latency_ms', 0) >= 150",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critical write latency (p95): {data.get('latency_ms', 0):.2f}ms. Severe performance degradation detected.",
+        "recommendations": [
+          "URGENT: Write latency over 150ms indicates severe issues",
+          "Check disk I/O performance - commit log may be slow",
+          "Review compaction backlog - may be impacting writes",
+          "Check for fsync latency spikes",
+          "Monitor for write timeout errors from clients",
+          "Review write workload - may be overwhelming capacity"
+        ]
+      },
+      {
+        "expression": "data.get('latency_ms', 0) >= 75",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has critically high write latency (p95): {data.get('latency_ms', 0):.2f}ms.",
+        "recommendations": [
+          "Very high write latency - investigate immediately",
+          "Check disk I/O performance",
+          "Review compaction activity",
+          "Monitor commit log sync times"
+        ]
+      }
+    ]
+  },
+  "high_write_latency": {
+    "metric_keywords": ["prometheus_latency", "write_latency_p95", "data"],
+    "rules": [
+      {
+        "expression": "30 <= data.get('latency_ms', 0) < 75",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Node {data.get('node_id', 'unknown')} ({data.get('public_ip', 'N/A')}) has high write latency (p95): {data.get('latency_ms', 0):.2f}ms.",
+        "recommendations": [
+          "Write latency elevated above normal range",
+          "Monitor disk performance metrics",
+          "Check compaction backlog",
+          "Review commit log disk separate from data disks",
+          "Monitor trend - plan optimization if increasing"
+        ]
+      }
+    ]
+  },
+  "cluster_latency_degradation": {
+    "metric_keywords": ["prometheus_latency", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('average_read_latency_ms', 0) >= 75 or data.get('average_write_latency_ms', 0) >= 50",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Cluster experiencing latency degradation: Read avg={data.get('average_read_latency_ms', 0):.2f}ms, Write avg={data.get('average_write_latency_ms', 0):.2f}ms.",
+        "recommendations": [
+          "Cluster-wide performance degradation detected",
+          "Review overall cluster health and capacity",
+          "Check for systemic issues (network, storage, etc.)",
+          "Consider scaling out to improve performance",
+          "Review application query patterns"
+        ]
+      }
+    ]
+  }
+}
