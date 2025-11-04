@@ -1,0 +1,777 @@
+== Operational Health
+
+=== Compaction Pending Tasks Analysis (All Nodes)
+
+Checking for pending compaction tasks using `nodetool compactionstats` across all nodes.
+
+[NOTE]
+====
+**Requirements:**
+
+* SSH access to the database server
+====
+[IMPORTANT]
+====
+This check requires SSH access for nodetool commands.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+=== Schema Version Consistency (All Nodes)
+
+Verifying that all nodes in the cluster agree on the schema version using `nodetool describecluster`.
+
+[NOTE]
+====
+**Requirements:**
+
+* SSH access to the database server
+====
+[IMPORTANT]
+====
+This check requires SSH access for nodetool commands.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+=== Disk Space per Keyspace and Table
+
+Analyzing disk usage across keyspaces and tables using `nodetool tablestats`. This check aggregates live disk space usage, excluding system keyspaces.
+
+[NOTE]
+====
+**Requirements:**
+
+* SSH access to the database server
+====
+[IMPORTANT]
+====
+This check requires SSH access for nodetool commands.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+[IMPORTANT]
+====
+This check requires SSH access for Disk space check.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+[IMPORTANT]
+====
+This check requires SSH access for Memory usage check.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+[IMPORTANT]
+====
+This check requires SSH access for JVM statistics check.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+[IMPORTANT]
+====
+This check requires SSH access for CPU load check.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+=== Temporary Files in Data Directory (All Nodes)
+
+Scanning for temporary files in Cassandra data directories using `find` command across all nodes.
+
+[NOTE]
+====
+**Requirements:**
+
+* SSH access to the database server
+====
+[IMPORTANT]
+====
+This check requires SSH access for shell commands.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+[IMPORTANT]
+====
+This check requires SSH access for GC stats check.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+=== Tombstone Metrics Analysis
+
+Checking for high tombstone counts across tables using `nodetool tablestats`.
+
+[NOTE]
+====
+**Requirements:**
+
+* SSH access to the database server
+====
+[IMPORTANT]
+====
+This check requires SSH access for nodetool commands.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+[IMPORTANT]
+====
+This check requires SSH access for Cluster connectivity diagnostics.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+=== GC Grace Seconds Audit
+
+Scanning all tables for inappropriate gc_grace_seconds settings ( > 3 days or 0 ).
+|===
+|keyspace_name|table_name|gc_grace_seconds
+|system_auth|cidr_groups|7776000
+|system_auth|cidr_permissions|7776000
+|system_auth|identity_to_role|7776000
+|system_auth|network_permissions|7776000
+|system_auth|resource_role_permissons_index|7776000
+|system_auth|role_members|7776000
+|system_auth|role_permissions|7776000
+|system_auth|roles|7776000
+|system_schema|aggregates|604800
+|system_schema|column_masks|604800
+|system_schema|columns|604800
+|system_schema|dropped_columns|604800
+|system_schema|functions|604800
+|system_schema|indexes|604800
+|system_schema|keyspaces|604800
+|system_schema|tables|604800
+|system_schema|triggers|604800
+|system_schema|types|604800
+|system_schema|views|604800
+|system_distributed|parent_repair_history|864000
+|system_distributed|partition_denylist|864000
+|system_distributed|repair_history|864000
+|system_distributed|view_build_status|864000
+|system|IndexInfo|0
+|system|available_ranges|0
+|system|available_ranges_v2|0
+|system|batches|0
+|system|built_views|0
+|system|compaction_history|0
+|system|local|0
+|system|paxos|0
+|system|paxos_repair_history|0
+|system|peer_events|0
+|system|peer_events_v2|0
+|system|peers|0
+|system|peers_v2|0
+|system|prepared_statements|0
+|system|repairs|0
+|system|size_estimates|0
+|system|sstable_activity|0
+|system|sstable_activity_v2|0
+|system|table_estimates|0
+|system|top_partitions|0
+|system|transferred_ranges|0
+|system|transferred_ranges_v2|0
+|system|view_builds_in_progress|0
+|instaclustr|recovery_codes|864000
+|instaclustr|sla_latency|0
+|system_traces|events|0
+|system_traces|sessions|0
+|===
+[WARNING]
+====
+**2 table(s)** have gc_grace_seconds > 3 days or set to 0. This can lead to increased storage usage due to delayed tombstone cleanup and potential zombie reads.
+====
+
+
+==== Problematic Tables
+|===
+|Keyspace|Table|GC Grace Seconds
+|instaclustr|recovery_codes|864000s
+|instaclustr|sla_latency|0s
+|===
+
+
+==== Recommendations
+[TIP]
+====
+* Review and reduce gc_grace_seconds for affected tables to 1-2 days (86400-172800 seconds) unless specific retention needs exist.
+* Execute: ALTER TABLE keyspace.table WITH gc_grace_seconds = 86400;
+* After changes, monitor tombstone counts with 'nodetool tablestats' and consider running 'nodetool cleanup' if needed.
+* For tables with gc_grace_seconds=0, set an appropriate value to enable tombstone expiration.
+====
+
+
+=== Table Compression Settings Analysis
+
+Checking compression configuration for all user tables in system_schema.tables.
+|===
+|keyspace_name|table_name|compression
+|system_auth|cidr_groups|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_auth|cidr_permissions|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_auth|identity_to_role|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_auth|network_permissions|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_auth|resource_role_permissons_index|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_auth|role_members|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_auth|role_permissions|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_auth|roles|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|aggregates|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|column_masks|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|columns|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|dropped_columns|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|functions|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|indexes|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|keyspaces|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|tables|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|triggers|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|types|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_schema|views|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_distributed|parent_repair_history|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_distributed|partition_denylist|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_distributed|repair_history|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_distributed|view_build_status|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|IndexInfo|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|available_ranges|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|available_ranges_v2|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|batches|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|built_views|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|compaction_history|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|local|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|paxos|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|paxos_repair_history|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|peer_events|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|peer_events_v2|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|peers|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|peers_v2|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|prepared_statements|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|repairs|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|size_estimates|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|sstable_activity|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|sstable_activity_v2|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|table_estimates|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|top_partitions|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|transferred_ranges|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|transferred_ranges_v2|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system|view_builds_in_progress|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|instaclustr|recovery_codes|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|instaclustr|sla_latency|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_traces|events|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|system_traces|sessions|{'chunk_length_in_kb': '16', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+|===
+[NOTE]
+====
+All 2 user table(s) have appropriate compression settings (LZ4Compressor enabled).
+====
+
+
+=== Row Cache Analysis
+
+Checking row cache settings across all user tables. Row cache is often discouraged in production due to memory concerns.
+[NOTE]
+====
+All 2 user table(s) have row cache disabled.
+====
+
+|===
+|keyspace_name|table_name|caching
+|system_auth|cidr_groups|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_auth|cidr_permissions|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_auth|identity_to_role|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_auth|network_permissions|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_auth|resource_role_permissons_index|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_auth|role_members|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_auth|role_permissions|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_auth|roles|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|aggregates|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|column_masks|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|columns|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|dropped_columns|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|functions|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|indexes|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|keyspaces|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|tables|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|triggers|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|types|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_schema|views|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_distributed|parent_repair_history|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_distributed|partition_denylist|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_distributed|repair_history|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_distributed|view_build_status|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|IndexInfo|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|available_ranges|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|available_ranges_v2|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|batches|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|built_views|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|compaction_history|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|local|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|paxos|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|paxos_repair_history|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|peer_events|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|peer_events_v2|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|peers|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|peers_v2|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|prepared_statements|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|repairs|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|size_estimates|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|sstable_activity|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|sstable_activity_v2|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|table_estimates|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|top_partitions|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|transferred_ranges|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|transferred_ranges_v2|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system|view_builds_in_progress|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|instaclustr|recovery_codes|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|instaclustr|sla_latency|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_traces|events|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|system_traces|sessions|{'keys': 'ALL', 'rows_per_partition': 'NONE'}
+|===
+
+=== Durable Writes Analysis
+
+Checking durable_writes setting for all user keyspaces.
+[NOTE]
+====
+All user keyspaces have durable_writes enabled.
+====
+
+|===
+|keyspace_name|durable_writes
+|system_auth|True
+|system_schema|True
+|system_distributed|True
+|system|True
+|instaclustr|True
+|system_traces|True
+|===
+
+=== Materialized Views Analysis
+
+Querying system_schema.views to list all materialized views, which can introduce performance overhead.
+[NOTE]
+====
+No user materialized views found.
+====
+
+
+=== User-Defined Functions and Aggregates Analysis
+
+Querying system_schema.functions and system_schema.aggregates to list all UDFs and aggregates, flagging any using the 'java' language.
+[NOTE]
+====
+Query returned no results.
+====
+
+[NOTE]
+====
+Query returned no results.
+====
+
+[NOTE]
+====
+No user-defined functions or aggregates found.
+====
+
+
+=== Keyspace Replication Health Analysis
+
+Analyzing replication strategies and factors for all user keyspaces.
+|===
+|keyspace_name|replication|durable_writes
+|system_auth|{'AWS_VPC_US_EAST_1': '3', 'class': 'org.apache.cassandra.locator.NetworkTopologyStrategy'}|True
+|system_schema|{'class': 'org.apache.cassandra.locator.LocalStrategy'}|True
+|system_distributed|{'class': 'org.apache.cassandra.locator.SimpleStrategy', 'replication_factor': '3'}|True
+|system|{'class': 'org.apache.cassandra.locator.LocalStrategy'}|True
+|instaclustr|{'AWS_VPC_US_EAST_1': '3', 'class': 'org.apache.cassandra.locator.NetworkTopologyStrategy'}|True
+|system_traces|{'class': 'org.apache.cassandra.locator.SimpleStrategy', 'replication_factor': '2'}|True
+|===
+[NOTE]
+====
+All user keyspaces have healthy replication configurations (NetworkTopologyStrategy with RF >= 2).
+====
+
+
+=== Superuser Roles Analysis
+
+Querying system_auth.roles to identify all superuser accounts for security review.
+|===
+|role|is_superuser
+|instaclustr|True
+|iccassandra|True
+|===
+
+==== Superuser Roles Found
+|===
+|Role Name
+|instaclustr
+|iccassandra
+|===
+
+
+==== Recommendations
+[TIP]
+====
+* Review all superuser roles for least privilege principle: revoke superuser from accounts that don't need full admin access
+* Use GRANT/REVOKE to assign specific permissions instead of superuser status
+* Enable audit logging if available (cassandra.yaml: enabled: true) to track superuser actions
+* Regularly audit role memberships: LIST ROLES; LIST PERMISSIONS ON ALL BY <role>
+* Consider rotating passwords for superuser accounts and using strong, unique credentials
+====
+
+
+== Configuration
+
+=== Keyspace Replication Strategy Analysis
+
+Verifying that all user-defined keyspaces use NetworkTopologyStrategy and reporting replication factors per datacenter.
+|===
+|keyspace_name|replication|durable_writes
+|system_auth|{'AWS_VPC_US_EAST_1': '3', 'class': 'org.apache.cassandra.locator.NetworkTopologyStrategy'}|True
+|system_schema|{'class': 'org.apache.cassandra.locator.LocalStrategy'}|True
+|system_distributed|{'class': 'org.apache.cassandra.locator.SimpleStrategy', 'replication_factor': '3'}|True
+|system|{'class': 'org.apache.cassandra.locator.LocalStrategy'}|True
+|instaclustr|{'AWS_VPC_US_EAST_1': '3', 'class': 'org.apache.cassandra.locator.NetworkTopologyStrategy'}|True
+|system_traces|{'class': 'org.apache.cassandra.locator.SimpleStrategy', 'replication_factor': '2'}|True
+|===
+[NOTE]
+====
+All 1 user keyspace(s) use NetworkTopologyStrategy.
+====
+
+
+==== Replication Factors per Datacenter
+|===
+|Keyspace|Datacenter|Replication Factor
+|instaclustr|AWS_VPC_US_EAST_1|3
+|===
+
+
+== Hardware
+
+[IMPORTANT]
+====
+This check requires SSH access for Disk usage check.
+
+Configure the following in your settings:
+
+**For single host:**
+* `ssh_host`: Hostname or IP address
+
+**For multiple hosts (recommended for clusters):**
+* `ssh_hosts`: List of hostnames/IPs
+
+**Authentication (required):**
+* `ssh_user`: SSH username
+* `ssh_key_file` OR `ssh_password`: Authentication method
+
+**Optional:**
+* `ssh_port`: SSH port (default: 22)
+* `ssh_timeout`: Connection timeout in seconds (default: 10)
+====
+
+
+=== AI-Generated Recommendations
+Provides intelligent, context-aware recommendations based on dynamic analysis of database metrics.
+
+==== AI Analysis Details
+[options="header"]
+|===
+| Parameter | Value
+| AI Provider | xAI
+| AI Model | grok-4
+| Prompt Size | 10,096 characters (~2,524 tokens)
+| AI Processing Time | 54.82 seconds
+|===
+=== AI-Generated Recommendations
+
+==== Executive Summary
+
+The Cassandra 5.0.5 cluster exhibits generally stable health based on available metrics, with successful checks on compression, durable writes, materialized views, and user-defined functions. However, several high-priority issues require immediate attention: the system_auth keyspace is not configured with NetworkTopologyStrategy, posing risks to authentication availability in multi-DC setups; row caching is enabled on two tables in the 'instaclustr' keyspace, which could lead to excessive heap memory consumption and potential OutOfMemory errors; and improper gc_grace_seconds settings on tables may result in data inconsistencies or premature tombstone cleanup. Many critical diagnostics (e.g., compaction pending tasks, schema consistency, disk space, memory usage, JVM stats, CPU load, temporary files, GC stats, tombstone metrics, and cluster connectivity) were skipped due to missing SSH configuration, limiting the analysis scope. No correlations are evident from skipped metrics, but row caching could exacerbate undetected memory pressure, and low gc_grace_seconds on 'sla_latency' might correlate with higher tombstone failure risks if read latencies or compactions are elevated (though unverified). Prioritize configuring SSH for a full health check and addressing the system_auth replication to ensure cluster-wide resilience.
+
+==== Critical Issues
+
+===== System Auth Keyspace Not Using NetworkTopologyStrategy
+
+The system_auth keyspace is configured with an invalid or missing replication strategy (reported as None), instead of the required NetworkTopologyStrategy. This misconfiguration can lead to authentication failures during datacenter outages, as roles and permissions may not replicate properly across DCs, potentially causing cluster-wide downtime for user access and operations.
+
+**Action Steps:**
+
+. Verify the current replication strategy using CQL:
++
+[source,cql]
+----
+DESCRIBE KEYSPACE system_auth;
+----
+
+. Alter the keyspace to use NetworkTopologyStrategy with appropriate replication factors for each DC (e.g., 3 for AWS_VPC_US_EAST_1):
++
+[source,cql]
+----
+ALTER KEYSPACE system_auth WITH REPLICATION = {
+  'class': 'org.apache.cassandra.locator.NetworkTopologyStrategy',
+  'AWS_VPC_US_EAST_1': 3
+};
+----
+
+. Run a full repair on the system_auth keyspace to ensure data consistency:
++
+[source,bash]
+----
+nodetool repair -full system_auth
+----
+
+[CAUTION]
+====
+This alteration requires a rolling restart of the cluster to propagate changes safely. Schedule a maintenance window to avoid disrupting ongoing operations, as authentication may be intermittently unavailable during the process.
+====
+
+==== High Issues
+
+===== Row Cache Enabled on Tables in 'instaclustr' Keyspace
+
+Row caching is enabled (with keys=ALL and rows_per_partition=NONE) on tables 'recovery_codes' and 'sla_latency' in the 'instaclustr' keyspace. This is discouraged in production due to potential excessive heap memory usage, especially for tables with large partitions or high update rates, leading to OutOfMemory errors, increased GC pauses, and degraded query performance cluster-wide.
+
+**Action Steps:**
+
+. Disable row caching for each affected table:
++
+[source,cql]
+----
+ALTER TABLE instaclustr.recovery_codes WITH caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'} ;  // Adjust to disable rows if needed, but monitor
+ALTER TABLE instaclustr.sla_latency WITH caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'} ;
+----
+To fully disable row caching, set rows_per_partition to 0 or NONE explicitly if not already.
+
+. Monitor heap usage post-change using nodetool gcstats or JVM metrics (enable SSH for full checks).
+
+. If caching is required for performance, consider key caching only and evaluate off-heap alternatives.
+
+[CAUTION]
+====
+Disabling caching may require a rolling restart if schema changes propagate slowly. Perform during a low-traffic window to minimize impact on read-heavy workloads across the cluster.
+====
+
+===== Improper gc_grace_seconds Settings on Tables
+
+Tables in 'instaclustr' keyspace have problematic gc_grace_seconds: 'recovery_codes' at 864000 (10 days, which is excessively high and may delay tombstone cleanup, increasing disk usage and read latencies) and 'sla_latency' at 0 (disabling tombstone protection, risking data resurrection or inconsistencies during repairs or node failures). This could correlate with higher tombstone counts or failures if compactions are pending (skipped check), affecting cluster-wide read performance and data integrity.
+
+**Action Steps:**
+
+. Adjust gc_grace_seconds to a standard value (e.g., 864000 for most, but lower to 3600-86400 for high-churn tables):
++
+[source,cql]
+----
+ALTER TABLE instaclustr.recovery_codes WITH gc_grace_seconds = 86400;
+ALTER TABLE instaclustr.sla_latency WITH gc_grace_seconds = 86400;
+----
+
+. Trigger a major compaction if disk space is constrained:
++
+[source,bash]
+----
+nodetool compact instaclustr
+----
+
+. Monitor for tombstone warnings via nodetool tpstats (enable SSH for metrics).
+
+No rolling restart required, but changes propagate via gossip; verify with DESCRIBE TABLE.
+
+==== Medium Issues
+
+===== Multiple Superuser Roles Detected
+
+Two superuser roles ('instaclustr' and 'iccassandra') are present, which is a security risk as it increases the attack surface for privilege escalation. In a distributed cluster, unnecessary superusers could lead to unauthorized access if credentials are compromised, though no immediate operational impact is evident.
+
+**Action Steps:**
+
+. List all roles and permissions:
++
+[source,cql]
+----
+LIST ROLES;
+----
+
+. Revoke superuser status from non-essential roles:
++
+[source,cql]
+----
+ALTER ROLE instaclustr WITH SUPERUSER = false;
+ALTER ROLE iccassandra WITH SUPERUSER = false;
+----
+
+. Create least-privilege roles for specific tasks and audit access logs.
+
+No restart needed; changes are immediate but ensure at least one superuser remains for administration.
+
+==== Low Issues
+
+No low-severity issues identified from the provided findings. All flagged items fall into higher severity categories or were skipped.

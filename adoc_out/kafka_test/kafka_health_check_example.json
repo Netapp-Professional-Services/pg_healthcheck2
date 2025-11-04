@@ -1,0 +1,409 @@
+{
+  "under_replicated_partitions": {
+    "status": "error",
+    "error": "No module named 'plugins.kafka.checks.under_replicated_partitions'"
+  },
+  "check_partition_balance": {
+    "partition_balance": {
+      "status": "success",
+      "data": []
+    }
+  },
+  "check_topic_count_and_naming": {
+    "topic_analysis": {
+      "status": "success",
+      "data": [
+        {
+          "total_count": 9,
+          "max_threshold": 100,
+          "violation_count": 2,
+          "violations_by_type": {
+            "starts_with_digit": 0,
+            "contains_space": 0,
+            "contains_hyphen": 2,
+            "contains_uppercase": 0
+          },
+          "exceeds_threshold": false
+        }
+      ]
+    },
+    "topic_details": {
+      "status": "success",
+      "data": [
+        {
+          "topic": "bad-name-with-hyphens",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": true,
+          "contains_uppercase": false,
+          "has_violation": true
+        },
+        {
+          "topic": "high_throughput_topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": false,
+          "contains_uppercase": false,
+          "has_violation": false
+        },
+        {
+          "topic": "imbalanced_data_topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": false,
+          "contains_uppercase": false,
+          "has_violation": false
+        },
+        {
+          "topic": "large_message_topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": false,
+          "contains_uppercase": false,
+          "has_violation": false
+        },
+        {
+          "topic": "short_retention_topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": false,
+          "contains_uppercase": false,
+          "has_violation": false
+        },
+        {
+          "topic": "test-topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": true,
+          "contains_uppercase": false,
+          "has_violation": true
+        },
+        {
+          "topic": "transactions_topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": false,
+          "contains_uppercase": false,
+          "has_violation": false
+        },
+        {
+          "topic": "under_replicated_topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": false,
+          "contains_uppercase": false,
+          "has_violation": false
+        },
+        {
+          "topic": "user_profiles_topic",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": false,
+          "contains_uppercase": false,
+          "has_violation": false
+        }
+      ]
+    }
+  },
+  "check_isr_health": {
+    "isr_health": {
+      "status": "success",
+      "data": [],
+      "under_replicated_total": 0,
+      "isr_shrinks_total": 0
+    }
+  },
+  "check_storage_health": {
+    "broker_storage": {
+      "status": "success",
+      "total_brokers": 1,
+      "brokers_critical": [],
+      "brokers_warning": [],
+      "thresholds": {
+        "warning_broker_gb": 100,
+        "critical_broker_gb": 500,
+        "warning_partition_gb": 10,
+        "critical_partition_gb": 50
+      },
+      "data": [
+        {
+          "broker_id": 0,
+          "total_size_bytes": 252678684,
+          "total_size_gb": 0.24,
+          "partition_count": 44,
+          "largest_partition_mb": 39.98005199432373,
+          "largest_partition_topic": "high_throughput_topic-1"
+        }
+      ]
+    },
+    "partition_storage": {
+      "status": "success",
+      "total_large_partitions": 0,
+      "critical_partitions": 0,
+      "warning_partitions": 0,
+      "data": []
+    }
+  },
+  "check_broker_availability": {
+    "broker_availability": {
+      "status": "success",
+      "data": [],
+      "count": 0,
+      "available_count": 0,
+      "unavailable_count": 0,
+      "controller_id": -1,
+      "controller_available": false,
+      "under_replicated_partitions": 0
+    }
+  },
+  "check_consumer_group_health": {
+    "consumer_groups": {
+      "status": "success",
+      "groups_analyzed": 1,
+      "issues_detected": true,
+      "groups_with_issues": {
+        "unstable": [],
+        "low_members": [
+          "console-consumer-41450"
+        ],
+        "high_lag": []
+      },
+      "groups_without_offsets": [],
+      "groups_with_errors": [],
+      "thresholds": {
+        "critical_lag": 0,
+        "min_members": 2
+      },
+      "data": [
+        {
+          "group_id": "console-consumer-41450",
+          "state": "Stable",
+          "members": 1,
+          "total_lag": 0,
+          "has_offsets": false
+        }
+      ]
+    }
+  },
+  "down_members": {
+    "status": "error",
+    "error": "No module named 'plugins.kafka.utils.qrylib.consumer_group_queries'"
+  },
+  "check_consumer_lag": {
+    "consumer_lag": {
+      "status": "success",
+      "data": []
+    }
+  },
+  "summarized_findings": {
+    "under_replicated_partitions": {
+      "status": "error",
+      "error": "No module named 'plugins.kafka.checks.under_replicated_partitions'"
+    },
+    "check_partition_balance": {
+      "partition_balance": {
+        "status": "success",
+        "data": []
+      }
+    },
+    "check_topic_count_and_naming": {
+      "topic_analysis": {
+        "status": "success",
+        "data": [
+          {
+            "total_count": 9,
+            "max_threshold": 100,
+            "violation_count": 2,
+            "violations_by_type": {
+              "starts_with_digit": 0,
+              "contains_space": 0,
+              "contains_hyphen": 2,
+              "contains_uppercase": 0
+            },
+            "exceeds_threshold": false
+          }
+        ]
+      },
+      "topic_details": {
+        "status": "success",
+        "data": [
+          {
+            "topic": "bad-name-with-hyphens",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": true,
+            "contains_uppercase": false,
+            "has_violation": true
+          },
+          {
+            "topic": "high_throughput_topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": false,
+            "contains_uppercase": false,
+            "has_violation": false
+          },
+          {
+            "topic": "imbalanced_data_topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": false,
+            "contains_uppercase": false,
+            "has_violation": false
+          },
+          {
+            "topic": "large_message_topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": false,
+            "contains_uppercase": false,
+            "has_violation": false
+          },
+          {
+            "topic": "short_retention_topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": false,
+            "contains_uppercase": false,
+            "has_violation": false
+          },
+          {
+            "topic": "test-topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": true,
+            "contains_uppercase": false,
+            "has_violation": true
+          },
+          {
+            "topic": "transactions_topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": false,
+            "contains_uppercase": false,
+            "has_violation": false
+          },
+          {
+            "topic": "under_replicated_topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": false,
+            "contains_uppercase": false,
+            "has_violation": false
+          },
+          {
+            "topic": "user_profiles_topic",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": false,
+            "contains_uppercase": false,
+            "has_violation": false
+          }
+        ]
+      }
+    },
+    "check_isr_health": {
+      "isr_health": {
+        "status": "success",
+        "data": [],
+        "under_replicated_total": 0,
+        "isr_shrinks_total": 0
+      }
+    },
+    "check_storage_health": {
+      "broker_storage": {
+        "status": "success",
+        "total_brokers": 1,
+        "brokers_critical": [],
+        "brokers_warning": [],
+        "thresholds": {
+          "warning_broker_gb": 100,
+          "critical_broker_gb": 500,
+          "warning_partition_gb": 10,
+          "critical_partition_gb": 50
+        },
+        "data": [
+          {
+            "broker_id": 0,
+            "total_size_bytes": 252678684,
+            "total_size_gb": 0.24,
+            "partition_count": 44,
+            "largest_partition_mb": 39.98005199432373,
+            "largest_partition_topic": "high_throughput_topic-1"
+          }
+        ]
+      },
+      "partition_storage": {
+        "status": "success",
+        "total_large_partitions": 0,
+        "critical_partitions": 0,
+        "warning_partitions": 0,
+        "data": []
+      }
+    },
+    "check_broker_availability": {
+      "broker_availability": {
+        "status": "success",
+        "data": [],
+        "count": 0,
+        "available_count": 0,
+        "unavailable_count": 0,
+        "controller_id": -1,
+        "controller_available": false,
+        "under_replicated_partitions": 0
+      }
+    },
+    "check_consumer_group_health": {
+      "consumer_groups": {
+        "status": "success",
+        "groups_analyzed": 1,
+        "issues_detected": true,
+        "groups_with_issues": {
+          "unstable": [],
+          "low_members": [
+            "console-consumer-41450"
+          ],
+          "high_lag": []
+        },
+        "groups_without_offsets": [],
+        "groups_with_errors": [],
+        "thresholds": {
+          "critical_lag": 0,
+          "min_members": 2
+        },
+        "data": [
+          {
+            "group_id": "console-consumer-41450",
+            "state": "Stable",
+            "members": 1,
+            "total_lag": 0,
+            "has_offsets": false
+          }
+        ]
+      }
+    },
+    "down_members": {
+      "status": "error",
+      "error": "No module named 'plugins.kafka.utils.qrylib.consumer_group_queries'"
+    },
+    "check_consumer_lag": {
+      "consumer_lag": {
+        "status": "success",
+        "data": []
+      }
+    }
+  },
+  "prompt_template_name": "default_prompt.j2",
+  "execution_context": {
+    "tool_version": "2.1.0",
+    "run_by_user": "pclark",
+    "run_from_host": "fedora",
+    "ai_execution_metrics": {
+      "ai_provider": "xAI",
+      "ai_model": "grok-4",
+      "prompt_characters": 7155,
+      "prompt_estimated_tokens": 1788,
+      "processing_time_seconds": 0.0
+    }
+  }
+}
