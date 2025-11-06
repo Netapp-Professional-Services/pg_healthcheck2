@@ -2,6 +2,7 @@
 
 import logging
 import json
+import socket
 from kafka import KafkaAdminClient, KafkaConsumer
 from kafka.admin import NewTopic, ConfigResource, ConfigResourceType
 from plugins.common.ssh_mixin import SSHSupportMixin
@@ -19,10 +20,14 @@ class KafkaConnector(SSHSupportMixin):
         self.admin_client = None
         self._version_info = {}
         self.formatter = AsciiDocFormatter()
-        
+
+        # Environment detection
+        self.environment = None
+        self.environment_details = {}
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
-        
+
         logger.info(f"Kafka connector initialized")
     
     def connect(self):
@@ -34,14 +39,65 @@ class KafkaConnector(SSHSupportMixin):
             if isinstance(bootstrap_servers, str):
                 bootstrap_servers = [s.strip() for s in bootstrap_servers.split(',')]
 
-            self.admin_client = KafkaAdminClient(
-                bootstrap_servers=bootstrap_servers,
-                client_id='healthcheck_client',
-                request_timeout_ms=30000
-            )
+            # Build connection parameters with higher timeouts for cloud/managed services
+            connection_params = {
+                'bootstrap_servers': bootstrap_servers,
+                'client_id': 'healthcheck_client',
+                'request_timeout_ms': 60000,  # 60 seconds for cloud connections
+                'connections_max_idle_ms': 540000,  # 9 minutes
+                'metadata_max_age_ms': 300000,  # 5 minutes
+                'socket_options': [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
+            }
+
+            # Specify API version for newer Kafka brokers
+            # Convert list from YAML to tuple if present
+            api_version = self.settings.get('api_version')
+            if api_version:
+                if isinstance(api_version, list):
+                    api_version = tuple(api_version)
+                connection_params['api_version'] = api_version
+                logger.info(f"Using API version: {api_version}")
+
+            # Add security configuration if present
+            security_protocol = self.settings.get('security_protocol')
+            if security_protocol:
+                connection_params['security_protocol'] = security_protocol
+                logger.info(f"Using security protocol: {security_protocol}")
+
+                # SASL configuration
+                if 'SASL' in security_protocol:
+                    sasl_mechanism = self.settings.get('sasl_mechanism', 'PLAIN')
+                    connection_params['sasl_mechanism'] = sasl_mechanism
+                    connection_params['sasl_plain_username'] = self.settings.get('sasl_username')
+                    connection_params['sasl_plain_password'] = self.settings.get('sasl_password')
+                    logger.info(f"Using SASL mechanism: {sasl_mechanism}")
+
+                # SSL/TLS configuration
+                if 'SSL' in security_protocol:
+                    ssl_cafile = self.settings.get('ssl_cafile')
+                    if ssl_cafile:
+                        connection_params['ssl_cafile'] = ssl_cafile
+                        logger.info(f"Using SSL CA file: {ssl_cafile}")
+
+                    # Optional: client certificate for mTLS
+                    ssl_certfile = self.settings.get('ssl_certfile')
+                    ssl_keyfile = self.settings.get('ssl_keyfile')
+                    if ssl_certfile and ssl_keyfile:
+                        connection_params['ssl_certfile'] = ssl_certfile
+                        connection_params['ssl_keyfile'] = ssl_keyfile
+                        logger.info("Using mTLS with client certificate")
+
+                    # SSL check hostname (default True for security)
+                    if 'ssl_check_hostname' in self.settings:
+                        connection_params['ssl_check_hostname'] = self.settings['ssl_check_hostname']
+
+            self.admin_client = KafkaAdminClient(**connection_params)
 
             self._version_info = self._get_version_info()
-            
+
+            # Detect environment (Instaclustr vs self-hosted)
+            self._detect_environment()
+
             # Connect all SSH hosts (from mixin)
             connected_ssh_hosts = self.connect_all_ssh()
             
@@ -76,9 +132,19 @@ class KafkaConnector(SSHSupportMixin):
                     controller_id = -1
                 
                 print(f"   - Cluster ID: {cluster_id}")
+
+                # Display version
+                version = self._version_info.get('version_string', 'Unknown')
+                print(f"   - Kafka Version: {version}")
+
                 print(f"   - Brokers: {broker_count}")
                 if controller_id != -1:
                     print(f"   - Controller: Broker {controller_id}")
+
+                # Display environment
+                if self.environment:
+                    env_label = "Instaclustr Managed" if self.environment == 'instaclustr_managed' else "Self-Hosted"
+                    print(f"   - Environment: {env_label}")
                 
                 # Show broker addresses
                 if broker_count > 0:
@@ -151,18 +217,99 @@ class KafkaConnector(SSHSupportMixin):
         """Alias for disconnect()."""
         self.disconnect()
 
+    def _detect_environment(self):
+        """
+        Detect the hosting environment (Instaclustr managed vs self-hosted).
+
+        Detection logic:
+        1. Instaclustr: If instaclustr_cluster_id or instaclustr_prometheus_enabled is configured
+        2. Self-hosted: Default if no managed indicators
+
+        Updates self.environment and self.environment_details
+        """
+        try:
+            # Check for Instaclustr configuration
+            cluster_id = self.settings.get('instaclustr_cluster_id')
+            prometheus_enabled = self.settings.get('instaclustr_prometheus_enabled')
+
+            if cluster_id or prometheus_enabled:
+                self.environment = 'instaclustr_managed'
+                self.environment_details = {
+                    'provider': 'Instaclustr',
+                    'monitoring': 'prometheus' if prometheus_enabled else 'api',
+                    'has_prometheus_metrics': bool(prometheus_enabled)
+                }
+                if cluster_id:
+                    self.environment_details['cluster_id'] = cluster_id
+                logger.info(f"Detected Instaclustr managed environment" + (f": {cluster_id}" if cluster_id else ""))
+                return
+
+            # Default to self-hosted
+            self.environment = 'self_hosted'
+            self.environment_details = {
+                'provider': 'self_hosted',
+                'ssh_access': self.has_ssh_support()
+            }
+            logger.info("Detected self-hosted Kafka environment")
+
+        except Exception as e:
+            logger.warning(f"Error detecting environment: {e}. Assuming self-hosted.")
+            self.environment = 'self_hosted'
+            self.environment_details = {'provider': 'self_hosted'}
+
     def _get_version_info(self):
         """Fetches broker version information."""
         try:
+            # First check if version is configured in settings
+            configured_version = self.settings.get('kafka_version')
+            if configured_version:
+                logger.info(f"Using configured Kafka version: {configured_version}")
+                cluster_metadata = self.admin_client._client.cluster
+                brokers = cluster_metadata.brokers()
+                return {
+                    'version_string': configured_version,
+                    'broker_count': len(brokers) if brokers else 0,
+                    'source': 'configured'
+                }
+
+            # Try to detect from broker API versions
             cluster_metadata = self.admin_client._client.cluster
-            brokers = cluster_metadata.brokers()
+            brokers = list(cluster_metadata.brokers())
+            broker_count = len(brokers) if brokers else 0
+
+            # Attempt to get version from broker metadata
+            # Note: kafka-python doesn't directly expose broker version in admin API
+            # We can infer from API versions or use configured value
+            version_string = 'Unknown'
+
+            # Check if we have API version info
+            if brokers:
+                first_broker = list(brokers)[0]
+                # Get the API version range to infer Kafka version
+                try:
+                    api_versions = self.admin_client._client.check_version(first_broker.nodeId)
+                    if api_versions:
+                        # Rough mapping of API versions to Kafka versions
+                        if api_versions >= (3, 0, 0):
+                            version_string = '3.x (KRaft)'
+                        elif api_versions >= (2, 8, 0):
+                            version_string = '2.8.x+'
+                        elif api_versions >= (2, 0, 0):
+                            version_string = '2.x'
+                        else:
+                            version_string = f'{api_versions[0]}.x'
+                        logger.info(f"Detected Kafka version from API: {version_string}")
+                except:
+                    logger.debug("Could not detect version from API versions")
+
             return {
-                'version_string': 'Kafka (Version API not supported by client)',
-                'broker_count': len(brokers) if brokers else 0
+                'version_string': version_string,
+                'broker_count': broker_count,
+                'source': 'detected' if version_string != 'Unknown' else 'unknown'
             }
         except Exception as e:
             logger.warning(f"Could not fetch version: {e}")
-            return {'version_string': 'Unknown', 'broker_count': 0}
+            return {'version_string': 'Unknown', 'broker_count': 0, 'source': 'error'}
 
     @property
     def version_info(self):
@@ -173,21 +320,43 @@ class KafkaConnector(SSHSupportMixin):
 
     def get_db_metadata(self):
         """
-        Fetches cluster-level metadata.
-        
+        Fetches cluster-level metadata for trend analysis.
+
         Returns:
-            dict: {'version': str, 'db_name': str}
+            dict: Metadata including version, cluster_name, nodes, environment
         """
         try:
+            # Get cluster information
             cluster_info = self.admin_client.describe_cluster()
             cluster_id = cluster_info.get('cluster_id', 'Unknown')
+
+            # Get broker count
+            cluster = self.admin_client._client.cluster
+            cluster.request_update()
+            brokers = list(cluster.brokers())
+            broker_count = len(brokers)
+
+            # Use detected environment
+            environment = self.environment if self.environment else 'self_hosted'
+            environment_details = self.environment_details if self.environment_details else {}
+
             return {
                 'version': self.version_info.get('version_string', 'N/A'),
-                'db_name': f"Cluster ID: {cluster_id}"
+                'cluster_name': cluster_id,
+                'nodes': broker_count,
+                'environment': environment,
+                'environment_details': environment_details,
+                'db_name': f"Cluster ID: {cluster_id}"  # Keep for backwards compatibility
             }
         except Exception as e:
             logger.warning(f"Could not fetch metadata: {e}")
-            return {'version': 'N/A', 'db_name': 'N/A'}
+            return {
+                'version': 'N/A',
+                'cluster_name': 'Unknown',
+                'nodes': 0,
+                'environment': 'unknown',
+                'db_name': 'N/A'
+            }
 
     def execute_query(self, query, params=None, return_raw=False):
         """
@@ -265,7 +434,8 @@ class KafkaConnector(SSHSupportMixin):
             return (msg, {'error': str(e)}) if return_raw else msg
         except Exception as e:
             msg = self.formatter.format_error(f"Operation failed: {e}")
-            logger.error(msg, exc_info=True)
+            logger.debug(f"Exception details: {e}", exc_info=True)  # Full trace only in debug
+            logger.error(f"Operation failed: {e}")  # User-friendly error without trace
             return (msg, {'error': str(e)}) if return_raw else msg
 
     def _execute_shell_command(self, command, return_raw=False):
@@ -301,10 +471,11 @@ class KafkaConnector(SSHSupportMixin):
             
             # Delegate to ShellExecutor (uses shared formatter)
             return self.shell_executor.execute(query, return_raw=return_raw)
-            
+
         except Exception as e:
             error_msg = self.formatter.format_error(f"Shell command failed: {str(e)}")
-            logger.error(error_msg, exc_info=True)
+            logger.debug(f"Shell command exception details: {e}", exc_info=True)
+            logger.error(f"Shell command failed: {e}")
             return (error_msg, {'error': str(e)}) if return_raw else error_msg
 
     def _list_topics(self, return_raw=False):
@@ -445,8 +616,33 @@ class KafkaConnector(SSHSupportMixin):
     
             partitions = list(committed_offsets.keys())
             logger.info(f"Partitions for {group_id}: {partitions}")
-            
-            consumer = KafkaConsumer(bootstrap_servers=self.settings.get('bootstrap_servers'))
+
+            # Build consumer parameters with same security config
+            consumer_params = {'bootstrap_servers': self.settings.get('bootstrap_servers')}
+
+            # Add security configuration if present
+            security_protocol = self.settings.get('security_protocol')
+            if security_protocol:
+                consumer_params['security_protocol'] = security_protocol
+
+                if 'SASL' in security_protocol:
+                    consumer_params['sasl_mechanism'] = self.settings.get('sasl_mechanism', 'PLAIN')
+                    consumer_params['sasl_plain_username'] = self.settings.get('sasl_username')
+                    consumer_params['sasl_plain_password'] = self.settings.get('sasl_password')
+
+                if 'SSL' in security_protocol:
+                    ssl_cafile = self.settings.get('ssl_cafile')
+                    if ssl_cafile:
+                        consumer_params['ssl_cafile'] = ssl_cafile
+                    ssl_certfile = self.settings.get('ssl_certfile')
+                    ssl_keyfile = self.settings.get('ssl_keyfile')
+                    if ssl_certfile and ssl_keyfile:
+                        consumer_params['ssl_certfile'] = ssl_certfile
+                        consumer_params['ssl_keyfile'] = ssl_keyfile
+                    if 'ssl_check_hostname' in self.settings:
+                        consumer_params['ssl_check_hostname'] = self.settings['ssl_check_hostname']
+
+            consumer = KafkaConsumer(**consumer_params)
             end_offsets = consumer.end_offsets(partitions)
             consumer.close()
             
@@ -746,11 +942,17 @@ class KafkaConnector(SSHSupportMixin):
                 formatted = self.formatter.format_table(raw_results)
             
             return (formatted, raw_results) if return_raw else formatted
-            
+
         except Exception as e:
-            logger.error(f"Failed to describe log dirs: {e}", exc_info=True)
-            error_msg = self.formatter.format_error(f"Failed to describe log dirs: {e}")
-            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+            # For managed clusters, this API is typically restricted - handle gracefully
+            if self.environment == 'instaclustr_managed':
+                logger.debug(f"describe_log_dirs not available on managed cluster (expected): {e}")
+                info_msg = self.formatter.format_note("Log directory details not available on managed Kafka clusters (API restricted by provider)")
+                return (info_msg, {'unavailable': 'managed_cluster_restriction'}) if return_raw else info_msg
+            else:
+                logger.warning(f"Failed to describe log dirs: {e}")
+                error_msg = self.formatter.format_note(f"Could not retrieve log directory information: {e}")
+                return (error_msg, {'error': str(e)}) if return_raw else error_msg
         
 
 

@@ -1,0 +1,112 @@
+{
+  "critical_cpu_load": {
+    "metric_keywords": ["cpu_load", "kafka"],
+    "rules": [
+      {
+        "expression": "data.get('max_load', 0) >= 10",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has extreme CPU load: {data.get('max_load'):.2f} (1min: {data.get('load_1min'):.2f}, 5min: {data.get('load_5min'):.2f}, 15min: {data.get('load_15min'):.2f}). System is severely overloaded.",
+        "recommendations": [
+          "IMMEDIATE: Identify CPU-intensive processes with 'top -c' or 'htop'",
+          "Check for runaway producer/consumer traffic or replication storms",
+          "Consider emergency load shedding or traffic throttling",
+          "Scale out immediately by adding brokers to distribute load",
+          "Review recent changes that may have triggered the load spike"
+        ]
+      },
+      {
+        "expression": "data.get('max_load', 0) >= 5",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical CPU load: {data.get('max_load'):.2f} (1min: {data.get('load_1min'):.2f}, 5min: {data.get('load_5min'):.2f}, 15min: {data.get('load_15min'):.2f}).",
+        "recommendations": [
+          "Investigate CPU usage patterns immediately",
+          "Check for heavy compaction, replication, or consumer activity",
+          "Monitor network throughput correlation with CPU spikes",
+          "Plan capacity increase within 24-48 hours"
+        ]
+      },
+      {
+        "expression": "data.get('max_load', 0) >= 3",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has elevated CPU load: {data.get('max_load'):.2f}.",
+        "recommendations": [
+          "Monitor CPU trends to identify if load is increasing",
+          "Review partition distribution for hot spots",
+          "Check producer batch settings and compression ratios",
+          "Consider load balancing across more brokers"
+        ]
+      },
+      {
+        "expression": "data.get('max_load', 0) >= 2",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has moderate CPU load: {data.get('max_load'):.2f}.",
+        "recommendations": [
+          "Track CPU usage patterns over time",
+          "Optimize topic configurations if load correlates with throughput",
+          "Review JVM GC settings for CPU efficiency"
+        ]
+      }
+    ]
+  },
+  "broker_cpu_health": {
+    "metric_keywords": ["cpu_load"],
+    "data_conditions": [
+      {"key": "broker_id", "exists": true},
+      {"key": "max_load", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('exceeds_critical') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Critical CPU load threshold exceeded on broker {data.get('broker_id')}: max load {data.get('max_load'):.2f}",
+        "recommendations": [
+          "Immediate investigation required",
+          "CPU exhaustion can cause message processing delays and broker instability"
+        ]
+      },
+      {
+        "expression": "data.get('exceeds_warning') == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Warning CPU load threshold exceeded on broker {data.get('broker_id')}: max load {data.get('max_load'):.2f}",
+        "recommendations": [
+          "Monitor CPU trends closely",
+          "Plan remediation within 24-48 hours"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_cpu_issues": {
+    "metric_keywords": ["cpu_load"],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_cpu_load', {}).get('cpu_load', {}).get('critical_brokers', [])) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_cpu_load', {}).get('cpu_load', {}).get('critical_brokers', []))}) have critical CPU load. This indicates a cluster-wide performance issue.",
+        "recommendations": [
+          "Cluster-wide CPU crisis - immediate action required",
+          "Check for cluster-wide events (rebalancing, elections, compaction storms)",
+          "Review overall cluster throughput and consider emergency throttling",
+          "Plan emergency cluster expansion"
+        ]
+      },
+      {
+        "expression": "len(all_structured_findings.get('check_cpu_load', {}).get('cpu_load', {}).get('warning_brokers', [])) >= 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_cpu_load', {}).get('cpu_load', {}).get('warning_brokers', []))}) have elevated CPU load. Cluster-wide capacity planning needed.",
+        "recommendations": [
+          "Perform cluster-wide capacity review",
+          "Analyze traffic patterns for optimization opportunities",
+          "Plan coordinated scaling across the cluster"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "warning_fenced_brokers": {
+    "metric_keywords": ["prometheus_controller_health", "cluster_aggregate"],
+    "rules": [{
+      "expression": "data.get('total_fenced_brokers', 0) > 0",
+      "level": "high",
+      "score": 7,
+      "reasoning": "KRaft controller reports {data.get('total_fenced_brokers')} fenced broker(s)",
+      "recommendations": [
+        "Fenced brokers are isolated by controller",
+        "Check broker connectivity",
+        "Review controller logs",
+        "Verify cluster metadata synchronization"
+      ]
+    }]
+  },
+  "warning_metadata_errors": {
+    "metric_keywords": ["prometheus_controller_health", "cluster_aggregate"],
+    "rules": [{
+      "expression": "data.get('total_metadata_errors', 0) > 0",
+      "level": "high",
+      "score": 7,
+      "reasoning": "KRaft controller has {data.get('total_metadata_errors')} metadata errors",
+      "recommendations": ["Review controller logs", "Check metadata synchronization", "Verify quorum health"]
+    }]
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "critical_consumer_group_lag": {
+    "metric_keywords": ["prometheus_consumer_lag", "per_consumer_group_lag", "data"],
+    "data_conditions": [
+      { "key": "total_lag", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_lag', 0) >= 100000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Consumer group '{data.get('group_id')}' has critical lag of {data.get('total_lag'):,} messages - consumers severely behind producers",
+        "recommendations": [
+          "URGENT: Consumer group '{data.get('group_id')}' cannot keep up with message production",
+          "Check consumer application logs for errors or exceptions",
+          "Verify all consumer instances are running and healthy",
+          "Review consumer processing logic for performance bottlenecks",
+          "Consider scaling consumer instances (up to partition count)",
+          "Check if consumers are doing synchronous blocking operations",
+          "Review fetch.min.bytes and fetch.max.wait.ms settings"
+        ]
+      }
+    ]
+  },
+
+  "warning_consumer_group_lag": {
+    "metric_keywords": ["prometheus_consumer_lag", "per_consumer_group_lag", "data"],
+    "data_conditions": [
+      { "key": "total_lag", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_lag', 0) >= 10000 and data.get('total_lag', 0) < 100000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Consumer group '{data.get('group_id')}' has elevated lag of {data.get('total_lag'):,} messages",
+        "recommendations": [
+          "Monitor consumer group '{data.get('group_id')}' lag trends",
+          "Check if lag is growing or stable",
+          "Review consumer performance metrics",
+          "Verify consumer instances have adequate resources",
+          "Consider scaling if lag continues to grow",
+          "Check for recent traffic increases"
+        ]
+      }
+    ]
+  },
+
+  "cluster_consumer_lag_pressure": {
+    "metric_keywords": ["prometheus_consumer_lag", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('groups_with_critical_lag', 0) >= 3",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Multiple consumer groups ({data.get('groups_with_critical_lag')}) experiencing critical lag - widespread consumption issues",
+        "recommendations": [
+          "URGENT: Multiple consumer groups cannot keep up with production",
+          "Check if this is a cluster-wide issue affecting all consumers",
+          "Review broker performance - high produce latency affects consumers",
+          "Verify no network issues between consumers and brokers",
+          "Check if recent traffic spike overwhelmed consumers",
+          "Review consumer application deployment status",
+          "Consider if consumer infrastructure is undersized"
+        ]
+      },
+      {
+        "expression": "data.get('total_lag_all_groups', 0) >= 500000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster-wide consumer lag of {data.get('total_lag_all_groups'):,} messages indicates severe backlog",
+        "recommendations": [
+          "Review overall consumer ecosystem health",
+          "Check if producers are overwhelming consumers",
+          "Verify consumer scaling strategy is adequate",
+          "Consider implementing backpressure mechanisms",
+          "Review message retention to ensure consumers can catch up"
+        ]
+      }
+    ]
+  },
+
+  "healthy_consumer_lag": {
+    "metric_keywords": ["prometheus_consumer_lag", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('groups_with_critical_lag', 0) == 0 and data.get('groups_with_warning_lag', 0) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "All {data.get('total_groups')} consumer groups have healthy lag - consumers keeping up with producers",
+        "recommendations": [
+          "Consumer lag is healthy",
+          "Continue monitoring lag trends",
+          "Maintain current consumer scaling strategy",
+          "Ensure alerting is configured for lag thresholds",
+          "Document successful consumer configuration for reference"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "critical_heap_usage": {
+    "metric_keywords": ["prometheus_jvm_heap", "data"],
+    "data_conditions": [
+      { "key": "heap_percent", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('heap_percent', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical JVM heap usage of {data.get('heap_percent')}% ({data.get('heap_used_gb')}GB / {data.get('heap_max_gb')}GB)",
+        "recommendations": [
+          "URGENT: Broker {data.get('node_id', 'unknown')[:8]} is near JVM heap exhaustion",
+          "Check for memory leaks or excessive buffering",
+          "Review GC logs for excessive full GC activity",
+          "Consider increasing heap size (-Xmx flag)",
+          "Typical Kafka production heap: 6-8GB",
+          "Check for large message batches causing memory pressure",
+          "Verify max.request.size and fetch.max.bytes are reasonable"
+        ]
+      }
+    ]
+  },
+
+  "warning_heap_usage": {
+    "metric_keywords": ["prometheus_jvm_heap", "data"],
+    "data_conditions": [
+      { "key": "heap_percent", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('heap_percent', 0) >= 75 and data.get('heap_percent', 0) < 90",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated JVM heap usage of {data.get('heap_percent')}%",
+        "recommendations": [
+          "Monitor heap usage trends on broker {data.get('node_id', 'unknown')[:8]}",
+          "Check GC frequency and duration",
+          "Review memory usage patterns",
+          "Consider heap tuning if usage remains consistently high",
+          "Ensure G1GC is being used for heaps > 4GB",
+          "Monitor for memory growth indicating potential leak"
+        ]
+      }
+    ]
+  },
+
+  "cluster_heap_pressure": {
+    "metric_keywords": ["prometheus_jvm_heap", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('average_heap_percent', 0) >= 80",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster-wide heap pressure - average {data.get('average_heap_percent')}% across {data.get('broker_count')} brokers",
+        "recommendations": [
+          "Multiple brokers experiencing high heap usage",
+          "Review cluster-wide memory configuration",
+          "Check for recent workload changes causing increased memory usage",
+          "Consider increasing heap size across all brokers",
+          "Review GC configuration and performance",
+          "Verify message sizes and batching are appropriate"
+        ]
+      }
+    ]
+  },
+
+  "healthy_heap_usage": {
+    "metric_keywords": ["prometheus_jvm_heap", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('average_heap_percent', 0) < 65",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Healthy JVM heap usage - average {data.get('average_heap_percent')}% across cluster",
+        "recommendations": [
+          "Heap usage is healthy",
+          "Continue monitoring for gradual growth",
+          "Ensure GC metrics are also healthy (pause times < 100ms)",
+          "Maintain current JVM configuration",
+          "Document successful heap sizing for future reference"
+        ]
+      }
+    ]
+  }
+}

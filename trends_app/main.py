@@ -152,49 +152,42 @@ def get_all_runs():
     try:
         conn = psycopg2.connect(**db_settings)
         cursor = conn.cursor()
-        
-        params = {
-            'company_ids': accessible_company_ids,
-            'user_id': current_user.id
-        }
-        
-        query_parts = [
-            "SELECT hcr.id, hcr.run_timestamp, hcr.target_host, hcr.target_port, hcr.target_db_name,",
-            "CASE WHEN ufr.user_id IS NOT NULL THEN true ELSE false END AS is_favorite",
-            "FROM health_check_runs hcr",
-            "JOIN companies c ON hcr.company_id = c.id",
-            "LEFT JOIN user_favorite_runs ufr ON hcr.id = ufr.run_id AND ufr.user_id = %(user_id)s",
-            "WHERE hcr.company_id = ANY(%(company_ids)s)"
-        ]
 
+        # Parse target filter if provided
+        company_name = None
+        target_host = None
+        target_port = None
+        target_db_name = None
         if target_filter and target_filter != 'all':
             try:
-                company_name, host, port, db_name = target_filter.split(':', 3)
-                query_parts.append("AND c.company_name = %(company_name)s AND hcr.target_host = %(host)s AND hcr.target_port = %(port)s AND hcr.target_db_name = %(db_name)s")
-                params.update({'company_name': company_name, 'host': host, 'port': int(port), 'db_name': db_name})
+                company_name, target_host, port_str, target_db_name = target_filter.split(':', 3)
+                target_port = int(port_str)
             except (ValueError, IndexError) as e:
                 current_app.logger.warning(f"Invalid target filter format: {target_filter}. Error: {e}")
 
-        if start_time_str:
-            query_parts.append("AND hcr.run_timestamp >= %(start_time)s::date")
-            params['start_time'] = start_time_str
+        # Use stored procedure for analytics abstraction
+        query = "SELECT get_health_check_runs(%s, %s, %s, %s, %s, %s, %s, %s);"
+        cursor.execute(query, (
+            accessible_company_ids,
+            current_user.id,
+            company_name,
+            target_host,
+            target_port,
+            target_db_name,
+            start_time_str,
+            end_time_str
+        ))
+        result = cursor.fetchone()[0]
 
-        if end_time_str:
-            query_parts.append("AND hcr.run_timestamp < (%(end_time)s::date + interval '1 day')")
-            params['end_time'] = end_time_str
-
-        query_parts.append("ORDER BY hcr.run_timestamp DESC;")
-        
-        query = " ".join(query_parts)
-        cursor.execute(query, params)
-
-        for row in cursor.fetchall():
-            all_runs.append({
-                "id": row[0],
-                "timestamp": row[1].isoformat(),
-                "target": f"{row[2]}:{row[3]} ({row[4]})",
-                "is_favorite": row[5]
-            })
+        # Parse JSONB result and format for API response
+        if result:
+            for run_obj in result:
+                all_runs.append({
+                    "id": run_obj['id'],
+                    "timestamp": run_obj['run_timestamp'],
+                    "target": f"{run_obj['target_host']}:{run_obj['target_port']} ({run_obj['target_db_name']})",
+                    "is_favorite": run_obj['is_favorite']
+                })
     except psycopg2.Error as e:
         current_app.logger.error(f"Database error fetching all runs with filters: {e}")
     finally:
@@ -532,53 +525,34 @@ def get_all_reports():
     config = load_trends_config()
     db_settings = config.get('database')
     conn = None
-    reports = []
     try:
         conn = psycopg2.connect(**db_settings)
         cursor = conn.cursor()
-        query = """
-        SELECT 
-            gar.id, 'generated' AS report_type, gar.report_name, gar.report_description,
-            gar.annotations, gar.generation_timestamp AS timestamp, hcr.target_host, 
-            hcr.target_db_name, uap.profile_name, ar.rule_set_name, pt.template_name
-        FROM generated_ai_reports gar
-        JOIN health_check_runs hcr ON gar.run_id = hcr.id
-        LEFT JOIN user_ai_profiles uap ON gar.ai_profile_id = uap.id
-        LEFT JOIN analysis_rules ar ON gar.rule_set_id = ar.id
-        LEFT JOIN prompt_templates pt ON gar.template_id = pt.id
-        WHERE gar.generated_by_user_id = %(user_id)s
-        UNION ALL
-        SELECT
-            ur.id, 'uploaded' AS report_type, ur.report_name, ur.report_description,
-            NULL AS annotations, ur.upload_timestamp AS timestamp, 'N/A' AS target_host,
-            'N/A' AS target_db_name, 'Manual Upload' AS profile_name,
-            NULL AS rule_set_name, NULL AS template_name
-        FROM uploaded_reports ur
-        WHERE ur.uploaded_by_user_id = %(user_id)s
-        ORDER BY timestamp DESC;
-        """
-        cursor.execute(query, {'user_id': current_user.id})
-        for row in cursor.fetchall():
-            reports.append({
-                "id": row[0], "type": row[1], "name": row[2], "description": row[3],
-                "annotations": row[4], "timestamp": row[5].isoformat(),
-                "target_host": row[6], "db_name": row[7],
-                "profile_name": row[8], "rules_name": row[9], "template_name": row[10]
-            })
+
+        # Call the stored function get_all_reports(user_id)
+        # Returns JSONB array of report objects
+        cursor.execute("SELECT get_all_reports(%s)", (current_user.id,))
+        result = cursor.fetchone()
+
+        # The stored function returns JSONB, parse it
+        reports_json = result[0] if result else []
+
+        # Convert timestamps from ISO format strings if they're not already
+        # The JSONB from the function should already have properly formatted data
+        return jsonify(reports_json)
     except psycopg2.Error as e:
         current_app.logger.error(f"DB error fetching all reports: {e}")
         return jsonify({"error": "Could not fetch report history."}), 500
     finally:
         if conn: conn.close()
-    return jsonify(reports)
 
-@bp.route('/api/download-report/<int:report_id>')
+@bp.route('/api/download-report/<string:report_type>/<int:report_id>')
 @login_required
-def download_report(report_id):
-    """API endpoint to download a previously generated AI report.
+def download_report(report_type, report_id):
+    """API endpoint to download a report.
 
-    Fetches the encrypted report content from the database, decrypts it,
-    and returns it as a downloadable AsciiDoc file.
+    Fetches the report content from the appropriate table based on type,
+    decrypts it if necessary, and returns it as a downloadable AsciiDoc file.
     """
 
     config = load_trends_config()
@@ -587,15 +561,41 @@ def download_report(report_id):
     try:
         conn = psycopg2.connect(**db_settings)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT pgp_sym_decrypt(report_content::bytea, get_encryption_key()), run_id FROM generated_ai_reports WHERE id = %s AND generated_by_user_id = %s;",
-            (report_id, current_user.id)
-        )
-        report_data = cursor.fetchone()
-        if not report_data:
-            abort(404, "Report not found or permission denied.")
-        report_content, run_id = report_data
-        return send_file(io.BytesIO(report_content.encode('utf-8')), mimetype='text/plain', as_attachment=True, download_name=f"ai_report_run_{run_id}_saved.adoc")
+
+        if report_type in ['generated', 'trend_analysis']:
+            # Fetch from generated_ai_reports
+            cursor.execute(
+                "SELECT pgp_sym_decrypt(report_content::bytea, get_encryption_key()), run_id, report_name FROM generated_ai_reports WHERE id = %s AND generated_by_user_id = %s;",
+                (report_id, current_user.id)
+            )
+            report_data = cursor.fetchone()
+            if not report_data:
+                abort(404, "Report not found or permission denied.")
+            report_content, run_id, report_name = report_data
+            filename = f"{report_name or f'ai_report_run_{run_id}'}.adoc"
+        elif report_type == 'health_check':
+            # Fetch from health_check_runs - verify user access via company
+            cursor.execute(
+                """
+                SELECT hcr.report_adoc, hcr.prompt_template_name, hcr.target_host
+                FROM health_check_runs hcr
+                JOIN companies c ON hcr.company_id = c.id
+                JOIN user_company_access uca ON c.id = uca.company_id
+                WHERE hcr.id = %s
+                  AND uca.user_id = %s
+                  AND hcr.report_adoc IS NOT NULL;
+                """,
+                (report_id, current_user.id)
+            )
+            report_data = cursor.fetchone()
+            if not report_data:
+                abort(404, "Report not found or permission denied.")
+            report_content, template_name, target_host = report_data
+            filename = f"health_check_{target_host}_{template_name}_{report_id}.adoc"
+        else:
+            abort(404, "Invalid report type for download.")
+
+        return send_file(io.BytesIO(report_content.encode('utf-8')), mimetype='text/plain', as_attachment=True, download_name=filename)
     except psycopg2.Error as e:
         current_app.logger.error(f"DB error downloading report: {e}")
         abort(500, "DB error occurred.")

@@ -1,0 +1,143 @@
+= SSL/TLS Certificates Directory
+
+This directory contains SSL/TLS certificates and keys required for secure connections to managed database services (Kafka, Cassandra, OpenSearch, etc.).
+
+[IMPORTANT]
+====
+**Do NOT commit actual certificates, keys, or keystores to version control!**
+
+The `.gitignore` file is configured to exclude all files in this directory except this README.
+====
+
+== For Kafka (Instaclustr or other providers)
+
+=== Option 1: mTLS Authentication (recommended)
+
+Required files:
+
+* `cluster-ca-certificate.pem` - CA certificate to verify the server
+* `certificate.pem` - Client certificate for authentication
+* `key.pem` - Private key for the client certificate
+
+==== How to generate:
+
+. Generate a Java KeyStore with private key:
++
+[source,bash]
+----
+keytool -genkey -noprompt -alias <your-alias> -keyalg RSA \
+  -dname "CN=<your-name>,OU=IT,O=<your-org>,C=US" \
+  -keystore keystore.jks \
+  -storepass <your-password> \
+  -keypass <your-password>
+----
+
+. Generate a Certificate Signing Request (CSR):
++
+[source,bash]
+----
+keytool -keystore keystore.jks -alias <your-alias> \
+  -certreq -file client.csr \
+  -storepass <your-password> -keypass <your-password>
+----
+
+. Submit the CSR to your provider (Instaclustr, Confluent, etc.) to get it signed
+
+. Import the CA certificate:
++
+[source,bash]
+----
+keytool -import -trustcacerts -alias cluster-ca \
+  -file cluster-ca-certificate.pem \
+  -keystore keystore.jks \
+  -storepass <your-password> -noprompt
+----
+
+. Import the signed certificate:
++
+[source,bash]
+----
+keytool -import -alias <your-alias> \
+  -file <signed-certificate>.crt \
+  -keystore keystore.jks \
+  -storepass <your-password> -keypass <your-password> -noprompt
+----
+
+. Export certificate to PEM format:
++
+[source,bash]
+----
+keytool -exportcert -alias <your-alias> -keystore keystore.jks \
+  -storepass <your-password> -rfc -file certificate.pem
+----
+
+. Export private key to PEM format:
++
+[source,bash]
+----
+# First convert to PKCS12
+keytool -importkeystore -srckeystore keystore.jks \
+  -destkeystore keystore.p12 -deststoretype PKCS12 \
+  -srcalias <your-alias> -deststorepass <your-password> \
+  -srcstorepass <your-password> -srckeypass <your-password>
+
+# Extract private key
+openssl pkcs12 -in keystore.p12 -nodes -nocerts \
+  -out key.pem -passin pass:<your-password>
+----
+
+=== Option 2: SASL_SSL Authentication
+
+Required files:
+
+* `cluster-ca-certificate.pem` - CA certificate to verify the server
+
+In your config YAML, set:
+[source,yaml]
+----
+security_protocol: "SASL_SSL"
+sasl_mechanism: "PLAIN"
+sasl_username: "your-username"
+sasl_password: "your-password"
+ssl_cafile: "config/certs/cluster-ca-certificate.pem"
+----
+
+== For Cassandra (Instaclustr or other providers)
+
+Download the CA bundle from your provider and place:
+
+* `ca.crt` - CA certificate bundle
+
+== For OpenSearch (Instaclustr or other providers)
+
+Download certificates from your provider and place:
+
+* `ca.pem` - CA certificate
+* `client-cert.pem` - Client certificate (optional, for client authentication)
+* `client-key.pem` - Client private key (optional, for client authentication)
+
+== Security Best Practices
+
+. **Never commit certificates or keys to version control**
+. Store passwords and credentials in environment variables or secure vaults
+. Use restrictive file permissions:
+  ** Private keys: `chmod 600 key.pem`
+  ** Certificates: `chmod 644 certificate.pem`
+. Rotate certificates before they expire
+. Use strong passwords for keystores (minimum 12 characters)
+. Keep backups of certificates in a secure location separate from code repository
+
+== Troubleshooting
+
+=== Connection failures
+
+. Verify certificate files exist and have correct permissions
+. Check certificate expiration: `openssl x509 -in certificate.pem -noout -dates`
+. Verify certificate chain: `openssl verify -CAfile cluster-ca-certificate.pem certificate.pem`
+. Check hostnames match certificate CN or SAN fields
+
+=== Certificate format issues
+
+. Convert DER to PEM: `openssl x509 -inform der -in cert.der -out cert.pem`
+. View certificate details: `openssl x509 -in cert.pem -text -noout`
+. Check key format: `openssl rsa -in key.pem -check`

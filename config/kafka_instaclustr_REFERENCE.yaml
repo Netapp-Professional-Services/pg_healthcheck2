@@ -1,0 +1,88 @@
+# Instaclustr Kafka Cluster Configuration
+db_type: "kafka"
+
+company_name: "Instaclustr Kafka Test"
+report_title: "Kafka Health Check Report - Instaclustr"
+logo_image: MyLogo.svg[900,900]
+
+# Kafka Configuration
+kafka_version: "Apache Kafka 4.0.0"
+# API version tuple for kafka-python library (major, minor, patch)
+# Use [3, 7, 0] for Kafka 3.7.x, or comment out to auto-detect
+#api_version: [3, 7, 0]
+
+# Instaclustr Public Broker Addresses
+# Port 9082 for SSL/mTLS (mutual TLS authentication)
+bootstrap_servers:
+ - 10.10.10.10:9082
+ - 10.10.10.11:9082
+ - 10.10.10.12:9082
+
+# Security Configuration - SSL with mTLS (Mutual TLS Authentication)
+security_protocol: "SSL"
+
+# SSL/TLS Configuration with Client Certificates
+# See your Instaclustr console - Certificates for Client ⇄ Node Encryption
+ssl_cafile: "config/certs/cluster-ca-certificate.pem"
+ssl_certfile: "config/certs/certificate.pem"
+ssl_keyfile: "config/certs/key.pem"
+ssl_check_hostname: true
+
+# Prometheus Monitoring Configuration (Instaclustr)
+# Provides rich metrics without requiring SSH access to managed Kafka brokers
+instaclustr_prometheus_enabled: true
+instaclustr_cluster_id: "<YOUR_IC_KAFKA_CLUSTER_ID"
+instaclustr_prometheus_base_url: "https://<YOUR_IC_ACCOUNT>.prometheus.monitoring.instaclustr.com"
+instaclustr_prometheus_username: "YOUR_IC_USER"
+instaclustr_prometheus_api_key: "YOUR_IC_PROMETHEUS_API_KEY"
+
+# SSH Configuration (OPTIONAL - only for OS-level checks)
+# Note: Instaclustr is a managed service, so SSH access is typically not available
+# Leave these commented out unless you have special access
+# ssh_hosts:
+#  - 10.10.10.10
+#  - 10.10.10.11
+#  - 10.10.10.12
+# ssh_user: "your_ssh_user"
+# ssh_key_file: "/path/to/.ssh/my_key_file"
+# ssh_timeout: 10
+
+# JVM Memory Thresholds 
+#(Defaults shown, can be overridden)
+#kafka_jvm_heap_warning_percent: 75
+#kafka_jvm_heap_critical_percent: 90
+#kafka_jvm_old_gen_warning_percent: 80
+#kafka_jvm_old_gen_critical_percent: 90
+#kafka_jvm_metaspace_warning_percent: 85
+#kafka_jvm_metaspace_critical_percent: 95
+#kafka_jvm_fgc_warning_count: 10
+#kafka_jvm_fgc_critical_count: 50
+
+# I/O Statistics Thresholds
+#(Defaults shown, can be overridden)
+#kafka_io_util_warning_percent: 80
+#kafka_io_util_critical_percent: 95
+#kafka_io_await_warning_ms: 20
+#kafka_io_await_critical_ms: 50
+#kafka_cpu_iowait_warning_percent: 10
+#kafka_cpu_iowait_critical_percent: 25
+
+# AI Configuration
+ai_analyze: true
+
+# set to true to run in-line with health check.  
+# Otherwise, you can pass the structured findings to AI with utils/offline_ai_processor.py
+ai_run_integrated: false 
+
+ai_provider: AIPROVIDER
+ai_endpoint: https://api.ai.endpoint/
+ai_api_key: AI_API_KEY
+ai_model: AI_MODEL
+ai_temperature: 0.1
+ai_max_output_tokens: 20000
+ai_max_prompt_tokens: 20000
+
+# ai_user: anonymous #IF REQUIRED
+# ai_user_header: "X-User-ID" # IF REQUIRED
+# Optional: Path to a custom SSL certificate for verifying AI endpoint (e.g., for corporate proxies)
+# ssl_cert_path: "/path/to/your/custom/cert.pem" 

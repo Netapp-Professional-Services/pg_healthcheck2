@@ -1,0 +1,78 @@
+{
+  "critical_produce_purgatory": {
+    "metric_keywords": ["prometheus_purgatory", "per_broker_purgatory", "data"],
+    "data_conditions": [
+      { "key": "produce_purgatory", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('produce_purgatory', 0) >= 500",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical produce purgatory of {data.get('produce_purgatory')} requests",
+        "recommendations": [
+          "High produce purgatory indicates requests waiting for acks",
+          "Usually caused by slow replication or lagging replicas",
+          "Check ISR health and replication latency",
+          "Review producer acks configuration (acks=all most common cause)",
+          "Verify all replicas are keeping up with leader"
+        ]
+      }
+    ]
+  },
+  "warning_produce_purgatory": {
+    "metric_keywords": ["prometheus_purgatory", "per_broker_purgatory", "data"],
+    "data_conditions": [
+      { "key": "produce_purgatory", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('produce_purgatory', 0) >= 100 and data.get('produce_purgatory', 0) < 500",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated produce purgatory of {data.get('produce_purgatory')} requests",
+        "recommendations": [
+          "Monitor produce purgatory trends",
+          "Check if correlated with ISR shrinks",
+          "Review replication performance"
+        ]
+      }
+    ]
+  },
+  "critical_fetch_purgatory": {
+    "metric_keywords": ["prometheus_purgatory", "per_broker_purgatory", "data"],
+    "data_conditions": [
+      { "key": "fetch_purgatory", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('fetch_purgatory', 0) >= 500",
+        "level": "critical",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical fetch purgatory of {data.get('fetch_purgatory')} requests",
+        "recommendations": [
+          "High fetch purgatory indicates fetch requests waiting for data",
+          "Check consumer fetch.min.bytes and fetch.max.wait.ms settings",
+          "May be normal during low traffic if fetch.min.bytes is high",
+          "Review consumer configuration"
+        ]
+      }
+    ]
+  },
+  "healthy_purgatory": {
+    "metric_keywords": ["prometheus_purgatory", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('avg_produce_purgatory', 0) < 50 and data.get('avg_fetch_purgatory', 0) < 50",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Purgatory sizes healthy - avg produce: {data.get('avg_produce_purgatory'):.1f}, avg fetch: {data.get('avg_fetch_purgatory'):.1f}",
+        "recommendations": [
+          "Purgatory sizes are healthy",
+          "Continue monitoring for spikes",
+          "Typical values should be < 100 requests"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "critical_produce_latency": {
+    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "data_conditions": [
+      { "key": "produce_latency_ms", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('produce_latency_ms', 0) >= 500",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical produce latency of {data.get('produce_latency_ms')}ms - producers experiencing severe delays",
+        "recommendations": [
+          "URGENT: Investigate broker {data.get('node_id', 'unknown')[:8]} performance immediately",
+          "Check disk I/O performance - slow disks are the most common cause",
+          "Review CPU utilization - high CPU can cause latency spikes",
+          "Check for network issues or bandwidth saturation",
+          "Review log segment configuration (segment.ms, segment.bytes)",
+          "Consider using faster storage (NVMe SSDs)"
+        ]
+      }
+    ]
+  },
+
+  "warning_produce_latency": {
+    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "data_conditions": [
+      { "key": "produce_latency_ms", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('produce_latency_ms', 0) >= 100 and data.get('produce_latency_ms', 0) < 500",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated produce latency of {data.get('produce_latency_ms')}ms",
+        "recommendations": [
+          "Monitor produce latency trends on broker {data.get('node_id', 'unknown')[:8]}",
+          "Check if latency correlates with traffic spikes",
+          "Review disk I/O metrics (await, utilization)",
+          "Verify adequate CPU and memory resources",
+          "Consider tuning OS page cache and I/O scheduler"
+        ]
+      }
+    ]
+  },
+
+  "critical_fetch_consumer_latency": {
+    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "data_conditions": [
+      { "key": "fetch_consumer_latency_ms", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('fetch_consumer_latency_ms', 0) >= 500",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical consumer fetch latency of {data.get('fetch_consumer_latency_ms')}ms",
+        "recommendations": [
+          "Investigate consumer fetch performance on broker {data.get('node_id', 'unknown')[:8]}",
+          "Check disk read performance",
+          "Review page cache effectiveness",
+          "Verify consumers are not requesting excessive data per fetch",
+          "Check for disk contention with writes"
+        ]
+      }
+    ]
+  },
+
+  "warning_fetch_consumer_latency": {
+    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "data_conditions": [
+      { "key": "fetch_consumer_latency_ms", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('fetch_consumer_latency_ms', 0) >= 100 and data.get('fetch_consumer_latency_ms', 0) < 500",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated consumer fetch latency of {data.get('fetch_consumer_latency_ms')}ms",
+        "recommendations": [
+          "Monitor consumer fetch patterns",
+          "Check if consumers are reading from tail of log (good) or seeking back (slower)",
+          "Review fetch.min.bytes and fetch.max.wait.ms settings",
+          "Verify page cache is warm for frequently read data"
+        ]
+      }
+    ]
+  },
+
+  "critical_fetch_follower_latency": {
+    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "data_conditions": [
+      { "key": "fetch_follower_latency_ms", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('fetch_follower_latency_ms', 0) >= 1000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical replication latency of {data.get('fetch_follower_latency_ms')}ms - ISR shrinks likely",
+        "recommendations": [
+          "URGENT: High replication latency can cause ISR shrinks",
+          "Check inter-broker network performance",
+          "Verify broker resources (CPU, disk, network)",
+          "Review replica.fetch.max.bytes setting",
+          "Check if broker is overloaded with leader partitions"
+        ]
+      }
+    ]
+  },
+
+  "warning_fetch_follower_latency": {
+    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "data_conditions": [
+      { "key": "fetch_follower_latency_ms", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('fetch_follower_latency_ms', 0) >= 200 and data.get('fetch_follower_latency_ms', 0) < 1000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated replication latency of {data.get('fetch_follower_latency_ms')}ms",
+        "recommendations": [
+          "Monitor replication lag metrics",
+          "Check inter-broker network bandwidth and latency",
+          "Verify followers can keep up with leader's write rate",
+          "Review partition distribution across brokers"
+        ]
+      }
+    ]
+  },
+
+  "cluster_latency_degradation": {
+    "metric_keywords": ["prometheus_request_latency", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('avg_produce_latency_ms', 0) >= 300 or data.get('avg_fetch_consumer_latency_ms', 0) >= 300",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster-wide latency degradation detected - avg produce: {data.get('avg_produce_latency_ms')}ms, avg consumer: {data.get('avg_fetch_consumer_latency_ms')}ms",
+        "recommendations": [
+          "URGENT: Cluster-wide performance issue affecting client operations",
+          "Check if all brokers are experiencing high latency or just some",
+          "Review cluster resource utilization (CPU, disk, network)",
+          "Verify no ongoing rebalancing or partition reassignments",
+          "Consider if cluster is undersized for current workload",
+          "Check for network issues affecting multiple brokers"
+        ]
+      },
+      {
+        "expression": "data.get('avg_produce_latency_ms', 0) >= 80 or data.get('avg_fetch_consumer_latency_ms', 0) >= 80",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Elevated cluster latency - avg produce: {data.get('avg_produce_latency_ms')}ms, avg consumer: {data.get('avg_fetch_consumer_latency_ms')}ms",
+        "recommendations": [
+          "Monitor latency trends across cluster",
+          "Check if degradation is recent or gradual",
+          "Review workload changes (new topics, increased traffic)",
+          "Verify broker resources are adequate",
+          "Consider performance tuning or capacity planning"
+        ]
+      }
+    ]
+  },
+
+  "healthy_latency": {
+    "metric_keywords": ["prometheus_request_latency", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('avg_produce_latency_ms', 0) < 50 and data.get('avg_fetch_consumer_latency_ms', 0) < 50",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Excellent latency performance - avg produce: {data.get('avg_produce_latency_ms')}ms, avg consumer: {data.get('avg_fetch_consumer_latency_ms')}ms",
+        "recommendations": [
+          "Maintain current performance levels",
+          "Continue monitoring latency metrics",
+          "Consider documenting configuration for future reference",
+          "Monitor p99 latencies for early warning of issues"
+        ]
+      }
+    ]
+  }
+}

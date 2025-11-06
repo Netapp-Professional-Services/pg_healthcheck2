@@ -1,0 +1,145 @@
+{
+  "critical_cpu_broker": {
+    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "data_conditions": [
+      { "key": "cpu_utilization", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('cpu_utilization', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical CPU utilization of {data.get('cpu_utilization')}%",
+        "recommendations": [
+          "URGENT: Broker {data.get('node_id', 'unknown')[:8]} is CPU saturated",
+          "Check for runaway processes or unexpected workload",
+          "Review partition leadership distribution",
+          "Consider scaling up instance type or redistributing load",
+          "Check for compression/decompression overhead"
+        ]
+      }
+    ]
+  },
+
+  "warning_cpu_broker": {
+    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "data_conditions": [
+      { "key": "cpu_utilization", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('cpu_utilization', 0) >= 75 and data.get('cpu_utilization', 0) < 90",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated CPU utilization of {data.get('cpu_utilization')}%",
+        "recommendations": [
+          "Monitor CPU trends on broker {data.get('node_id', 'unknown')[:8]}",
+          "Review workload distribution across brokers",
+          "Check if specific topics are causing high CPU",
+          "Consider rebalancing partitions across cluster"
+        ]
+      }
+    ]
+  },
+
+  "critical_disk_broker": {
+    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "data_conditions": [
+      { "key": "disk_utilization", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('disk_utilization', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical disk utilization of {data.get('disk_utilization')}% ({data.get('disk_available_gb')}GB available)",
+        "recommendations": [
+          "URGENT: Broker {data.get('node_id', 'unknown')[:8]} is nearly out of disk space",
+          "Implement aggressive log retention policies immediately",
+          "Delete old log segments: kafka-log-dirs.sh",
+          "Consider expanding disk capacity",
+          "Review topic retention settings (retention.ms, retention.bytes)",
+          "Check for topics with infinite retention"
+        ]
+      }
+    ]
+  },
+
+  "warning_disk_broker": {
+    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "data_conditions": [
+      { "key": "disk_utilization", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('disk_utilization', 0) >= 80 and data.get('disk_utilization', 0) < 90",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated disk utilization of {data.get('disk_utilization')}% ({data.get('disk_available_gb')}GB available)",
+        "recommendations": [
+          "Plan disk capacity expansion for broker {data.get('node_id', 'unknown')[:8]}",
+          "Review log retention policies",
+          "Check for topics with excessive data retention",
+          "Monitor disk growth trends",
+          "Consider log compaction for appropriate topics"
+        ]
+      }
+    ]
+  },
+
+  "cluster_cpu_pressure": {
+    "metric_keywords": ["prometheus_broker_health", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('avg_cpu_utilization', 0) >= 80",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster-wide CPU pressure - average {data.get('avg_cpu_utilization')}% across {data.get('broker_count')} brokers",
+        "recommendations": [
+          "Cluster is CPU constrained - consider scaling out",
+          "Review partition distribution across brokers",
+          "Check for compression overhead (prefer producer-side compression)",
+          "Verify no unexpected workload increases",
+          "Consider adding more brokers to distribute load"
+        ]
+      }
+    ]
+  },
+
+  "cluster_disk_pressure": {
+    "metric_keywords": ["prometheus_broker_health", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('avg_disk_utilization', 0) >= 80",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Cluster-wide disk pressure - average {data.get('avg_disk_utilization')}% across {data.get('broker_count')} brokers",
+        "recommendations": [
+          "Cluster storage capacity needs attention",
+          "Review retention policies across all topics",
+          "Implement log compaction where appropriate",
+          "Plan storage expansion",
+          "Consider adding more brokers with additional storage"
+        ]
+      }
+    ]
+  },
+
+  "healthy_broker_resources": {
+    "metric_keywords": ["prometheus_broker_health", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('avg_cpu_utilization', 0) < 60 and data.get('avg_disk_utilization', 0) < 70",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Healthy broker resource utilization - avg CPU: {data.get('avg_cpu_utilization')}%, avg disk: {data.get('avg_disk_utilization')}%",
+        "recommendations": [
+          "Broker resources are healthy",
+          "Continue monitoring trends",
+          "Maintain current capacity planning approach",
+          "Ensure alerting is configured for resource thresholds"
+        ]
+      }
+    ]
+  }
+}

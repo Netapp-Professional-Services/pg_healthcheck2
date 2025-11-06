@@ -1,0 +1,142 @@
+{
+  "fatal_errors_detected": {
+    "metric_keywords": ["log_errors", "kafka"],
+    "rules": [
+      {
+        "expression": "data.get('fatal_count', 0) >= 5",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has {data.get('fatal_count')} FATAL errors in recent logs. Multiple FATAL errors indicate severe broker instability.",
+        "recommendations": [
+          "IMMEDIATE: Review FATAL error messages in full log context",
+          "FATAL errors typically precede broker failures - investigate urgently",
+          "Check for cascading failures affecting broker health",
+          "Prepare for potential broker restart or failover",
+          "Escalate to senior engineering team immediately"
+        ]
+      },
+      {
+        "expression": "data.get('fatal_count', 0) >= 1",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has {data.get('fatal_count')} FATAL error(s). FATAL errors require immediate attention.",
+        "recommendations": [
+          "Review complete log context around FATAL message",
+          "Check controller.log and state-change.log for related errors",
+          "Monitor broker health - FATAL may precede crash",
+          "Investigate root cause within 1 hour"
+        ]
+      }
+    ]
+  },
+  "high_error_count": {
+    "metric_keywords": ["log_errors"],
+    "rules": [
+      {
+        "expression": "data.get('error_count', 0) >= 50",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has {data.get('error_count')} ERROR messages ({data.get('warning_count')} warnings). High error rate indicates systemic issues.",
+        "recommendations": [
+          "Categorize errors to identify patterns",
+          "Check for repeated error types that indicate persistent problems",
+          "Review recent configuration or deployment changes",
+          "Investigate connection/network errors as high priority",
+          "Set up alerts for error rate spikes"
+        ]
+      },
+      {
+        "expression": "data.get('error_count', 0) >= 20",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has elevated ERROR count: {data.get('error_count')} errors.",
+        "recommendations": [
+          "Review error categories to understand failure modes",
+          "Check if errors correlate with performance degradation",
+          "Monitor error trends - are they increasing?",
+          "Plan investigation within 24 hours"
+        ]
+      },
+      {
+        "expression": "data.get('error_count', 0) >= 10",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} has moderate ERROR count: {data.get('error_count')} errors.",
+        "recommendations": [
+          "Track error patterns over time",
+          "Establish baseline error rates for comparison",
+          "Review error messages for actionable issues"
+        ]
+      }
+    ]
+  },
+  "broker_log_health": {
+    "metric_keywords": ["log_errors"],
+    "data_conditions": [
+      {"key": "broker_id", "exists": true},
+      {"key": "fatal_count", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('exceeds_fatal') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "FATAL threshold exceeded on broker {data.get('broker_id')}: {data.get('fatal_count')} FATAL error(s)",
+        "recommendations": [
+          "Immediate investigation required",
+          "FATAL errors can cause broker crashes and data loss"
+        ]
+      },
+      {
+        "expression": "data.get('exceeds_error') == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "ERROR threshold exceeded on broker {data.get('broker_id')}: {data.get('error_count')} errors",
+        "recommendations": [
+          "Review error categories and trends",
+          "Plan remediation within 24-48 hours"
+        ]
+      },
+      {
+        "expression": "data.get('exceeds_warning') == True",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "WARNING threshold exceeded on broker {data.get('broker_id')}: {data.get('warning_count')} warnings",
+        "recommendations": [
+          "Monitor warning patterns for potential issues",
+          "Review warnings for actionable items"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_log_issues": {
+    "metric_keywords": ["log_errors"],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_log_errors', {}).get('log_errors', {}).get('critical_brokers', [])) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_log_errors', {}).get('log_errors', {}).get('critical_brokers', []))}) have FATAL errors. This indicates a cluster-wide crisis.",
+        "recommendations": [
+          "Cluster-wide error crisis - immediate escalation required",
+          "Check for common root cause across all affected brokers",
+          "Review cluster-wide events (elections, rebalancing, network issues)",
+          "Prepare for potential cluster instability",
+          "Consider emergency maintenance window if pattern persists"
+        ]
+      },
+      {
+        "expression": "len(all_structured_findings.get('check_log_errors', {}).get('log_errors', {}).get('warning_brokers', [])) >= 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_log_errors', {}).get('log_errors', {}).get('warning_brokers', []))}) have high error counts. Cluster-wide issue investigation needed.",
+        "recommendations": [
+          "Perform cluster-wide log analysis",
+          "Look for common error patterns across brokers",
+          "Check for infrastructure issues affecting multiple nodes",
+          "Plan coordinated remediation"
+        ]
+      }
+    ]
+  }
+}

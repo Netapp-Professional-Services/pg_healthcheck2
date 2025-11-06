@@ -359,6 +359,22 @@ def view_report(report_type, report_id):
                 """,
                 (report_id, current_user.id)
             )
+        elif report_type == 'health_check':
+            # Fetch from health_check_runs - verify user access via company
+            cursor.execute(
+                """
+                SELECT
+                    hcr.prompt_template_name,
+                    hcr.report_adoc
+                FROM health_check_runs hcr
+                JOIN companies c ON hcr.company_id = c.id
+                JOIN user_company_access uca ON c.id = uca.company_id
+                WHERE hcr.id = %s
+                  AND uca.user_id = %s
+                  AND hcr.report_adoc IS NOT NULL;
+                """,
+                (report_id, current_user.id)
+            )
         else:
             abort(404, "Invalid report type specified.")
 
