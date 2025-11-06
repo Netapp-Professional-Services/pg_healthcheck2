@@ -10,6 +10,7 @@ import yaml
 import psycopg2
 import requests
 import json
+import re
 from decimal import Decimal
 from datetime import datetime, timedelta
 from utils.json_utils import UniversalJSONEncoder, safe_json_dumps
@@ -35,6 +36,219 @@ def load_config(config_path='config/trends.yaml'):
     except Exception as e:
         print(f"Error loading trends.yaml: {e}")
         return None
+
+
+def _extract_db_version(structured_findings):
+    """Extract database version from structured findings.
+
+    Args:
+        structured_findings (dict): The structured findings dictionary
+
+    Returns:
+        str: The database version string, or None if not found
+    """
+    # Look for version in common locations across different technologies
+    version_locations = [
+        ('db_metadata', 'version'),  # ClickHouse connector.get_db_metadata()
+        ('db_version', None),  # Direct field
+        ('database_version', None),
+        ('version', None),
+        ('server_info', 'version'),
+        ('cluster_info', 'version'),
+        ('system_info', 'version'),
+    ]
+
+    for location in version_locations:
+        if len(location) == 2 and location[1]:
+            # Nested lookup
+            parent = structured_findings.get(location[0], {})
+            if isinstance(parent, dict):
+                version = parent.get(location[1])
+                if version:
+                    return str(version)
+        else:
+            # Top-level lookup
+            version = structured_findings.get(location[0])
+            if version:
+                return str(version)
+
+    return None
+
+
+def _parse_version_components(version_string):
+    """Parse version string into major and minor components.
+
+    Args:
+        version_string (str): Version string like "16.3", "4.1.5", "25.1.2.15"
+
+    Returns:
+        tuple: (major, minor) version numbers, or (None, None) if parsing fails
+    """
+    if not version_string:
+        return None, None
+
+    # Extract numeric components using regex
+    match = re.match(r'(\d+)\.(\d+)', str(version_string))
+    if match:
+        try:
+            return int(match.group(1)), int(match.group(2))
+        except ValueError:
+            pass
+
+    return None, None
+
+
+def _extract_cluster_name(target_info, structured_findings):
+    """Extract cluster name from target info or findings.
+
+    Args:
+        target_info (dict): Target system information
+        structured_findings (dict): The structured findings dictionary
+
+    Returns:
+        str: The cluster name, or None if not found
+    """
+    # Check target_info first
+    cluster_name = target_info.get('cluster_name')
+    if cluster_name:
+        return cluster_name
+
+    # Check structured findings
+    name_locations = [
+        ('db_metadata', 'cluster_name'),  # ClickHouse connector.get_db_metadata()
+        ('cluster_name', None),
+        ('cluster_info', 'name'),
+        ('cluster_info', 'cluster_name'),
+        ('system_info', 'cluster_name'),
+    ]
+
+    for location in name_locations:
+        if len(location) == 2 and location[1]:
+            parent = structured_findings.get(location[0], {})
+            if isinstance(parent, dict):
+                name = parent.get(location[1])
+                if name:
+                    return str(name)
+        else:
+            name = structured_findings.get(location[0])
+            if name:
+                return str(name)
+
+    return None
+
+
+def _extract_node_count(structured_findings):
+    """Extract node count from structured findings.
+
+    Args:
+        structured_findings (dict): The structured findings dictionary
+
+    Returns:
+        int: The number of nodes, or None if not found
+    """
+    count_locations = [
+        ('db_metadata', 'nodes'),  # ClickHouse connector.get_db_metadata()
+        ('node_count', None),
+        ('cluster_info', 'node_count'),
+        ('cluster_info', 'nodes'),
+        ('cluster_size', None),
+    ]
+
+    for location in count_locations:
+        if len(location) == 2 and location[1]:
+            parent = structured_findings.get(location[0], {})
+            if isinstance(parent, dict):
+                count = parent.get(location[1])
+                if count is not None:
+                    try:
+                        return int(count)
+                    except (ValueError, TypeError):
+                        pass
+        else:
+            count = structured_findings.get(location[0])
+            if count is not None:
+                try:
+                    return int(count)
+                except (ValueError, TypeError):
+                    pass
+
+    return None
+
+
+def _build_infrastructure_metadata(target_info, structured_findings):
+    """Build infrastructure metadata JSONB from available data.
+
+    Args:
+        target_info (dict): Target system information
+        structured_findings (dict): The structured findings dictionary
+
+    Returns:
+        dict: Infrastructure metadata dictionary
+    """
+    metadata = {}
+
+    # Add cloud provider info if available
+    if 'cloud_provider' in target_info:
+        metadata['cloud_provider'] = target_info['cloud_provider']
+    if 'region' in target_info:
+        metadata['region'] = target_info['region']
+    if 'availability_zone' in target_info:
+        metadata['availability_zone'] = target_info['availability_zone']
+
+    # Add instance/resource info
+    if 'instance_type' in target_info:
+        metadata['instance_type'] = target_info['instance_type']
+
+    # Extract from structured findings
+    infra_locations = [
+        'infrastructure_info',
+        'cloud_metadata',
+        'deployment_info',
+    ]
+
+    for location in infra_locations:
+        info = structured_findings.get(location, {})
+        if isinstance(info, dict):
+            metadata.update(info)
+
+    return metadata if metadata else None
+
+
+def _calculate_health_score(analysis_results):
+    """Calculate overall health score from triggered rules.
+
+    Score is calculated as: 100 - (sum of severity scores)
+    Capped at 0 minimum.
+
+    Args:
+        analysis_results (dict): Results from generate_dynamic_prompt()
+
+    Returns:
+        float: Health score from 0.0 to 100.0, or None if no analysis results
+    """
+    if not analysis_results:
+        return None
+
+    total_deductions = 0
+
+    # Critical issues: 10 points each
+    critical_count = len(analysis_results.get('critical_issues', []))
+    total_deductions += critical_count * 10
+
+    # High priority issues: 7 points each
+    high_count = len(analysis_results.get('high_priority_issues', []))
+    total_deductions += high_count * 7
+
+    # Medium priority issues: 5 points each
+    medium_count = len(analysis_results.get('medium_priority_issues', []))
+    total_deductions += medium_count * 5
+
+    # Low priority issues: 2 points each
+    low_count = len(analysis_results.get('low_priority_issues', []))
+    total_deductions += low_count * 2
+
+    health_score = max(0.0, 100.0 - total_deductions)
+    return health_score
 
 
 def _store_triggered_rules(cursor, run_id, analysis_results):
@@ -171,20 +385,39 @@ def ship_to_database(db_config, target_info, findings_json, structured_findings,
         ai_context = context.get('ai_execution_metrics')
         ai_context_json = json.dumps(ai_context) if ai_context else None
 
-        # Insert health check run
+        # Extract metadata for new columns
+        db_version = _extract_db_version(structured_findings)
+        db_version_major, db_version_minor = _parse_version_components(db_version)
+        cluster_name = _extract_cluster_name(target_info, structured_findings)
+        node_count = _extract_node_count(structured_findings)
+        infrastructure_metadata = _build_infrastructure_metadata(target_info, structured_findings)
+        health_score = _calculate_health_score(analysis_results)
+
+        # Convert infrastructure_metadata to JSON if present
+        infra_json = json.dumps(infrastructure_metadata) if infrastructure_metadata else None
+
+        # Log extracted metadata for debugging
+        print(f"Log: Extracted metadata - Version: {db_version}, Major: {db_version_major}, Minor: {db_version_minor}")
+        print(f"Log: Cluster: {cluster_name}, Nodes: {node_count}, Health Score: {health_score}")
+
+        # Insert health check run with enhanced metadata
         insert_query = """
         INSERT INTO health_check_runs (
-            company_id, db_technology, target_host, target_port, target_db_name, 
+            company_id, db_technology, target_host, target_port, target_db_name,
             findings, prompt_template_name, run_by_user, run_from_host, tool_version,
-            report_adoc, ai_execution_context
+            report_adoc, ai_execution_context,
+            db_version, db_version_major, db_version_minor, cluster_name, node_count,
+            infrastructure_metadata, health_score
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id;
         """
         cursor.execute(insert_query, (
-            company_id, db_type, host, port, database, findings_json, 
+            company_id, db_type, host, port, database, findings_json,
             prompt_template_name, run_by_user, run_from_host, tool_version,
-            adoc_content, ai_context_json
+            adoc_content, ai_context_json,
+            db_version, db_version_major, db_version_minor, cluster_name, node_count,
+            infra_json, health_score
         ))
         
         # Get the ID of the newly inserted run

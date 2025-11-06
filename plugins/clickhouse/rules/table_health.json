@@ -1,0 +1,59 @@
+{
+  "excessive_parts": {
+    "metric_keywords": ["table_health", "data"],
+    "data_conditions": [{"key": "table_name", "exists": true}, {"key": "active_parts", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('active_parts', 0) > 300",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Table {data.get('database')}.{data.get('table_name')} has {data.get('active_parts')} active parts - severe merge backlog.",
+        "recommendations": [
+          "Run OPTIMIZE TABLE immediately to force merges",
+          "Increase background_pool_size for more concurrent merges",
+          "Review insert patterns - avoid too many small inserts",
+          "Check max_bytes_to_merge_at_max_space_in_pool setting"
+        ]
+      },
+      {
+        "expression": "data.get('active_parts', 0) > 150",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Table {data.get('database')}.{data.get('table_name')} has {data.get('active_parts')} active parts - merge backlog detected.",
+        "recommendations": [
+          "Schedule OPTIMIZE TABLE during maintenance window",
+          "Review merge settings and increase if needed",
+          "Monitor part count trends"
+        ]
+      },
+      {
+        "expression": "data.get('active_parts', 0) > 100",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Table {data.get('database')}.{data.get('table_name')} has {data.get('active_parts')} active parts - monitor for growth.",
+        "recommendations": [
+          "Monitor part count - may indicate merge issues",
+          "Review insert batch sizes",
+          "Consider partitioning strategy if time-series data"
+        ]
+      }
+    ]
+  },
+  "large_table_no_partitioning": {
+    "metric_keywords": ["table_health", "data"],
+    "data_conditions": [{"key": "table_name", "exists": true}, {"key": "bytes", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('bytes', 0) > 1099511627776 and data.get('engine', '').startswith('MergeTree') and not data.get('engine', '').startswith('ReplicatedMergeTree')",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Table {data.get('database')}.{data.get('table_name')} is {data.get('bytes') / (1024**4):.2f} TB without replication.",
+        "recommendations": [
+          "Consider ReplicatedMergeTree for data redundancy",
+          "Implement backup strategy",
+          "Review data retention policies"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,357 @@
+{
+  "critical_error_count": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "name", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "'CORRUPT' in data.get('name', '') or 'CHECKSUM' in data.get('name', '')",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Data corruption error detected: {data.get('name')} with {data.get('error_count', 0)} occurrences. This indicates potential data integrity issues.",
+        "recommendations": [
+          "Run CHECK TABLE queries on affected tables immediately",
+          "Review system.part_log for merge or mutation failures",
+          "Check hardware health - disk errors may indicate failing storage",
+          "Consider restoring affected partitions from backup if corruption is widespread",
+          "Review ClickHouse server logs for additional context"
+        ]
+      },
+      {
+        "expression": "'MEMORY' in data.get('name', '') or 'ALLOCATE' in data.get('name', '')",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Memory error detected: {data.get('name')} with {data.get('error_count', 0)} occurrences. Query memory limits may be exceeded.",
+        "recommendations": [
+          "Review max_memory_usage and max_memory_usage_for_user settings",
+          "Identify memory-intensive queries using system.query_log",
+          "Consider increasing available RAM or optimizing query memory consumption",
+          "Review max_bytes_before_external_sort and max_bytes_before_external_group_by settings",
+          "Check for queries performing large aggregations or joins"
+        ]
+      },
+      {
+        "expression": "'KEEPER' in data.get('name', '') or 'ZOOKEEPER' in data.get('name', '')",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "ZooKeeper/Keeper connectivity error: {data.get('name')} with {data.get('error_count', 0)} occurrences. Replication may be affected.",
+        "recommendations": [
+          "Check ZooKeeper/ClickHouse Keeper service health and connectivity",
+          "Review network connectivity between ClickHouse and Keeper nodes",
+          "Check system.replicas for read-only or expired session replicas",
+          "Verify Keeper ensemble quorum is maintained",
+          "Review Keeper logs for additional error context"
+        ]
+      },
+      {
+        "expression": "'REPLICA' in data.get('name', '') or 'REPLICATION' in data.get('name', '')",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Replication error detected: {data.get('name')} with {data.get('error_count', 0)} occurrences. Data consistency may be at risk.",
+        "recommendations": [
+          "Check system.replicas for replica status and health",
+          "Review system.replication_queue for stuck operations",
+          "Verify network connectivity between replica nodes",
+          "Check ZooKeeper/Keeper connectivity for coordination issues",
+          "Review quorum settings and replica availability"
+        ]
+      },
+      {
+        "expression": "'NETWORK' in data.get('name', '') or 'CONNECTION' in data.get('name', '')",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Network/connection error: {data.get('name')} with {data.get('error_count', 0)} occurrences. Connectivity issues detected.",
+        "recommendations": [
+          "Check network connectivity between cluster nodes",
+          "Review firewall rules and network latency",
+          "Increase connection timeout settings if network is slow",
+          "Monitor system.replication_queue for replication lag",
+          "Check for intermittent network issues or packet loss"
+        ]
+      },
+      {
+        "expression": "'READONLY' in data.get('name', '')",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Read-only mode error: {data.get('name')} with {data.get('error_count', 0)} occurrences. Write operations are blocked.",
+        "recommendations": [
+          "Check system.replicas for is_readonly status",
+          "Verify ZooKeeper/Keeper connectivity",
+          "Review disk space - full disks can trigger read-only mode",
+          "Check for expired ZooKeeper sessions",
+          "Review ClickHouse server logs for the cause of read-only mode"
+        ]
+      },
+      {
+        "expression": "data.get('error_count', 0) > 1000",
+        "level": "high",
+        "score": 8,
+        "reasoning": "High error frequency: {data.get('name')} has occurred {data.get('error_count', 0)} times. This indicates a persistent or recurring issue.",
+        "recommendations": [
+          "Investigate the root cause of this recurring error",
+          "Review recent changes to queries, schema, or configuration",
+          "Check if this error correlates with specific queries or users",
+          "Consider rate limiting or circuit breakers for problematic operations",
+          "Set up alerting for this specific error pattern"
+        ]
+      },
+      {
+        "expression": "data.get('error_count', 0) > 100",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Elevated error frequency: {data.get('name')} has occurred {data.get('error_count', 0)} times.",
+        "recommendations": [
+          "Monitor this error for increasing frequency",
+          "Review queries or operations that trigger this error",
+          "Check if this is a known issue with a workaround",
+          "Consider adjusting relevant ClickHouse settings"
+        ]
+      }
+    ]
+  },
+  "too_many_simultaneous_queries": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "name", "value": "TOO_MANY_SIMULTANEOUS_QUERIES"}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('error_count', 0) > 0",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Query concurrency limit reached: {data.get('error_count', 0)} queries were rejected due to max_concurrent_queries limit.",
+        "recommendations": [
+          "Review and increase max_concurrent_queries setting if appropriate",
+          "Analyze query patterns to identify if optimization can reduce concurrency",
+          "Consider implementing query queuing or rate limiting at application level",
+          "Review long-running queries that may be blocking resources",
+          "Check if specific users or applications are causing query spikes"
+        ]
+      }
+    ]
+  },
+  "query_execution_errors": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "name", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "'TIMEOUT' in data.get('name', '')",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Query timeout error: {data.get('name')} with {data.get('error_count', 0)} occurrences. Queries are exceeding time limits.",
+        "recommendations": [
+          "Review and optimize slow queries using system.query_log",
+          "Consider increasing max_execution_time or send_timeout settings",
+          "Add appropriate indexes or optimize table structure",
+          "Review query complexity and data volume being processed",
+          "Consider implementing query result caching for expensive queries"
+        ]
+      },
+      {
+        "expression": "'SYNTAX' in data.get('name', '') or 'UNKNOWN_IDENTIFIER' in data.get('name', '')",
+        "level": "low",
+        "score": 3,
+        "reasoning": "Query syntax error: {data.get('name')} with {data.get('error_count', 0)} occurrences. Likely application or user errors.",
+        "recommendations": [
+          "Review application query generation logic",
+          "Educate users on proper ClickHouse SQL syntax",
+          "Implement query validation at application level",
+          "Consider using prepared statements or query builders",
+          "Check if schema changes broke existing queries"
+        ]
+      },
+      {
+        "expression": "'TYPE_MISMATCH' in data.get('name', '')",
+        "level": "low",
+        "score": 3,
+        "reasoning": "Data type mismatch error: {data.get('name')} with {data.get('error_count', 0)} occurrences.",
+        "recommendations": [
+          "Review query parameter types and table column types",
+          "Use explicit type casting where appropriate",
+          "Validate input data types at application level",
+          "Check for schema changes that may have altered column types"
+        ]
+      }
+    ]
+  },
+  "high_error_volume": {
+    "metric_keywords": ["error_summary", "metadata"],
+    "data_conditions": [
+      {"key": "total_error_count", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_error_count', 0) > 10000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Very high error volume detected: {data.get('total_error_count', 0)} total errors across {data.get('total_error_types', 0)} error types.",
+        "recommendations": [
+          "Immediate investigation required - cluster health may be compromised",
+          "Review top errors by frequency in system.errors",
+          "Check ClickHouse server logs for error patterns",
+          "Consider temporarily disabling problematic queries or features",
+          "Review recent changes that may have introduced errors"
+        ]
+      },
+      {
+        "expression": "data.get('total_error_count', 0) > 5000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "High error volume detected: {data.get('total_error_count', 0)} total errors across {data.get('total_error_types', 0)} error types.",
+        "recommendations": [
+          "Prioritize investigation of most frequent errors",
+          "Review system health metrics for correlated issues",
+          "Check for recent configuration or schema changes",
+          "Monitor error trends to see if volume is increasing"
+        ]
+      },
+      {
+        "expression": "data.get('total_error_count', 0) > 1000",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Moderate error volume: {data.get('total_error_count', 0)} total errors detected.",
+        "recommendations": [
+          "Review error patterns for recurring issues",
+          "Set up monitoring for error rate trends",
+          "Investigate errors with highest frequency first"
+        ]
+      }
+    ]
+  },
+  "critical_errors_present": {
+    "metric_keywords": ["critical_errors", "metadata"],
+    "data_conditions": [
+      {"key": "count", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('count', 0)} critical error type(s) detected requiring immediate attention.",
+        "recommendations": [
+          "Review critical error details in the error tracking report",
+          "Address critical errors immediately before they impact service",
+          "Check for data corruption, memory issues, or replication problems",
+          "Review ClickHouse server logs for additional context",
+          "Consider alerting on-call personnel if errors persist"
+        ]
+      }
+    ]
+  },
+  "new_errors_detected": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "last_error_time", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "(datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(data.get('last_error_time', '2000-01-01T00:00:00+00:00'))).total_seconds() < 3600",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Recent error detected: {data.get('name')} occurred within the last hour ({data.get('error_count', 0)} total occurrences).",
+        "recommendations": [
+          "Investigate this recent error for active issues",
+          "Check if error correlates with recent changes or deployments",
+          "Review error message and trace for root cause",
+          "Monitor error frequency to see if issue is ongoing"
+        ]
+      }
+    ]
+  },
+  "high_frequency_memory_errors": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "category", "exists": true},
+      {"key": "is_high_frequency", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('category') == 'memory' and data.get('is_high_frequency') == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "High-frequency memory error detected: {data.get('name')} with {data.get('error_count', 0)} occurrences. This indicates persistent memory pressure.",
+        "recommendations": [
+          "Immediate action required - memory configuration may be inadequate",
+          "Review max_memory_usage and increase if necessary",
+          "Identify and optimize memory-intensive queries",
+          "Consider adding more RAM to the server",
+          "Check for memory leaks in queries or user-defined functions",
+          "Review external memory limits (cgroup, systemd, etc.)"
+        ]
+      }
+    ]
+  },
+  "keeper_category_errors": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "category", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('category') == 'keeper'",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Keeper/ZooKeeper error detected: {data.get('name')} ({data.get('severity')} severity) with {data.get('error_count', 0)} occurrences.",
+        "recommendations": [
+          "Critical infrastructure component affected - immediate investigation required",
+          "Check Keeper/ZooKeeper service health and logs",
+          "Verify network connectivity to Keeper ensemble",
+          "Check for Keeper session expiration or connection timeouts",
+          "Review Keeper ensemble quorum status",
+          "Verify sufficient resources (CPU, memory, disk) on Keeper nodes"
+        ]
+      }
+    ]
+  },
+  "corruption_category_critical": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "category", "exists": true},
+      {"key": "is_critical", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('category') == 'corruption' and data.get('is_critical') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Data corruption error: {data.get('name')} with {data.get('error_count', 0)} occurrences. Data integrity is at risk.",
+        "recommendations": [
+          "URGENT: Stop all writes to affected tables if possible",
+          "Run CHECK TABLE on all tables to identify corruption extent",
+          "Review system.part_log for failed merges or mutations",
+          "Check hardware health - corruption often indicates disk failures",
+          "Verify checksums and run filesystem checks (fsck)",
+          "Consider restoring from backup if corruption is widespread",
+          "Contact ClickHouse support for assistance with recovery"
+        ]
+      }
+    ]
+  },
+  "high_severity_network_errors": {
+    "metric_keywords": ["error_summary", "data"],
+    "data_conditions": [
+      {"key": "category", "exists": true},
+      {"key": "severity", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('category') == 'network' and data.get('severity') in ['critical', 'high']",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Significant network error: {data.get('name')} ({data.get('severity')} severity) with {data.get('error_count', 0)} occurrences.",
+        "recommendations": [
+          "Check network connectivity between all cluster nodes",
+          "Review network latency and packet loss metrics",
+          "Verify firewall rules allow ClickHouse interserver communication",
+          "Check for network infrastructure issues (switches, routers)",
+          "Review connection timeout settings (connect_timeout_with_failover_ms)",
+          "Monitor for DNS resolution issues if using hostnames"
+        ]
+      }
+    ]
+  }
+}

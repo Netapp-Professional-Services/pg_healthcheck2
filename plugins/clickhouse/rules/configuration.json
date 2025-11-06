@@ -1,0 +1,255 @@
+{
+  "excessive_config_drift": {
+    "metric_keywords": ["configuration_drift", "metadata"],
+    "data_conditions": [{"key": "total_changed_settings", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_changed_settings', 0) > 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Excessive configuration drift detected: {data.get('total_changed_settings')} settings changed from defaults. This indicates significant customization that may complicate troubleshooting.",
+        "recommendations": [
+          "Document all configuration changes with rationale",
+          "Review if all changes are still necessary",
+          "Consider standardizing configuration across environments",
+          "Use configuration management tools for consistency",
+          "Create baseline configuration documentation"
+        ]
+      },
+      {
+        "expression": "data.get('total_changed_settings', 0) > 50",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "{data.get('total_changed_settings')} settings changed from defaults. Moderate configuration drift detected.",
+        "recommendations": [
+          "Review changed settings periodically",
+          "Document intentional configuration changes",
+          "Monitor for unintended drift over time"
+        ]
+      }
+    ]
+  },
+  "low_concurrent_queries_limit": {
+    "metric_keywords": ["critical_settings", "data"],
+    "data_conditions": [{"key": "name", "value": "max_concurrent_queries"}],
+    "rules": [
+      {
+        "expression": "int(data.get('value', '200')) < 50",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "max_concurrent_queries is set to {data.get('value')}, which is critically low. This will severely limit query concurrency.",
+        "recommendations": [
+          "Increase max_concurrent_queries to at least 100 for production workloads",
+          "Recommended value: 200-500 depending on hardware and workload",
+          "Monitor query_thread pool utilization",
+          "Consider workload patterns when setting this value",
+          "Test with gradual increases to find optimal value"
+        ]
+      },
+      {
+        "expression": "int(data.get('value', '200')) < 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "max_concurrent_queries is set to {data.get('value')}, which may be too low for production workloads.",
+        "recommendations": [
+          "Consider increasing max_concurrent_queries to 200 or higher",
+          "Monitor for query queuing or rejection",
+          "Adjust based on actual concurrent query patterns"
+        ]
+      }
+    ]
+  },
+  "low_memory_limit": {
+    "metric_keywords": ["critical_settings", "data"],
+    "data_conditions": [{"key": "name", "value": "max_server_memory_usage"}],
+    "rules": [
+      {
+        "expression": "data.get('changed', False) == False",
+        "level": "high",
+        "score": 7,
+        "reasoning": "max_server_memory_usage is not configured (using default). ClickHouse may not utilize available memory effectively.",
+        "recommendations": [
+          "Set max_server_memory_usage to 80% of available system RAM",
+          "Example: For 64GB RAM, set to ~51GB (80% of total)",
+          "This prevents OOM while maximizing memory utilization",
+          "Monitor memory usage patterns after adjustment",
+          "Leave some RAM for OS and other processes"
+        ]
+      }
+    ]
+  },
+  "small_background_pool": {
+    "metric_keywords": ["critical_settings", "data"],
+    "data_conditions": [{"key": "name", "value": "background_pool_size"}],
+    "rules": [
+      {
+        "expression": "int(data.get('value', '16')) < 16",
+        "level": "high",
+        "score": 7,
+        "reasoning": "background_pool_size is {data.get('value')}, which is low. This limits concurrent merges and background operations.",
+        "recommendations": [
+          "Increase background_pool_size to at least 16",
+          "Recommended value: 32-64 for systems with many tables",
+          "Higher values improve merge throughput",
+          "Balance with system CPU resources",
+          "Monitor merge queue size after adjustment"
+        ]
+      }
+    ]
+  },
+  "unsafe_drop_limits": {
+    "metric_keywords": ["critical_settings", "data"],
+    "data_conditions": [{"key": "name", "value": "max_table_size_to_drop"}],
+    "rules": [
+      {
+        "expression": "data.get('value', '0') == '0'",
+        "level": "high",
+        "score": 6,
+        "reasoning": "max_table_size_to_drop is set to 0 (unlimited). This allows dropping tables of any size without protection.",
+        "recommendations": [
+          "Set max_table_size_to_drop to reasonable limit (e.g., 50GB)",
+          "Prevents accidental deletion of large tables",
+          "For intentional large table drops, temporarily increase limit",
+          "Consider production data protection policies",
+          "Document procedures for large table operations"
+        ]
+      }
+    ]
+  },
+  "listen_all_interfaces": {
+    "metric_keywords": ["configuration_drift", "data"],
+    "data_conditions": [{"key": "name", "exists": true}],
+    "rules": [
+      {
+        "expression": "'listen' in data.get('name', '').lower() and ('0.0.0.0' in data.get('value', '') or '::' in data.get('value', ''))",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Network interface {data.get('name')} is configured to listen on all interfaces (0.0.0.0 or ::). This may expose ClickHouse to unauthorized access.",
+        "recommendations": [
+          "Restrict listen_host to specific interface if possible",
+          "Use firewall rules to limit access to trusted networks",
+          "Ensure authentication is properly configured",
+          "Consider using SSL/TLS for remote connections",
+          "Review network security policy for database access"
+        ]
+      }
+    ]
+  },
+  "password_in_config": {
+    "metric_keywords": ["configuration_drift", "data"],
+    "data_conditions": [{"key": "name", "exists": true}],
+    "rules": [
+      {
+        "expression": "'password' in data.get('name', '').lower() and data.get('value', '') != '' and data.get('value', '') != data.get('default', '')",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Password or credential detected in configuration setting {data.get('name')}. This is a security risk.",
+        "recommendations": [
+          "Remove passwords from configuration files",
+          "Use environment variables or secret management systems",
+          "Implement proper credential rotation procedures",
+          "Use encrypted connection strings where possible",
+          "Review access control and authentication mechanisms",
+          "Audit configuration files for other sensitive data"
+        ]
+      }
+    ]
+  },
+  "excessive_memory_limit": {
+    "metric_keywords": ["configuration_drift", "data"],
+    "data_conditions": [{"key": "name", "exists": true}],
+    "rules": [
+      {
+        "expression": "'max_memory' in data.get('name', '').lower() and 'unlimited' in data.get('value', '').lower()",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Memory limit setting {data.get('name')} is set to unlimited. This may lead to OOM conditions.",
+        "recommendations": [
+          "Set appropriate memory limits to prevent OOM",
+          "Configure max_memory_usage and max_memory_usage_for_user",
+          "Monitor query memory consumption patterns",
+          "Implement query memory limits based on available resources",
+          "Consider per-user memory quotas"
+        ]
+      }
+    ]
+  },
+  "security_issues_detected": {
+    "metric_keywords": ["configuration_drift", "metadata"],
+    "data_conditions": [{"key": "security_issues", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('security_issues', 0) > 0",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "{data.get('security_issues')} security issue(s) detected in configuration. Immediate review required.",
+        "recommendations": [
+          "Review security configuration section in report",
+          "Address all identified security issues immediately",
+          "Implement security best practices for ClickHouse",
+          "Enable authentication and access control",
+          "Use SSL/TLS for network communication",
+          "Regularly audit security configuration",
+          "Follow principle of least privilege for access",
+          "Document security configuration decisions"
+        ]
+      }
+    ]
+  },
+  "resource_issues_detected": {
+    "metric_keywords": ["configuration_drift", "metadata"],
+    "data_conditions": [{"key": "resource_issues", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('resource_issues', 0) > 0",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('resource_issues')} resource configuration issue(s) detected. Performance may be impacted.",
+        "recommendations": [
+          "Review resource configuration section in report",
+          "Adjust resource limits based on available hardware",
+          "Monitor resource utilization patterns",
+          "Test configuration changes in non-production first",
+          "Document resource allocation decisions"
+        ]
+      }
+    ]
+  },
+  "default_ports_in_use": {
+    "metric_keywords": ["configuration_drift", "data"],
+    "data_conditions": [{"key": "name", "exists": true}],
+    "rules": [
+      {
+        "expression": "(data.get('name', '') == 'tcp_port' and data.get('value', '') == '9000') or (data.get('name', '') == 'http_port' and data.get('value', '') == '8123')",
+        "level": "low",
+        "score": 3,
+        "reasoning": "Using default port for {data.get('name')} ({data.get('value')}). While not critical, custom ports can improve security.",
+        "recommendations": [
+          "Consider using non-default ports for additional security",
+          "Update firewall rules if ports are changed",
+          "Document port assignments for operations team",
+          "Coordinate port changes with monitoring and applications"
+        ]
+      }
+    ]
+  },
+  "untuned_merge_settings": {
+    "metric_keywords": ["configuration_drift", "data"],
+    "data_conditions": [{"key": "name", "exists": true}],
+    "rules": [
+      {
+        "expression": "'merge' in data.get('name', '').lower() and data.get('changed', False) == False",
+        "level": "low",
+        "score": 3,
+        "reasoning": "Merge-related setting {data.get('name')} is at default value. Consider tuning for workload.",
+        "recommendations": [
+          "Review merge settings based on workload characteristics",
+          "Adjust max_bytes_to_merge_at_max_space_in_pool for better merge efficiency",
+          "Configure number_of_free_entries_in_pool_to_lower_max_size_of_merge",
+          "Monitor merge performance and adjust accordingly",
+          "Balance merge I/O with query performance"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,156 @@
+{
+  "critical_broker_overload": {
+    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "data_conditions": [
+      { "key": "total_partitions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_partitions', 0) >= 2000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} is critically overloaded with {data.get('total_partitions')} partitions",
+        "recommendations": [
+          "URGENT: Broker has excessive partition count - performance degradation likely",
+          "Kafka performance degrades significantly above 2000 partitions per broker",
+          "Plan immediate partition rebalancing to distribute load",
+          "Monitor broker CPU, memory, and disk I/O for signs of stress",
+          "Consider adding more brokers to cluster to reduce per-broker partition count",
+          "Review if any topics have excessive partition counts",
+          "Use kafka-reassign-partitions.sh to move partitions to other brokers"
+        ]
+      }
+    ]
+  },
+
+  "warning_broker_high_partitions": {
+    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "data_conditions": [
+      { "key": "total_partitions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_partitions', 0) >= 1500 and data.get('total_partitions', 0) < 2000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated partition count of {data.get('total_partitions')}",
+        "recommendations": [
+          "Broker approaching recommended partition limits",
+          "Plan partition rebalancing during next maintenance window",
+          "Monitor broker performance for signs of degradation",
+          "Consider cluster expansion if growth trend continues",
+          "Review topic partition strategies for new topics"
+        ]
+      }
+    ]
+  },
+
+  "critical_partition_imbalance": {
+    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "data_conditions": [
+      { "key": "partition_deviation_pct", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "abs(data.get('partition_deviation_pct', 0)) >= 40",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has severe partition imbalance: {data.get('partition_deviation_pct'):+.1f}% deviation from average ({data.get('total_partitions')} partitions)",
+        "recommendations": [
+          "Severe partition imbalance detected - rebalance immediately",
+          "This broker has {data.get('partition_deviation_pct'):+.1f}% more/fewer partitions than average",
+          "Imbalance causes uneven resource utilization and potential hotspots",
+          "Generate rebalance plan: kafka-reassign-partitions.sh --generate",
+          "Execute rebalancing during low-traffic period",
+          "Use throttling to avoid overwhelming brokers during rebalance"
+        ]
+      }
+    ]
+  },
+
+  "warning_partition_imbalance": {
+    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "data_conditions": [
+      { "key": "partition_deviation_pct", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "abs(data.get('partition_deviation_pct', 0)) >= 20 and abs(data.get('partition_deviation_pct', 0)) < 40",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has partition imbalance: {data.get('partition_deviation_pct'):+.1f}% deviation",
+        "recommendations": [
+          "Partition distribution is suboptimal",
+          "Plan rebalancing to improve distribution",
+          "Review partition assignment strategy",
+          "Consider using Cruise Control for automated rebalancing",
+          "Monitor for performance impact on overloaded brokers"
+        ]
+      }
+    ]
+  },
+
+  "critical_leader_imbalance": {
+    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "data_conditions": [
+      { "key": "leader_deviation_pct", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "abs(data.get('leader_deviation_pct', 0)) >= 40",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical leader imbalance: {data.get('leader_deviation_pct'):+.1f}% deviation ({data.get('leader_partitions')} leaders)",
+        "recommendations": [
+          "URGENT: Severe leader imbalance - this broker handling disproportionate load",
+          "Leaders handle ALL read/write traffic - imbalance causes hotspots",
+          "Run preferred leader election immediately: kafka-preferred-replica-election.sh",
+          "Check if automatic leader rebalancing is enabled (auto.leader.rebalance.enable=true)",
+          "This is often caused by broker restarts or failures",
+          "Leader election is quick and safe - can be done without downtime"
+        ]
+      }
+    ]
+  },
+
+  "warning_leader_imbalance": {
+    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "data_conditions": [
+      { "key": "leader_deviation_pct", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "abs(data.get('leader_deviation_pct', 0)) >= 20 and abs(data.get('leader_deviation_pct', 0)) < 40",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has leader imbalance: {data.get('leader_deviation_pct'):+.1f}% deviation",
+        "recommendations": [
+          "Leader distribution is suboptimal",
+          "Run preferred leader election to rebalance: kafka-preferred-replica-election.sh",
+          "Enable automatic leader rebalancing if not already enabled",
+          "Monitor broker load for performance impact",
+          "Check if recent broker restarts caused imbalance"
+        ]
+      }
+    ]
+  },
+
+  "healthy_partition_balance": {
+    "metric_keywords": ["prometheus_partition_balance", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('avg_partitions_per_broker', 0) < 1000",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Partition distribution is healthy - average {data.get('avg_partitions_per_broker'):.1f} partitions per broker",
+        "recommendations": [
+          "Partition balance is healthy",
+          "Continue monitoring for changes after topic additions/deletions",
+          "Consider enabling auto.leader.rebalance.enable=true for automatic leader rebalancing",
+          "Plan for rebalancing when adding/removing brokers",
+          "Recommended: Run preferred leader election periodically (e.g., weekly)"
+        ]
+      }
+    ]
+  }
+}

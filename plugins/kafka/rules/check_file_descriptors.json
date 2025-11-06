@@ -1,0 +1,112 @@
+{
+  "critical_fd_usage": {
+    "metric_keywords": ["file_descriptors", "kafka"],
+    "rules": [
+      {
+        "expression": "data.get('usage_pct', 0) >= 95",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critically high FD usage: {data.get('usage_pct'):.1f}% ({data.get('fd_used'):,}/{data.get('fd_limit'):,}). FD exhaustion imminent - broker will fail to accept connections.",
+        "recommendations": [
+          "IMMEDIATE: Increase FD limits in /etc/security/limits.conf",
+          "Check for file descriptor leaks with 'lsof -p <kafka-pid> | wc -l'",
+          "Review network connections - high connection count may indicate client issues",
+          "Restart broker after increasing limits if necessary",
+          "Investigate unclosed file handles or socket connections"
+        ]
+      },
+      {
+        "expression": "data.get('usage_pct', 0) >= 85",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical FD usage: {data.get('usage_pct'):.1f}% ({data.get('fd_used'):,} used, {data.get('fd_available'):,} available).",
+        "recommendations": [
+          "Increase FD limits within 24 hours",
+          "Set nofile limits to at least 100,000 for Kafka",
+          "Monitor connection count and look for leaks",
+          "Review client connection pooling configurations"
+        ]
+      },
+      {
+        "expression": "data.get('usage_pct', 0) >= 70",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has high FD usage: {data.get('usage_pct'):.1f}%.",
+        "recommendations": [
+          "Monitor FD usage trends to predict exhaustion",
+          "Review topic partition count - more partitions = more file handles",
+          "Check for excessive log segment files",
+          "Plan to increase FD limits within 1-2 weeks"
+        ]
+      },
+      {
+        "expression": "data.get('usage_pct', 0) >= 60",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has elevated FD usage: {data.get('usage_pct'):.1f}%.",
+        "recommendations": [
+          "Track FD usage patterns over time",
+          "Ensure FD limits are set appropriately for your workload",
+          "Review socket buffer settings that affect connection count"
+        ]
+      }
+    ]
+  },
+  "broker_fd_health": {
+    "metric_keywords": ["file_descriptors"],
+    "data_conditions": [
+      {"key": "broker_id", "exists": true},
+      {"key": "usage_pct", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('exceeds_critical') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Critical FD threshold exceeded on broker {data.get('broker_id')}: {data.get('usage_pct'):.1f}% used ({data.get('fd_used'):,}/{data.get('fd_limit'):,})",
+        "recommendations": [
+          "Immediate action required to prevent broker failure",
+          "FD exhaustion will cause broker to reject new connections and fail"
+        ]
+      },
+      {
+        "expression": "data.get('exceeds_warning') == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Warning FD threshold exceeded on broker {data.get('broker_id')}: {data.get('usage_pct'):.1f}% used",
+        "recommendations": [
+          "Plan to increase FD limits within 24-48 hours",
+          "Review connection and file handle usage patterns"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_fd_issues": {
+    "metric_keywords": ["file_descriptors"],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_file_descriptors', {}).get('file_descriptors', {}).get('critical_brokers', [])) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_file_descriptors', {}).get('file_descriptors', {}).get('critical_brokers', []))}) have critical FD usage. This indicates a cluster-wide configuration or leak issue.",
+        "recommendations": [
+          "Cluster-wide FD crisis - immediate action required",
+          "Check for systematic configuration issues across all brokers",
+          "Review global connection pooling settings",
+          "Increase FD limits cluster-wide as emergency measure"
+        ]
+      },
+      {
+        "expression": "len(all_structured_findings.get('check_file_descriptors', {}).get('file_descriptors', {}).get('warning_brokers', [])) >= 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_file_descriptors', {}).get('file_descriptors', {}).get('warning_brokers', []))}) have high FD usage. Cluster-wide configuration review needed.",
+        "recommendations": [
+          "Perform cluster-wide FD limit review",
+          "Standardize nofile limits across all brokers",
+          "Plan coordinated limit increases"
+        ]
+      }
+    ]
+  }
+}

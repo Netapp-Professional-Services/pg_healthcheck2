@@ -1,0 +1,99 @@
+{
+  "critical_under_replicated_partitions": {
+    "metric_keywords": ["prometheus_under_replicated", "per_broker_urp", "data"],
+    "data_conditions": [
+      { "key": "under_replicated_partitions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('under_replicated_partitions', 0) >= 10",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has {data.get('under_replicated_partitions')} under-replicated partitions - CRITICAL data loss risk",
+        "recommendations": [
+          "URGENT: Investigate broker {data.get('node_id', 'unknown')[:8]} immediately",
+          "Check broker logs for replication errors: grep 'replica' /var/log/kafka/server.log",
+          "Verify broker is responsive and not overloaded",
+          "Check network connectivity between this broker and other cluster members",
+          "Review partition reassignment status",
+          "If broker is healthy, check for slow/stuck replicas"
+        ]
+      }
+    ]
+  },
+
+  "warning_under_replicated_partitions": {
+    "metric_keywords": ["prometheus_under_replicated", "per_broker_urp", "data"],
+    "data_conditions": [
+      { "key": "under_replicated_partitions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('under_replicated_partitions', 0) > 0 and data.get('under_replicated_partitions', 0) < 10",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has {data.get('under_replicated_partitions')} under-replicated partitions",
+        "recommendations": [
+          "Monitor broker {data.get('node_id', 'unknown')[:8]} for replication lag",
+          "Check broker resource utilization (CPU, disk I/O, network)",
+          "Verify all replicas are active and not falling behind",
+          "Review replica.lag.time.max.ms setting (default 30s)",
+          "Check for recent broker restarts or network issues"
+        ]
+      }
+    ]
+  },
+
+  "cluster_urp_pressure": {
+    "metric_keywords": ["prometheus_under_replicated", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_under_replicated_partitions', 0) >= 20",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Cluster has {data.get('total_under_replicated_partitions')} total under-replicated partitions across {data.get('brokers_with_urp', 0)} brokers - severe replication issues",
+        "recommendations": [
+          "URGENT: Multiple brokers have under-replicated partitions - cluster-wide issue",
+          "Check for network issues affecting inter-broker communication",
+          "Verify all brokers are operational and responsive",
+          "Review cluster-wide resource pressure (CPU, disk, network)",
+          "Consider scaling out if cluster is undersized",
+          "Check for partition rebalancing operations in progress",
+          "Review min.insync.replicas configuration for affected topics"
+        ]
+      },
+      {
+        "expression": "data.get('total_under_replicated_partitions', 0) > 0 and data.get('total_under_replicated_partitions', 0) < 20",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Cluster has {data.get('total_under_replicated_partitions')} under-replicated partitions - investigate replication health",
+        "recommendations": [
+          "Monitor replication lag trends",
+          "Check if URPs are transient (during rebalance) or persistent",
+          "Verify broker health across the cluster",
+          "Review recent changes (configuration, traffic patterns, broker additions)",
+          "Ensure adequate network bandwidth between brokers",
+          "Check for specific topics with replication issues"
+        ]
+      }
+    ]
+  },
+
+  "healthy_replication": {
+    "metric_keywords": ["prometheus_under_replicated", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_under_replicated_partitions', 0) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "All partitions are fully replicated across {data.get('total_brokers', 0)} brokers - healthy replication status",
+        "recommendations": [
+          "Maintain current replication configuration",
+          "Continue monitoring for replication issues",
+          "Review min.insync.replicas settings periodically",
+          "Ensure rack awareness is properly configured for availability"
+        ]
+      }
+    ]
+  }
+}

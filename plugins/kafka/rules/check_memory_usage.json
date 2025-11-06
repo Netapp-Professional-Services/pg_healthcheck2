@@ -1,0 +1,113 @@
+{
+  "critical_memory_usage": {
+    "metric_keywords": ["memory_usage", "kafka"],
+    "rules": [
+      {
+        "expression": "data.get('usage_pct', 0) >= 95",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critically high memory usage: {data.get('usage_pct'):.1f}% ({data.get('used_mb'):,}MB used, only {data.get('available_mb'):,}MB available). OOM risk imminent.",
+        "recommendations": [
+          "IMMEDIATE: Check for memory leaks in Kafka process or OS",
+          "Review heap dump if OOM errors are occurring",
+          "Consider emergency restart with increased heap if needed",
+          "Add memory capacity immediately if system-level exhaustion",
+          "Check for runaway processes consuming memory"
+        ]
+      },
+      {
+        "expression": "data.get('usage_pct', 0) >= 90",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical memory usage: {data.get('usage_pct'):.1f}% used ({data.get('used_mb'):,}MB / {data.get('total_mb'):,}MB).",
+        "recommendations": [
+          "Investigate memory consumption within 24 hours",
+          "Review JVM heap settings (-Xmx, -Xms)",
+          "Check for heavy OS page cache usage",
+          "Plan memory upgrade if consistently high",
+          "Monitor swap usage - swapping kills Kafka performance"
+        ]
+      },
+      {
+        "expression": "data.get('usage_pct', 0) >= 85",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has high memory usage: {data.get('usage_pct'):.1f}%.",
+        "recommendations": [
+          "Monitor memory trends to predict when critical threshold will be reached",
+          "Review topic retention - excessive retention increases page cache pressure",
+          "Check producer batch sizes and consumer fetch sizes",
+          "Plan memory capacity increase within 1-2 weeks"
+        ]
+      },
+      {
+        "expression": "data.get('usage_pct', 0) >= 80",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has elevated memory usage: {data.get('usage_pct'):.1f}%.",
+        "recommendations": [
+          "Track memory usage patterns over time",
+          "Ensure adequate swap space is configured (but not actively used)",
+          "Review JVM GC logs for memory management efficiency"
+        ]
+      }
+    ]
+  },
+  "broker_memory_health": {
+    "metric_keywords": ["memory_usage"],
+    "data_conditions": [
+      {"key": "broker_id", "exists": true},
+      {"key": "usage_pct", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('exceeds_critical') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Critical memory threshold exceeded on broker {data.get('broker_id')}: {data.get('usage_pct'):.1f}% used",
+        "recommendations": [
+          "Immediate action required to prevent OOM",
+          "Memory exhaustion can cause broker crashes and data loss"
+        ]
+      },
+      {
+        "expression": "data.get('exceeds_warning') == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Warning memory threshold exceeded on broker {data.get('broker_id')}: {data.get('usage_pct'):.1f}% used",
+        "recommendations": [
+          "Plan remediation within 24-48 hours",
+          "Review memory allocation and usage patterns"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_memory_issues": {
+    "metric_keywords": ["memory_usage"],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_memory_usage', {}).get('memory_usage', {}).get('critical_brokers', [])) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_memory_usage', {}).get('memory_usage', {}).get('critical_brokers', []))}) have critical memory usage. This indicates a cluster-wide memory crisis.",
+        "recommendations": [
+          "Cluster-wide memory emergency - immediate action required",
+          "Check for memory leaks or configuration issues affecting all brokers",
+          "Review heap settings cluster-wide",
+          "Plan emergency memory expansion for the entire cluster"
+        ]
+      },
+      {
+        "expression": "len(all_structured_findings.get('check_memory_usage', {}).get('memory_usage', {}).get('warning_brokers', [])) >= 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_memory_usage', {}).get('memory_usage', {}).get('warning_brokers', []))}) have high memory usage. Cluster-wide capacity planning needed.",
+        "recommendations": [
+          "Perform cluster-wide memory capacity review",
+          "Standardize JVM settings across brokers",
+          "Plan coordinated memory expansion"
+        ]
+      }
+    ]
+  }
+}

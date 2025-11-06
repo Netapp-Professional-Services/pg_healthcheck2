@@ -1,0 +1,160 @@
+{
+  "critical_isr_shrink_rate": {
+    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "data_conditions": [
+      { "key": "isr_shrink_rate", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('isr_shrink_rate', 0) >= 10",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has critical ISR shrink rate of {data.get('isr_shrink_rate')}/sec - replicas are frequently being removed from ISR",
+        "recommendations": [
+          "URGENT: Investigate broker {data.get('node_id', 'unknown')[:8]} - replicas cannot keep up with leader",
+          "Check broker resource utilization (CPU, disk I/O, network)",
+          "Review broker logs for replication errors",
+          "Check for GC pauses: grep 'GC pause' /var/log/kafka/server.log",
+          "Verify network connectivity and bandwidth between brokers",
+          "Consider scaling up broker resources if consistently overloaded"
+        ]
+      }
+    ]
+  },
+
+  "warning_isr_shrink_rate": {
+    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "data_conditions": [
+      { "key": "isr_shrink_rate", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('isr_shrink_rate', 0) >= 1 and data.get('isr_shrink_rate', 0) < 10",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has elevated ISR shrink rate of {data.get('isr_shrink_rate')}/sec",
+        "recommendations": [
+          "Monitor broker {data.get('node_id', 'unknown')[:8]} for replication stability",
+          "Check if ISR shrinks correlate with traffic patterns",
+          "Review replica.lag.time.max.ms setting",
+          "Verify broker has adequate resources for current workload"
+        ]
+      }
+    ]
+  },
+
+  "critical_under_min_isr": {
+    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "data_conditions": [
+      { "key": "under_min_isr_partitions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('under_min_isr_partitions', 0) >= 5",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has {data.get('under_min_isr_partitions')} partitions under min ISR - durability guarantees are compromised",
+        "recommendations": [
+          "URGENT: {data.get('under_min_isr_partitions')} partitions lack sufficient in-sync replicas",
+          "Producers with acks=all may experience timeouts or failures",
+          "Check why replicas are not keeping up with leader",
+          "Review min.insync.replicas configuration for affected topics",
+          "Verify replication factor is adequate (should be ≥3 for critical topics)",
+          "Check broker health and replication lag"
+        ]
+      }
+    ]
+  },
+
+  "warning_under_min_isr": {
+    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "data_conditions": [
+      { "key": "under_min_isr_partitions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('under_min_isr_partitions', 0) > 0 and data.get('under_min_isr_partitions', 0) < 5",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has {data.get('under_min_isr_partitions')} partitions under min ISR",
+        "recommendations": [
+          "Monitor affected partitions - durability may be at risk",
+          "Identify which topics are affected",
+          "Check replication lag for these partitions",
+          "Verify min.insync.replicas settings are appropriate",
+          "Ensure replication factor is sufficient"
+        ]
+      }
+    ]
+  },
+
+  "cluster_isr_instability": {
+    "metric_keywords": ["prometheus_isr_health", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_isr_shrink_rate', 0) >= 20",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Cluster-wide ISR shrink rate of {data.get('total_isr_shrink_rate')}/sec indicates severe replication problems",
+        "recommendations": [
+          "URGENT: Cluster-wide replication instability detected",
+          "Check for network issues affecting inter-broker communication",
+          "Review cluster resource utilization across all brokers",
+          "Verify all brokers are operational and responsive",
+          "Check for configuration issues (replica.lag.time.max.ms too aggressive)",
+          "Consider if cluster is undersized for current workload"
+        ]
+      },
+      {
+        "expression": "data.get('total_isr_shrink_rate', 0) >= 5 and data.get('total_isr_shrink_rate', 0) < 20",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Elevated cluster-wide ISR shrink rate of {data.get('total_isr_shrink_rate')}/sec",
+        "recommendations": [
+          "Monitor ISR stability trends across cluster",
+          "Check if issues are concentrated on specific brokers",
+          "Review recent traffic changes or broker additions",
+          "Verify network performance between brokers"
+        ]
+      }
+    ]
+  },
+
+  "cluster_under_min_isr_pressure": {
+    "metric_keywords": ["prometheus_isr_health", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_under_min_isr_partitions', 0) >= 10",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Cluster has {data.get('total_under_min_isr_partitions')} partitions under min ISR - widespread durability issues",
+        "recommendations": [
+          "URGENT: Multiple partitions lack sufficient in-sync replicas",
+          "This affects producer availability and data durability",
+          "Investigate cluster-wide replication problems immediately",
+          "Check if specific topics or brokers are affected",
+          "Review min.insync.replicas configuration cluster-wide",
+          "Verify replication factor is adequate for all critical topics"
+        ]
+      }
+    ]
+  },
+
+  "healthy_isr": {
+    "metric_keywords": ["prometheus_isr_health", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_isr_shrink_rate', 0) < 1 and data.get('total_under_min_isr_partitions', 0) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "ISR health is stable - low shrink rate and all partitions have sufficient replicas",
+        "recommendations": [
+          "Maintain current replication configuration",
+          "Continue monitoring ISR metrics for early warning signs",
+          "Ensure min.insync.replicas is set appropriately for topic criticality",
+          "Review replica.lag.time.max.ms periodically based on workload"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,2270 @@
+{
+  "prometheus_unclean_elections": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 No unclean leader elections (checked 1 brokers)",
+    "per_broker_unclean": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "unclean_elections": 0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metric": "unclean_leader_elections",
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "total_unclean_elections": 0,
+      "brokers_with_unclean": 0,
+      "broker_count": 1
+    }
+  },
+  "prometheus_offline_partitions": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 No offline partitions (3 brokers checked)",
+    "per_broker_offline": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "offline_partitions": 0
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "rack": "us-east-1b",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "offline_partitions": 0
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "rack": "us-east-1c",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "offline_partitions": 0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metric": "ic_node_offline_partitions_kraft",
+        "broker_count": 3
+      }
+    },
+    "cluster_aggregate": {
+      "total_offline_partitions": 0,
+      "brokers_with_offline": 0,
+      "total_brokers": 3
+    }
+  },
+  "prometheus_under_replicated": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 No under-replicated partitions (3 brokers checked)",
+    "per_broker_urp": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "under_replicated_partitions": 0
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "rack": "us-east-1b",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "under_replicated_partitions": 0
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "rack": "us-east-1c",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "under_replicated_partitions": 0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metric": "ic_node_under_replicated_partitions",
+        "broker_count": 3
+      }
+    },
+    "cluster_aggregate": {
+      "total_under_replicated_partitions": 0,
+      "brokers_with_urp": 0,
+      "total_brokers": 3,
+      "thresholds": {
+        "warning": 0,
+        "critical": 10
+      }
+    }
+  },
+  "prometheus_file_descriptors": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 File descriptor usage healthy across 1 brokers",
+    "per_broker_fd": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "fd_open": 1792,
+          "fd_limit": 9223372036854775808,
+          "fd_usage_pct": 0.0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metrics": [
+          "filedescriptoropencount",
+          "filedescriptorlimit"
+        ],
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "avg_fd_usage_pct": 0.0,
+      "brokers_critical": 0,
+      "brokers_warning": 0,
+      "broker_count": 1,
+      "thresholds": {
+        "warning_pct": 70,
+        "critical_pct": 85
+      }
+    }
+  },
+  "prometheus_network_errors": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 No network errors detected across 1 brokers",
+    "per_broker_network": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "rx_errors": 0,
+          "tx_errors": 0,
+          "rx_drops": 0,
+          "tx_drops": 0,
+          "total_errors": 0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metrics": [
+          "network_errors",
+          "network_drops"
+        ],
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "total_errors_cluster": 0,
+      "brokers_with_errors": 0,
+      "broker_count": 1
+    }
+  },
+  "prometheus_isr_health": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "ISR health is stable across 3 brokers",
+    "per_broker_isr": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "isr_shrink_rate": 0.0,
+          "isr_expand_rate": 0.0,
+          "under_min_isr_partitions": 0
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "rack": "us-east-1b",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "isr_shrink_rate": 0.0,
+          "isr_expand_rate": 0.0,
+          "under_min_isr_partitions": 0
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "rack": "us-east-1c",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "isr_shrink_rate": 0.0,
+          "isr_expand_rate": 0.0,
+          "under_min_isr_partitions": 0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metrics": [
+          "isr_shrink_rate",
+          "isr_expand_rate",
+          "under_min_isr_partitions"
+        ],
+        "broker_count": 3
+      }
+    },
+    "cluster_aggregate": {
+      "total_isr_shrink_rate": 0.0,
+      "total_isr_expand_rate": 0.0,
+      "total_under_min_isr_partitions": 0,
+      "avg_isr_shrink_rate": 0.0,
+      "avg_isr_expand_rate": 0.0,
+      "broker_count": 3,
+      "thresholds": {
+        "shrink_warning": 1.0,
+        "shrink_critical": 10.0,
+        "under_min_isr_warning": 0,
+        "under_min_isr_critical": 5
+      }
+    }
+  },
+  "prometheus_request_latency": {
+    "status": "critical",
+    "severity": 10,
+    "message": "3 broker(s) with critical consumer latency and 3 broker(s) with critical replication latency",
+    "per_broker_latency": {
+      "status": "critical",
+      "data": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "produce_latency_ms": 2.4,
+          "fetch_consumer_latency_ms": 1417.0,
+          "fetch_follower_latency_ms": 2065.0
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "rack": "us-east-1b",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "produce_latency_ms": 2.25,
+          "fetch_consumer_latency_ms": 1310.0,
+          "fetch_follower_latency_ms": 2074.0
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "rack": "us-east-1c",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "produce_latency_ms": 2.27,
+          "fetch_consumer_latency_ms": 1782.0,
+          "fetch_follower_latency_ms": 1832.0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metrics": [
+          "produce_latency_ms",
+          "fetch_consumer_latency_ms",
+          "fetch_follower_latency_ms"
+        ],
+        "broker_count": 3
+      }
+    },
+    "cluster_aggregate": {
+      "avg_produce_latency_ms": 2.31,
+      "avg_fetch_consumer_latency_ms": 1503.0,
+      "avg_fetch_follower_latency_ms": 1990.33,
+      "broker_count": 3,
+      "thresholds": {
+        "produce_warning_ms": 100,
+        "produce_critical_ms": 500,
+        "fetch_consumer_warning_ms": 100,
+        "fetch_consumer_critical_ms": 500,
+        "fetch_follower_warning_ms": 200,
+        "fetch_follower_critical_ms": 1000
+      }
+    },
+    "critical_fetch_consumer_latency": {
+      "count": 3,
+      "brokers": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "fetch_consumer_latency_ms": 1417.0
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "fetch_consumer_latency_ms": 1310.0
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "fetch_consumer_latency_ms": 1782.0
+        }
+      ],
+      "recommendation": "Investigate consumer fetch performance - reads are critically slow"
+    },
+    "critical_fetch_follower_latency": {
+      "count": 3,
+      "brokers": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "fetch_follower_latency_ms": 2065.0
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "fetch_follower_latency_ms": 2074.0
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "fetch_follower_latency_ms": 1832.0
+        }
+      ],
+      "recommendation": "Investigate replication performance - followers are critically lagging"
+    }
+  },
+  "prometheus_request_handler": {
+    "status": "critical",
+    "severity": 9,
+    "message": "\ud83d\udd34 1 broker(s) with critical request handler saturation (<10% idle)",
+    "per_broker_handler": {
+      "status": "critical",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "3.218.14.119",
+          "handler_idle_pct": 1.0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "avg_handler_idle_pct": 1.0,
+      "broker_count": 1
+    }
+  },
+  "prometheus_replica_fetcher": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 Replica fetchers healthy across 1 brokers",
+    "per_broker_fetcher": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "100.24.74.94",
+          "failed_partitions": 0,
+          "max_lag": 0.0,
+          "min_fetch_rate": 5.12
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "total_failed_partitions": 0,
+      "broker_count": 1
+    }
+  },
+  "prometheus_partition_balance": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "Partitions well-balanced across 3 brokers",
+    "per_broker_partitions": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "total_partitions": 53,
+          "leader_partitions": 18,
+          "follower_partitions": 35,
+          "partition_deviation_pct": 0.0,
+          "leader_deviation_pct": 1.9
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "rack": "us-east-1b",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "total_partitions": 53,
+          "leader_partitions": 18,
+          "follower_partitions": 35,
+          "partition_deviation_pct": 0.0,
+          "leader_deviation_pct": 1.9
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "rack": "us-east-1c",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "total_partitions": 53,
+          "leader_partitions": 17,
+          "follower_partitions": 36,
+          "partition_deviation_pct": 0.0,
+          "leader_deviation_pct": 3.8
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metrics": [
+          "partition_count",
+          "leader_count"
+        ],
+        "broker_count": 3
+      }
+    },
+    "cluster_aggregate": {
+      "total_partitions": 159,
+      "total_leaders": 53,
+      "avg_partitions_per_broker": 53.0,
+      "avg_leaders_per_broker": 17.7,
+      "broker_count": 3,
+      "thresholds": {
+        "imbalance_warning_pct": 20,
+        "imbalance_critical_pct": 40,
+        "per_broker_warning": 1500,
+        "per_broker_critical": 2000
+      }
+    }
+  },
+  "prometheus_broker_health": {
+    "prometheus_broker_health": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "All 3 brokers have healthy CPU and disk usage",
+      "per_broker_metrics": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "cpu_utilization": 2.689117868811259,
+            "disk_utilization": 1.4503042275279938,
+            "disk_available_gb": 4.75,
+            "bytes_in_per_sec": 24922711.0,
+            "bytes_out_per_sec": 122.25
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "rack": "us-east-1b",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "cpu_utilization": 2.693856998992951,
+            "disk_utilization": 1.4486422144978235,
+            "disk_available_gb": 4.75,
+            "bytes_in_per_sec": 24177067.0,
+            "bytes_out_per_sec": 104.2
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "rack": "us-east-1c",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "cpu_utilization": 2.440251572327044,
+            "disk_utilization": 1.449354505796478,
+            "disk_available_gb": 4.75,
+            "bytes_in_per_sec": 24934258.0,
+            "bytes_out_per_sec": 51.5
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metric_type": "instaclustr_managed",
+          "broker_count": 3
+        }
+      },
+      "cluster_aggregate": {
+        "avg_cpu_utilization": 2.61,
+        "avg_disk_utilization": 1.45,
+        "total_bytes_in_per_sec": 74034036.0,
+        "total_bytes_out_per_sec": 277.95,
+        "broker_count": 3
+      }
+    }
+  },
+  "prometheus_gc_health": {
+    "status": "info",
+    "severity": 0,
+    "message": "GC metrics collected from 3 brokers",
+    "per_broker_gc": {
+      "status": "info",
+      "data": [
+        {
+          "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "young_gc_time_ms": 35448.0,
+          "old_gc_time_ms": 0.0
+        },
+        {
+          "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+          "public_ip": "3.208.112.189",
+          "rack": "us-east-1b",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "young_gc_time_ms": 18466.0,
+          "old_gc_time_ms": 0.0
+        },
+        {
+          "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+          "public_ip": "3.218.14.119",
+          "rack": "us-east-1c",
+          "datacenter": "AWS_VPC_US_EAST_1",
+          "young_gc_time_ms": 21602.0,
+          "old_gc_time_ms": 0.0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metrics": [
+          "young_gc_time_ms",
+          "old_gc_time_ms"
+        ],
+        "broker_count": 3,
+        "note": "Values are cumulative - monitor trends over time"
+      }
+    },
+    "cluster_aggregate": {
+      "avg_young_gc_time_ms": 25172.0,
+      "avg_old_gc_time_ms": 0.0,
+      "broker_count": 3
+    }
+  },
+  "prometheus_log_flush": {
+    "status": "info",
+    "severity": 0,
+    "message": "Log flush metrics collected from 1 brokers",
+    "per_broker_flush": {
+      "status": "info",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "100.24.74.94",
+          "flush_rate": 0.04,
+          "flush_time_ms": 26.79
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "avg_flush_rate": 0.04,
+      "broker_count": 1
+    }
+  },
+  "prometheus_controller_health": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 Controller health good (KRaft mode)",
+    "per_broker_controller": {
+      "status": "healthy",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "3.218.14.119",
+          "active_controllers": 0,
+          "fenced_brokers": 0,
+          "metadata_errors": 0
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "total_fenced_brokers": 0,
+      "total_metadata_errors": 0,
+      "broker_count": 1
+    }
+  },
+  "prometheus_consumer_lag": {
+    "status": "healthy",
+    "severity": 0,
+    "message": "\u2705 All 3 consumer group(s) have healthy lag",
+    "per_consumer_group_lag": {
+      "status": "healthy",
+      "data": [
+        {
+          "group_id": "KafkaConsumer-2",
+          "total_lag": 60,
+          "topics": [
+            "instaclustr-sla"
+          ]
+        },
+        {
+          "group_id": "KafkaConsumer-4",
+          "total_lag": 60,
+          "topics": [
+            "instaclustr-sla"
+          ]
+        },
+        {
+          "group_id": "KafkaConsumer-6",
+          "total_lag": 60,
+          "topics": [
+            "instaclustr-sla"
+          ]
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metric": "kafka_consumerGroup_consumergrouplag",
+        "group_count": 3
+      }
+    },
+    "cluster_aggregate": {
+      "total_lag_all_groups": 180,
+      "groups_with_critical_lag": 0,
+      "groups_with_warning_lag": 0,
+      "total_groups": 3,
+      "thresholds": {
+        "warning": 10000,
+        "critical": 100000
+      }
+    }
+  },
+  "prometheus_purgatory": {
+    "status": "critical",
+    "severity": 9,
+    "message": "1 broker(s) with critical fetch purgatory",
+    "per_broker_purgatory": {
+      "status": "critical",
+      "data": [
+        {
+          "node_id": "unknown",
+          "public_ip": "100.24.74.94",
+          "rack": "us-east-1a",
+          "produce_purgatory": 0,
+          "fetch_purgatory": 921
+        }
+      ],
+      "metadata": {
+        "source": "prometheus",
+        "metrics": [
+          "produce_purgatory",
+          "fetch_purgatory"
+        ],
+        "broker_count": 1
+      }
+    },
+    "cluster_aggregate": {
+      "avg_produce_purgatory": 0.0,
+      "avg_fetch_purgatory": 921.0,
+      "broker_count": 1
+    },
+    "critical_fetch_purgatory": {
+      "count": 1,
+      "brokers": [
+        {
+          "node_id": "unknown",
+          "public_ip": "100.24.74.94",
+          "fetch_purgatory": 921
+        }
+      ],
+      "recommendation": "High fetch purgatory indicates consumers/followers waiting for data"
+    }
+  },
+  "prometheus_jvm_heap": {
+    "prometheus_jvm_heap": {
+      "status": "error",
+      "error_message": "JVM heap metrics not found in Prometheus",
+      "data": [],
+      "metadata": {
+        "source": "prometheus",
+        "timestamp": "2025-11-06T04:02:38.893516Z"
+      }
+    }
+  },
+  "check_cpu_load": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_memory_usage": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_file_descriptors": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_broker_config": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_log_errors": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_gc_pauses": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "kafka_overview": {
+    "version_info": {
+      "status": "success",
+      "data": [
+        {
+          "version": "Apache Kafka 4.0.0",
+          "cluster_id": "9VWND7rSQByU37apX2j_Cg",
+          "broker_count": 3,
+          "controller_id": 6
+        }
+      ]
+    },
+    "broker_info": {
+      "status": "success",
+      "data": [
+        {
+          "broker_id": 4,
+          "host": "3.208.112.189",
+          "port": 9082,
+          "rack": "us-east-1b"
+        },
+        {
+          "broker_id": 6,
+          "host": "100.24.74.94",
+          "port": 9082,
+          "rack": "us-east-1a"
+        },
+        {
+          "broker_id": 2,
+          "host": "3.218.14.119",
+          "port": 9082,
+          "rack": "us-east-1c"
+        }
+      ]
+    },
+    "controller_info": {
+      "status": "success",
+      "data": [
+        {
+          "controller_id": 6,
+          "controller_host": "100.24.74.94",
+          "controller_port": 9082
+        }
+      ]
+    }
+  },
+  "check_purgatory_size": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_partition_balance": {
+    "partition_balance": {
+      "status": "error",
+      "details": "'str' object has no attribute 'get'"
+    }
+  },
+  "check_topic_count_and_naming": {
+    "topic_analysis": {
+      "status": "success",
+      "data": [
+        {
+          "total_count": 1,
+          "max_threshold": 100,
+          "violation_count": 1,
+          "violations_by_type": {
+            "starts_with_digit": 0,
+            "contains_space": 0,
+            "contains_hyphen": 1,
+            "contains_uppercase": 0
+          },
+          "exceeds_threshold": false
+        }
+      ]
+    },
+    "topic_details": {
+      "status": "success",
+      "data": [
+        {
+          "topic": "instaclustr-sla",
+          "starts_with_digit": false,
+          "contains_space": false,
+          "contains_hyphen": true,
+          "contains_uppercase": false,
+          "has_violation": true
+        }
+      ]
+    }
+  },
+  "check_topic_configuration": {
+    "topic_configuration": {
+      "status": "success",
+      "topics_checked": 0,
+      "topics_with_issues": 0,
+      "critical_count": 0,
+      "warning_count": 0,
+      "critical_topics": [],
+      "warning_topics": [],
+      "thresholds": {
+        "min_replication_factor": 3,
+        "min_isr_warning": 2,
+        "max_retention_days": 30
+      },
+      "data": []
+    }
+  },
+  "check_iostat": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_jvm_stats": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_isr_health": {
+    "isr_health": {
+      "status": "success",
+      "summary": {
+        "total_topics": 0,
+        "total_partitions": 0,
+        "under_replicated_partitions": 0,
+        "topics_with_issues": 0,
+        "has_critical_issues": false,
+        "has_warning_issues": false
+      },
+      "affected_topics": [],
+      "all_topics": []
+    }
+  },
+  "check_storage_health": {
+    "storage_health": {
+      "status": "success",
+      "data": [],
+      "message": "No log directory data returned"
+    }
+  },
+  "check_disk_usage": {
+    "status": "skipped",
+    "reason": "SSH not configured",
+    "required_settings": [
+      "ssh_host or ssh_hosts",
+      "ssh_user",
+      "ssh_key_file or ssh_password"
+    ]
+  },
+  "check_broker_availability": {
+    "broker_availability": {
+      "status": "success",
+      "cluster_id": "9VWND7rSQByU37apX2j_Cg",
+      "data": [
+        {
+          "broker_id": 6,
+          "host": "100.24.74.94",
+          "port": 9082,
+          "status": "available"
+        },
+        {
+          "broker_id": 4,
+          "host": "3.208.112.189",
+          "port": 9082,
+          "status": "available"
+        },
+        {
+          "broker_id": 2,
+          "host": "3.218.14.119",
+          "port": 9082,
+          "status": "available"
+        }
+      ],
+      "count": 3,
+      "available_count": 3,
+      "unavailable_count": 0,
+      "unavailable_broker_ids": [],
+      "controller_id": 6,
+      "controller_available": true,
+      "under_replicated_partitions": 0
+    }
+  },
+  "check_consumer_group_health": {
+    "consumer_groups": {
+      "status": "success",
+      "groups_analyzed": 3,
+      "production_groups": 3,
+      "test_groups": 0,
+      "issues_detected": true,
+      "groups_with_issues": {
+        "unstable": [],
+        "low_members": [
+          "KafkaConsumer-4",
+          "KafkaConsumer-6",
+          "KafkaConsumer-2"
+        ],
+        "critical_lag": [],
+        "warning_lag": []
+      },
+      "groups_without_offsets": [],
+      "groups_with_errors": [],
+      "thresholds": {
+        "critical_lag": 10000,
+        "warning_lag": 5000,
+        "min_members": 2
+      },
+      "data": [
+        {
+          "group_id": "KafkaConsumer-4",
+          "state": "Stable",
+          "members": 1,
+          "total_lag": 30,
+          "max_lag": 17,
+          "has_offsets": true,
+          "is_test_consumer": false
+        },
+        {
+          "group_id": "KafkaConsumer-6",
+          "state": "Stable",
+          "members": 1,
+          "total_lag": 0,
+          "max_lag": 0,
+          "has_offsets": true,
+          "is_test_consumer": false
+        },
+        {
+          "group_id": "KafkaConsumer-2",
+          "state": "Stable",
+          "members": 1,
+          "total_lag": 60,
+          "max_lag": 47,
+          "has_offsets": true,
+          "is_test_consumer": false
+        }
+      ],
+      "production_data": [
+        {
+          "group_id": "KafkaConsumer-4",
+          "state": "Stable",
+          "members": 1,
+          "total_lag": 30,
+          "max_lag": 17,
+          "has_offsets": true,
+          "is_test_consumer": false
+        },
+        {
+          "group_id": "KafkaConsumer-6",
+          "state": "Stable",
+          "members": 1,
+          "total_lag": 0,
+          "max_lag": 0,
+          "has_offsets": true,
+          "is_test_consumer": false
+        },
+        {
+          "group_id": "KafkaConsumer-2",
+          "state": "Stable",
+          "members": 1,
+          "total_lag": 60,
+          "max_lag": 47,
+          "has_offsets": true,
+          "is_test_consumer": false
+        }
+      ],
+      "test_data": []
+    }
+  },
+  "check_consumer_lag": {
+    "consumer_lag": {
+      "status": "success",
+      "data": [
+        {
+          "group_id": "KafkaConsumer-4",
+          "topic": "instaclustr-sla",
+          "partition": 0,
+          "current_offset": 74125,
+          "log_end_offset": 74125,
+          "lag": 0
+        },
+        {
+          "group_id": "KafkaConsumer-4",
+          "topic": "instaclustr-sla",
+          "partition": 2,
+          "current_offset": 75393,
+          "log_end_offset": 75406,
+          "lag": 13
+        },
+        {
+          "group_id": "KafkaConsumer-4",
+          "topic": "instaclustr-sla",
+          "partition": 1,
+          "current_offset": 65462,
+          "log_end_offset": 65479,
+          "lag": 17
+        },
+        {
+          "group_id": "KafkaConsumer-6",
+          "topic": "instaclustr-sla",
+          "partition": 0,
+          "current_offset": 74125,
+          "log_end_offset": 74125,
+          "lag": 0
+        },
+        {
+          "group_id": "KafkaConsumer-6",
+          "topic": "instaclustr-sla",
+          "partition": 2,
+          "current_offset": 75406,
+          "log_end_offset": 75406,
+          "lag": 0
+        },
+        {
+          "group_id": "KafkaConsumer-6",
+          "topic": "instaclustr-sla",
+          "partition": 1,
+          "current_offset": 65479,
+          "log_end_offset": 65479,
+          "lag": 0
+        },
+        {
+          "group_id": "KafkaConsumer-2",
+          "topic": "instaclustr-sla",
+          "partition": 0,
+          "current_offset": 74125,
+          "log_end_offset": 74125,
+          "lag": 0
+        },
+        {
+          "group_id": "KafkaConsumer-2",
+          "topic": "instaclustr-sla",
+          "partition": 2,
+          "current_offset": 75393,
+          "log_end_offset": 75406,
+          "lag": 13
+        },
+        {
+          "group_id": "KafkaConsumer-2",
+          "topic": "instaclustr-sla",
+          "partition": 1,
+          "current_offset": 65432,
+          "log_end_offset": 65479,
+          "lag": 47
+        }
+      ],
+      "count": 9
+    }
+  },
+  "db_metadata": {
+    "version": "Apache Kafka 4.0.0",
+    "cluster_name": "9VWND7rSQByU37apX2j_Cg",
+    "nodes": 3,
+    "environment": "instaclustr_managed",
+    "environment_details": {
+      "provider": "Instaclustr",
+      "monitoring": "prometheus",
+      "has_prometheus_metrics": true,
+      "cluster_id": "aa642a45-80ba-4cd7-b6dd-c54e1c0fd4c8"
+    },
+    "db_name": "Cluster ID: 9VWND7rSQByU37apX2j_Cg"
+  },
+  "summarized_findings": {
+    "kafka_overview": {
+      "version_info": {
+        "status": "success",
+        "data": [
+          {
+            "version": "Apache Kafka 4.0.0",
+            "cluster_id": "9VWND7rSQByU37apX2j_Cg",
+            "broker_count": 3,
+            "controller_id": 6
+          }
+        ]
+      },
+      "broker_info": {
+        "status": "success",
+        "data": [
+          {
+            "broker_id": 4,
+            "host": "3.208.112.189",
+            "port": 9082,
+            "rack": "us-east-1b"
+          },
+          {
+            "broker_id": 6,
+            "host": "100.24.74.94",
+            "port": 9082,
+            "rack": "us-east-1a"
+          },
+          {
+            "broker_id": 2,
+            "host": "3.218.14.119",
+            "port": 9082,
+            "rack": "us-east-1c"
+          }
+        ]
+      },
+      "controller_info": {
+        "status": "success",
+        "data": [
+          {
+            "controller_id": 6,
+            "controller_host": "100.24.74.94",
+            "controller_port": 9082
+          }
+        ]
+      }
+    },
+    "prometheus_unclean_elections": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 No unclean leader elections (checked 1 brokers)",
+      "per_broker_unclean": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "unclean_elections": 0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metric": "unclean_leader_elections",
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "total_unclean_elections": 0,
+        "brokers_with_unclean": 0,
+        "broker_count": 1
+      }
+    },
+    "prometheus_offline_partitions": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 No offline partitions (3 brokers checked)",
+      "per_broker_offline": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "offline_partitions": 0
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "rack": "us-east-1b",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "offline_partitions": 0
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "rack": "us-east-1c",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "offline_partitions": 0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metric": "ic_node_offline_partitions_kraft",
+          "broker_count": 3
+        }
+      },
+      "cluster_aggregate": {
+        "total_offline_partitions": 0,
+        "brokers_with_offline": 0,
+        "total_brokers": 3
+      }
+    },
+    "prometheus_under_replicated": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 No under-replicated partitions (3 brokers checked)",
+      "per_broker_urp": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "under_replicated_partitions": 0
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "rack": "us-east-1b",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "under_replicated_partitions": 0
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "rack": "us-east-1c",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "under_replicated_partitions": 0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metric": "ic_node_under_replicated_partitions",
+          "broker_count": 3
+        }
+      },
+      "cluster_aggregate": {
+        "total_under_replicated_partitions": 0,
+        "brokers_with_urp": 0,
+        "total_brokers": 3,
+        "thresholds": {
+          "warning": 0,
+          "critical": 10
+        }
+      }
+    },
+    "prometheus_file_descriptors": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 File descriptor usage healthy across 1 brokers",
+      "per_broker_fd": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "fd_open": 1792,
+            "fd_limit": 9223372036854775808,
+            "fd_usage_pct": 0.0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metrics": [
+            "filedescriptoropencount",
+            "filedescriptorlimit"
+          ],
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "avg_fd_usage_pct": 0.0,
+        "brokers_critical": 0,
+        "brokers_warning": 0,
+        "broker_count": 1,
+        "thresholds": {
+          "warning_pct": 70,
+          "critical_pct": 85
+        }
+      }
+    },
+    "prometheus_network_errors": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 No network errors detected across 1 brokers",
+      "per_broker_network": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "rx_errors": 0,
+            "tx_errors": 0,
+            "rx_drops": 0,
+            "tx_drops": 0,
+            "total_errors": 0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metrics": [
+            "network_errors",
+            "network_drops"
+          ],
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "total_errors_cluster": 0,
+        "brokers_with_errors": 0,
+        "broker_count": 1
+      }
+    },
+    "prometheus_isr_health": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "ISR health is stable across 3 brokers",
+      "per_broker_isr": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "isr_shrink_rate": 0.0,
+            "isr_expand_rate": 0.0,
+            "under_min_isr_partitions": 0
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "rack": "us-east-1b",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "isr_shrink_rate": 0.0,
+            "isr_expand_rate": 0.0,
+            "under_min_isr_partitions": 0
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "rack": "us-east-1c",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "isr_shrink_rate": 0.0,
+            "isr_expand_rate": 0.0,
+            "under_min_isr_partitions": 0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metrics": [
+            "isr_shrink_rate",
+            "isr_expand_rate",
+            "under_min_isr_partitions"
+          ],
+          "broker_count": 3
+        }
+      },
+      "cluster_aggregate": {
+        "total_isr_shrink_rate": 0.0,
+        "total_isr_expand_rate": 0.0,
+        "total_under_min_isr_partitions": 0,
+        "avg_isr_shrink_rate": 0.0,
+        "avg_isr_expand_rate": 0.0,
+        "broker_count": 3,
+        "thresholds": {
+          "shrink_warning": 1.0,
+          "shrink_critical": 10.0,
+          "under_min_isr_warning": 0,
+          "under_min_isr_critical": 5
+        }
+      }
+    },
+    "prometheus_request_latency": {
+      "status": "critical",
+      "severity": 10,
+      "message": "3 broker(s) with critical consumer latency and 3 broker(s) with critical replication latency",
+      "per_broker_latency": {
+        "status": "critical",
+        "data": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "produce_latency_ms": 2.4,
+            "fetch_consumer_latency_ms": 1417.0,
+            "fetch_follower_latency_ms": 2065.0
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "rack": "us-east-1b",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "produce_latency_ms": 2.25,
+            "fetch_consumer_latency_ms": 1310.0,
+            "fetch_follower_latency_ms": 2074.0
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "rack": "us-east-1c",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "produce_latency_ms": 2.27,
+            "fetch_consumer_latency_ms": 1782.0,
+            "fetch_follower_latency_ms": 1832.0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metrics": [
+            "produce_latency_ms",
+            "fetch_consumer_latency_ms",
+            "fetch_follower_latency_ms"
+          ],
+          "broker_count": 3
+        }
+      },
+      "cluster_aggregate": {
+        "avg_produce_latency_ms": 2.31,
+        "avg_fetch_consumer_latency_ms": 1503.0,
+        "avg_fetch_follower_latency_ms": 1990.33,
+        "broker_count": 3,
+        "thresholds": {
+          "produce_warning_ms": 100,
+          "produce_critical_ms": 500,
+          "fetch_consumer_warning_ms": 100,
+          "fetch_consumer_critical_ms": 500,
+          "fetch_follower_warning_ms": 200,
+          "fetch_follower_critical_ms": 1000
+        }
+      },
+      "critical_fetch_consumer_latency": {
+        "count": 3,
+        "brokers": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "fetch_consumer_latency_ms": 1417.0
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "fetch_consumer_latency_ms": 1310.0
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "fetch_consumer_latency_ms": 1782.0
+          }
+        ],
+        "recommendation": "Investigate consumer fetch performance - reads are critically slow"
+      },
+      "critical_fetch_follower_latency": {
+        "count": 3,
+        "brokers": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "fetch_follower_latency_ms": 2065.0
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "fetch_follower_latency_ms": 2074.0
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "fetch_follower_latency_ms": 1832.0
+          }
+        ],
+        "recommendation": "Investigate replication performance - followers are critically lagging"
+      }
+    },
+    "prometheus_request_handler": {
+      "status": "critical",
+      "severity": 9,
+      "message": "\ud83d\udd34 1 broker(s) with critical request handler saturation (<10% idle)",
+      "per_broker_handler": {
+        "status": "critical",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "3.218.14.119",
+            "handler_idle_pct": 1.0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "avg_handler_idle_pct": 1.0,
+        "broker_count": 1
+      }
+    },
+    "prometheus_replica_fetcher": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 Replica fetchers healthy across 1 brokers",
+      "per_broker_fetcher": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "100.24.74.94",
+            "failed_partitions": 0,
+            "max_lag": 0.0,
+            "min_fetch_rate": 5.12
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "total_failed_partitions": 0,
+        "broker_count": 1
+      }
+    },
+    "prometheus_partition_balance": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "Partitions well-balanced across 3 brokers",
+      "per_broker_partitions": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "total_partitions": 53,
+            "leader_partitions": 18,
+            "follower_partitions": 35,
+            "partition_deviation_pct": 0.0,
+            "leader_deviation_pct": 1.9
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "rack": "us-east-1b",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "total_partitions": 53,
+            "leader_partitions": 18,
+            "follower_partitions": 35,
+            "partition_deviation_pct": 0.0,
+            "leader_deviation_pct": 1.9
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "rack": "us-east-1c",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "total_partitions": 53,
+            "leader_partitions": 17,
+            "follower_partitions": 36,
+            "partition_deviation_pct": 0.0,
+            "leader_deviation_pct": 3.8
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metrics": [
+            "partition_count",
+            "leader_count"
+          ],
+          "broker_count": 3
+        }
+      },
+      "cluster_aggregate": {
+        "total_partitions": 159,
+        "total_leaders": 53,
+        "avg_partitions_per_broker": 53.0,
+        "avg_leaders_per_broker": 17.7,
+        "broker_count": 3,
+        "thresholds": {
+          "imbalance_warning_pct": 20,
+          "imbalance_critical_pct": 40,
+          "per_broker_warning": 1500,
+          "per_broker_critical": 2000
+        }
+      }
+    },
+    "prometheus_broker_health": {
+      "prometheus_broker_health": {
+        "status": "healthy",
+        "severity": 0,
+        "message": "All 3 brokers have healthy CPU and disk usage",
+        "per_broker_metrics": {
+          "status": "healthy",
+          "data": [
+            {
+              "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+              "public_ip": "100.24.74.94",
+              "rack": "us-east-1a",
+              "datacenter": "AWS_VPC_US_EAST_1",
+              "cpu_utilization": 2.689117868811259,
+              "disk_utilization": 1.4503042275279938,
+              "disk_available_gb": 4.75,
+              "bytes_in_per_sec": 24922711.0,
+              "bytes_out_per_sec": 122.25
+            },
+            {
+              "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+              "public_ip": "3.208.112.189",
+              "rack": "us-east-1b",
+              "datacenter": "AWS_VPC_US_EAST_1",
+              "cpu_utilization": 2.693856998992951,
+              "disk_utilization": 1.4486422144978235,
+              "disk_available_gb": 4.75,
+              "bytes_in_per_sec": 24177067.0,
+              "bytes_out_per_sec": 104.2
+            },
+            {
+              "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+              "public_ip": "3.218.14.119",
+              "rack": "us-east-1c",
+              "datacenter": "AWS_VPC_US_EAST_1",
+              "cpu_utilization": 2.440251572327044,
+              "disk_utilization": 1.449354505796478,
+              "disk_available_gb": 4.75,
+              "bytes_in_per_sec": 24934258.0,
+              "bytes_out_per_sec": 51.5
+            }
+          ],
+          "metadata": {
+            "source": "prometheus",
+            "metric_type": "instaclustr_managed",
+            "broker_count": 3
+          }
+        },
+        "cluster_aggregate": {
+          "avg_cpu_utilization": 2.61,
+          "avg_disk_utilization": 1.45,
+          "total_bytes_in_per_sec": 74034036.0,
+          "total_bytes_out_per_sec": 277.95,
+          "broker_count": 3
+        }
+      }
+    },
+    "prometheus_gc_health": {
+      "status": "info",
+      "severity": 0,
+      "message": "GC metrics collected from 3 brokers",
+      "per_broker_gc": {
+        "status": "info",
+        "data": [
+          {
+            "node_id": "7d867910-1527-471c-9c00-d91493447c8e",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "young_gc_time_ms": 35448.0,
+            "old_gc_time_ms": 0.0
+          },
+          {
+            "node_id": "fc7629a0-2473-45d3-ad4c-b46c977fa155",
+            "public_ip": "3.208.112.189",
+            "rack": "us-east-1b",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "young_gc_time_ms": 18466.0,
+            "old_gc_time_ms": 0.0
+          },
+          {
+            "node_id": "dab6a44c-64a6-4b55-a92e-5d9595266c8d",
+            "public_ip": "3.218.14.119",
+            "rack": "us-east-1c",
+            "datacenter": "AWS_VPC_US_EAST_1",
+            "young_gc_time_ms": 21602.0,
+            "old_gc_time_ms": 0.0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metrics": [
+            "young_gc_time_ms",
+            "old_gc_time_ms"
+          ],
+          "broker_count": 3,
+          "note": "Values are cumulative - monitor trends over time"
+        }
+      },
+      "cluster_aggregate": {
+        "avg_young_gc_time_ms": 25172.0,
+        "avg_old_gc_time_ms": 0.0,
+        "broker_count": 3
+      }
+    },
+    "prometheus_log_flush": {
+      "status": "info",
+      "severity": 0,
+      "message": "Log flush metrics collected from 1 brokers",
+      "per_broker_flush": {
+        "status": "info",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "100.24.74.94",
+            "flush_rate": 0.04,
+            "flush_time_ms": 26.79
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "avg_flush_rate": 0.04,
+        "broker_count": 1
+      }
+    },
+    "prometheus_controller_health": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 Controller health good (KRaft mode)",
+      "per_broker_controller": {
+        "status": "healthy",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "3.218.14.119",
+            "active_controllers": 0,
+            "fenced_brokers": 0,
+            "metadata_errors": 0
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "total_fenced_brokers": 0,
+        "total_metadata_errors": 0,
+        "broker_count": 1
+      }
+    },
+    "prometheus_consumer_lag": {
+      "status": "healthy",
+      "severity": 0,
+      "message": "\u2705 All 3 consumer group(s) have healthy lag",
+      "per_consumer_group_lag": {
+        "status": "healthy",
+        "data": [
+          {
+            "group_id": "KafkaConsumer-2",
+            "total_lag": 60,
+            "topics": [
+              "instaclustr-sla"
+            ]
+          },
+          {
+            "group_id": "KafkaConsumer-4",
+            "total_lag": 60,
+            "topics": [
+              "instaclustr-sla"
+            ]
+          },
+          {
+            "group_id": "KafkaConsumer-6",
+            "total_lag": 60,
+            "topics": [
+              "instaclustr-sla"
+            ]
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metric": "kafka_consumerGroup_consumergrouplag",
+          "group_count": 3
+        }
+      },
+      "cluster_aggregate": {
+        "total_lag_all_groups": 180,
+        "groups_with_critical_lag": 0,
+        "groups_with_warning_lag": 0,
+        "total_groups": 3,
+        "thresholds": {
+          "warning": 10000,
+          "critical": 100000
+        }
+      }
+    },
+    "prometheus_purgatory": {
+      "status": "critical",
+      "severity": 9,
+      "message": "1 broker(s) with critical fetch purgatory",
+      "per_broker_purgatory": {
+        "status": "critical",
+        "data": [
+          {
+            "node_id": "unknown",
+            "public_ip": "100.24.74.94",
+            "rack": "us-east-1a",
+            "produce_purgatory": 0,
+            "fetch_purgatory": 921
+          }
+        ],
+        "metadata": {
+          "source": "prometheus",
+          "metrics": [
+            "produce_purgatory",
+            "fetch_purgatory"
+          ],
+          "broker_count": 1
+        }
+      },
+      "cluster_aggregate": {
+        "avg_produce_purgatory": 0.0,
+        "avg_fetch_purgatory": 921.0,
+        "broker_count": 1
+      },
+      "critical_fetch_purgatory": {
+        "count": 1,
+        "brokers": [
+          {
+            "node_id": "unknown",
+            "public_ip": "100.24.74.94",
+            "fetch_purgatory": 921
+          }
+        ],
+        "recommendation": "High fetch purgatory indicates consumers/followers waiting for data"
+      }
+    },
+    "prometheus_jvm_heap": {
+      "prometheus_jvm_heap": {
+        "status": "error",
+        "error_message": "JVM heap metrics not found in Prometheus",
+        "data": [],
+        "metadata": {
+          "source": "prometheus",
+          "timestamp": "2025-11-06T04:02:38.893516Z"
+        }
+      }
+    },
+    "check_cpu_load": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_memory_usage": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_file_descriptors": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_broker_config": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_log_errors": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_gc_pauses": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_purgatory_size": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_partition_balance": {
+      "partition_balance": {
+        "status": "error",
+        "details": "'str' object has no attribute 'get'"
+      }
+    },
+    "check_topic_count_and_naming": {
+      "topic_analysis": {
+        "status": "success",
+        "data": [
+          {
+            "total_count": 1,
+            "max_threshold": 100,
+            "violation_count": 1,
+            "violations_by_type": {
+              "starts_with_digit": 0,
+              "contains_space": 0,
+              "contains_hyphen": 1,
+              "contains_uppercase": 0
+            },
+            "exceeds_threshold": false
+          }
+        ]
+      },
+      "topic_details": {
+        "status": "success",
+        "data": [
+          {
+            "topic": "instaclustr-sla",
+            "starts_with_digit": false,
+            "contains_space": false,
+            "contains_hyphen": true,
+            "contains_uppercase": false,
+            "has_violation": true
+          }
+        ]
+      }
+    },
+    "check_topic_configuration": {
+      "topic_configuration": {
+        "status": "success",
+        "topics_checked": 0,
+        "topics_with_issues": 0,
+        "critical_count": 0,
+        "warning_count": 0,
+        "critical_topics": [],
+        "warning_topics": [],
+        "thresholds": {
+          "min_replication_factor": 3,
+          "min_isr_warning": 2,
+          "max_retention_days": 30
+        },
+        "data": []
+      }
+    },
+    "check_iostat": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_jvm_stats": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_isr_health": {
+      "isr_health": {
+        "status": "success",
+        "summary": {
+          "total_topics": 0,
+          "total_partitions": 0,
+          "under_replicated_partitions": 0,
+          "topics_with_issues": 0,
+          "has_critical_issues": false,
+          "has_warning_issues": false
+        },
+        "affected_topics": [],
+        "all_topics": []
+      }
+    },
+    "check_storage_health": {
+      "storage_health": {
+        "status": "success",
+        "data": [],
+        "message": "No log directory data returned"
+      }
+    },
+    "check_disk_usage": {
+      "status": "skipped",
+      "reason": "SSH not configured",
+      "required_settings": [
+        "ssh_host or ssh_hosts",
+        "ssh_user",
+        "ssh_key_file or ssh_password"
+      ]
+    },
+    "check_broker_availability": {
+      "broker_availability": {
+        "status": "success",
+        "cluster_id": "9VWND7rSQByU37apX2j_Cg",
+        "data": [
+          {
+            "broker_id": 6,
+            "host": "100.24.74.94",
+            "port": 9082,
+            "status": "available"
+          },
+          {
+            "broker_id": 4,
+            "host": "3.208.112.189",
+            "port": 9082,
+            "status": "available"
+          },
+          {
+            "broker_id": 2,
+            "host": "3.218.14.119",
+            "port": 9082,
+            "status": "available"
+          }
+        ],
+        "count": 3,
+        "available_count": 3,
+        "unavailable_count": 0,
+        "unavailable_broker_ids": [],
+        "controller_id": 6,
+        "controller_available": true,
+        "under_replicated_partitions": 0
+      }
+    },
+    "check_consumer_group_health": {
+      "consumer_groups": {
+        "status": "success",
+        "groups_analyzed": 3,
+        "production_groups": 3,
+        "test_groups": 0,
+        "issues_detected": true,
+        "groups_with_issues": {
+          "unstable": [],
+          "low_members": [
+            "KafkaConsumer-4",
+            "KafkaConsumer-6",
+            "KafkaConsumer-2"
+          ],
+          "critical_lag": [],
+          "warning_lag": []
+        },
+        "groups_without_offsets": [],
+        "groups_with_errors": [],
+        "thresholds": {
+          "critical_lag": 10000,
+          "warning_lag": 5000,
+          "min_members": 2
+        },
+        "data": [
+          {
+            "group_id": "KafkaConsumer-4",
+            "state": "Stable",
+            "members": 1,
+            "total_lag": 30,
+            "max_lag": 17,
+            "has_offsets": true,
+            "is_test_consumer": false
+          },
+          {
+            "group_id": "KafkaConsumer-6",
+            "state": "Stable",
+            "members": 1,
+            "total_lag": 0,
+            "max_lag": 0,
+            "has_offsets": true,
+            "is_test_consumer": false
+          },
+          {
+            "group_id": "KafkaConsumer-2",
+            "state": "Stable",
+            "members": 1,
+            "total_lag": 60,
+            "max_lag": 47,
+            "has_offsets": true,
+            "is_test_consumer": false
+          }
+        ],
+        "production_data": [
+          {
+            "group_id": "KafkaConsumer-4",
+            "state": "Stable",
+            "members": 1,
+            "total_lag": 30,
+            "max_lag": 17,
+            "has_offsets": true,
+            "is_test_consumer": false
+          },
+          {
+            "group_id": "KafkaConsumer-6",
+            "state": "Stable",
+            "members": 1,
+            "total_lag": 0,
+            "max_lag": 0,
+            "has_offsets": true,
+            "is_test_consumer": false
+          },
+          {
+            "group_id": "KafkaConsumer-2",
+            "state": "Stable",
+            "members": 1,
+            "total_lag": 60,
+            "max_lag": 47,
+            "has_offsets": true,
+            "is_test_consumer": false
+          }
+        ],
+        "test_data": []
+      }
+    },
+    "check_consumer_lag": {
+      "consumer_lag": {
+        "status": "success",
+        "data": [
+          {
+            "group_id": "KafkaConsumer-4",
+            "topic": "instaclustr-sla",
+            "partition": 0,
+            "current_offset": 74125,
+            "log_end_offset": 74125,
+            "lag": 0
+          },
+          {
+            "group_id": "KafkaConsumer-4",
+            "topic": "instaclustr-sla",
+            "partition": 2,
+            "current_offset": 75393,
+            "log_end_offset": 75406,
+            "lag": 13
+          },
+          {
+            "group_id": "KafkaConsumer-4",
+            "topic": "instaclustr-sla",
+            "partition": 1,
+            "current_offset": 65462,
+            "log_end_offset": 65479,
+            "lag": 17
+          },
+          {
+            "group_id": "KafkaConsumer-6",
+            "topic": "instaclustr-sla",
+            "partition": 0,
+            "current_offset": 74125,
+            "log_end_offset": 74125,
+            "lag": 0
+          },
+          {
+            "group_id": "KafkaConsumer-6",
+            "topic": "instaclustr-sla",
+            "partition": 2,
+            "current_offset": 75406,
+            "log_end_offset": 75406,
+            "lag": 0
+          },
+          {
+            "group_id": "KafkaConsumer-6",
+            "topic": "instaclustr-sla",
+            "partition": 1,
+            "current_offset": 65479,
+            "log_end_offset": 65479,
+            "lag": 0
+          },
+          {
+            "group_id": "KafkaConsumer-2",
+            "topic": "instaclustr-sla",
+            "partition": 0,
+            "current_offset": 74125,
+            "log_end_offset": 74125,
+            "lag": 0
+          },
+          {
+            "group_id": "KafkaConsumer-2",
+            "topic": "instaclustr-sla",
+            "partition": 2,
+            "current_offset": 75393,
+            "log_end_offset": 75406,
+            "lag": 13
+          },
+          {
+            "group_id": "KafkaConsumer-2",
+            "topic": "instaclustr-sla",
+            "partition": 1,
+            "current_offset": 65432,
+            "log_end_offset": 65479,
+            "lag": 47
+          }
+        ],
+        "count": 9
+      }
+    }
+  },
+  "prompt_template_name": "default_prompt.j2",
+  "execution_context": {
+    "tool_version": "2.1.0",
+    "run_by_user": "pclark",
+    "run_from_host": "fedora",
+    "ai_execution_metrics": {
+      "ai_provider": "xAI",
+      "ai_model": "grok-4",
+      "prompt_characters": 32415,
+      "prompt_estimated_tokens": 8103,
+      "processing_time_seconds": 75.21805572509766
+    }
+  }
+}

@@ -1,0 +1,578 @@
+# ============================================================================
+# Netapp Instaclustr ClickHouse Configuration - Reference Guide
+# ============================================================================
+# This file provides a comprehensive reference for all configuration options
+# when connecting to an Instaclustr managed ClickHouse cluster.
+#
+# Key Features for Instaclustr:
+#   - Native and HTTP protocol support
+#   - Instaclustr API integration (comprehensive monitoring)
+#   - No SSH required (managed service)
+#   - Multi-node support with automatic failover
+#   - Secure SSL/TLS connections
+#   - AI-powered analysis
+#   - Trend tracking and historical analysis
+# ============================================================================
+
+# ============================================================================
+# BASIC CONFIGURATION
+# ============================================================================
+
+db_type: clickhouse
+
+company_name: Instaclustr ClickHouse
+report_title: ClickHouse Health Check Report
+
+# ============================================================================
+# CLICKHOUSE CONNECTION SETTINGS
+# ============================================================================
+# Instaclustr provides multiple connection methods. Choose based on your
+# protocol preference and security requirements.
+#
+# ClickHouse supports two protocols:
+#   1. Native Protocol (port 9000/9440) - Better performance, binary protocol
+#   2. HTTP Protocol (port 8123/8443) - More compatible, easier firewall rules
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# CONNECTION METHOD 1: HTTP Protocol (RECOMMENDED)
+# ----------------------------------------------------------------------------
+# HTTP interface is easier to configure and works through most firewalls
+# Best for: Most use cases, external monitoring, initial setup
+# ----------------------------------------------------------------------------
+
+protocol: http
+secure: true
+
+hosts:
+  - "10.0.1.100.clickhouse.instaclustr.com"
+  - "10.0.1.101.clickhouse.instaclustr.com"
+  - "10.0.1.102.clickhouse.instaclustr.com"
+
+http_port: 8443  # Use 8443 for HTTPS, 8123 for HTTP
+
+# ----------------------------------------------------------------------------
+# CONNECTION METHOD 2: Native Protocol (HIGHER PERFORMANCE)
+# ----------------------------------------------------------------------------
+# Native protocol provides better performance for large data transfers
+# Best for: High-throughput monitoring, performance-sensitive applications
+#
+# To use this method, change protocol setting:
+#
+# protocol: native
+# secure: true
+# native_port: 9440  # Use 9440 for secure, 9000 for non-secure
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# CONNECTION METHOD 3: Private VPC Endpoints (RECOMMENDED FOR PRODUCTION)
+# ----------------------------------------------------------------------------
+# Connect via private IPs within your VPC (requires VPC peering)
+# Best for: Production use, lower latency, reduced data transfer costs
+# Requires: VPC peering configured between your VPC and Instaclustr VPC
+#
+# To use private IPs, replace the hosts section with:
+#
+# hosts:
+#   - "10.0.1.100"
+#   - "10.0.1.101"
+#   - "10.0.1.102"
+#
+# Advantages:
+#   - Reduced latency (direct VPC routing)
+#   - Lower costs (private IP data transfer)
+#   - Enhanced security (traffic stays in private network)
+# ----------------------------------------------------------------------------
+
+# Authentication credentials
+# Get these from Instaclustr Console > Clusters > Connection Info
+user: "icclickhouse"
+password: "your_clickhouse_password_here"
+
+# Database to connect to (optional, defaults to 'default')
+database: "default"
+
+# Connection timeout (seconds)
+connection_timeout: 10
+
+# Request timeout (seconds)
+request_timeout: 30
+
+# Client name for identification in system.processes
+client_name: "pg_healthcheck2"
+
+# Compression (recommended for better performance)
+compression: true
+
+# Connection pool size (for concurrent queries)
+pool_size: 5
+
+# ============================================================================
+# INSTACLUSTR API INTEGRATION (RECOMMENDED)
+# ============================================================================
+# Instaclustr provides comprehensive API for cluster monitoring and management.
+# This enables detailed metrics collection beyond what's available via SQL.
+#
+# To get your API credentials:
+# 1. Log in to Instaclustr Console (https://console.instaclustr.com)
+# 2. Click Account Settings (top right)
+# 3. Navigate to API Keys section
+# 4. Generate a new Provisioning API key
+# 5. Copy the API key
+#
+# Documentation:
+# https://www.instaclustr.com/support/documentation/api-documentation/
+# ============================================================================
+
+# Find your cluster ID in Instaclustr Console > Clusters > Overview
+# It's the UUID in the cluster details
+instaclustr_cluster_id: "a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7"
+
+# Enable Instaclustr API monitoring
+instaclustr_api_enabled: true
+
+# Instaclustr API base URL
+instaclustr_api_base_url: "https://api.instaclustr.com"
+
+# API credentials (from Account Settings > API Keys)
+instaclustr_api_key: "your_instaclustr_api_key"
+
+# API request timeout (seconds)
+api_timeout: 30
+
+# Available API Metrics (when enabled):
+# - Cluster Status: Node health, version, uptime
+# - Node Metrics: CPU, memory, disk usage per node
+# - Replication Status: ZooKeeper connection, replica health
+# - Query Performance: QPS, slow queries, error rates
+# - Storage Metrics: Disk space, compression ratios
+# - Network Metrics: Bandwidth, connections
+# - Service Health: Backup status, configuration drift
+# - And 50+ additional ClickHouse metrics
+
+# ============================================================================
+# INSTACLUSTR API-BASED HEALTH CHECKS
+# ============================================================================
+# When Instaclustr API is enabled, the following checks are enhanced:
+#
+# 1. Node Status (api_node_status)
+#    - Monitors node health across cluster
+#    - Detects node failures or degradation
+#    - Tracks node uptime and restarts
+#
+# 2. Resource Utilization (api_resources)
+#    - CPU usage per node
+#    - Memory consumption
+#    - Disk space utilization
+#    - Network bandwidth
+#
+# 3. Replication Health (api_replication)
+#    - ZooKeeper connection status
+#    - Replica synchronization state
+#    - Replication lag detection
+#
+# 4. Backup Status (api_backups)
+#    - Recent backup completion
+#    - Backup failures and retries
+#    - Storage utilization trends
+#
+# 5. Cluster Configuration (api_configuration)
+#    - Configuration drift detection
+#    - Version consistency
+#    - Security settings validation
+# ============================================================================
+
+# ============================================================================
+# SSH CONFIGURATION (NOT AVAILABLE FOR INSTACLUSTR)
+# ============================================================================
+# SSH is NOT available for managed Instaclustr clusters
+# System-level checks will be automatically skipped
+# Use Instaclustr API and SQL-based checks instead
+#
+# For self-managed/baremetal ClickHouse clusters with SSH access,
+# enable SSH to unlock additional OS-level health checks.
+# ============================================================================
+
+ssh_enabled: false
+
+# ----------------------------------------------------------------------------
+# SSH-BASED HEALTH CHECKS (FOR SELF-MANAGED CLUSTERS ONLY)
+# ----------------------------------------------------------------------------
+# When SSH is enabled, the following additional checks become available:
+#
+# 1. OS System Metrics (check_os_system_metrics)
+#    - CPU information (/proc/cpuinfo)
+#    - Memory usage (/proc/meminfo)
+#    - Load average
+#    - File descriptor limits and usage
+#    - Disk I/O statistics (iostat)
+#    - Key kernel parameters (sysctl)
+#
+# 2. OS Disk Usage (check_os_disk_usage)
+#    - Filesystem disk usage (df -h)
+#    - ClickHouse data directory sizes (du)
+#    - Inode usage monitoring
+#    - OS-level view to complement SQL-based disk checks
+#
+# 3. OS Log Analysis (check_os_log_analysis)
+#    - ClickHouse server log analysis
+#    - ClickHouse Keeper log analysis
+#    - Error pattern detection and frequency analysis
+#    - Recent critical/fatal message identification
+#    - Complements SQL-based system.error_log checks
+#
+# These checks provide OS-level insights similar to Instacollector's
+# node_collector.sh functionality, but integrated into the health check framework.
+# ----------------------------------------------------------------------------
+
+# Note: For self-managed ClickHouse clusters with SSH access, you would configure:
+# ssh_enabled: true
+#
+# # Multi-node SSH configuration (recommended)
+# ssh_hosts:
+#   - "10.0.1.100"
+#   - "10.0.1.101"
+#   - "10.0.1.102"
+#
+# # SSH authentication
+# ssh_user: "clickhouse"
+# ssh_key_file: "/home/user/.ssh/id_rsa"
+# # OR: ssh_password: "your_ssh_password"
+#
+# # SSH connection settings (optional)
+# ssh_timeout: 10                    # Connection timeout in seconds (default: 10)
+# ssh_port: 22                       # SSH port (default: 22)
+# ssh_command_timeout: 30            # Command execution timeout (default: 30)
+# ssh_strict_host_key_checking: false  # Skip host key verification (default: false)
+#
+# # Customize ClickHouse paths (optional)
+# clickhouse_data_paths:             # ClickHouse data directories to check
+#   - "/var/lib/clickhouse"
+#   - "/var/lib/clickhouse/data"
+#   - "/var/lib/clickhouse-keeper"
+#
+# clickhouse_server_log_paths:      # Server log files to analyze
+#   - "/var/log/clickhouse-server/clickhouse-server.log"
+#   - "/var/log/clickhouse-server/clickhouse-server.err.log"
+#
+# clickhouse_keeper_log_paths:      # Keeper log files to analyze
+#   - "/var/log/clickhouse-keeper/clickhouse-keeper.log"
+#   - "/var/log/clickhouse-keeper/clickhouse-keeper.err.log"
+#
+# clickhouse_log_lines_to_analyze: 5000  # Number of recent log lines to analyze (default: 5000)
+#
+# # SSH check thresholds (optional)
+# clickhouse_ssh_memory_warning_percent: 85   # Memory usage warning (default: 85%)
+# clickhouse_ssh_memory_critical_percent: 95  # Memory usage critical (default: 95%)
+# clickhouse_ssh_disk_warning_percent: 80     # Disk usage warning (default: 80%)
+# clickhouse_ssh_disk_critical_percent: 90    # Disk usage critical (default: 90%)
+#
+# See config/clickhouse_selfmanaged_REFERENCE.yaml for a complete SSH-enabled example.
+
+# ============================================================================
+# CLICKHOUSE SYSTEM TABLE-BASED HEALTH CHECKS (AVAILABLE ON ALL CLUSTERS)
+# ============================================================================
+# These checks work on both managed and self-managed clusters.
+# The framework includes version-aware queries for ClickHouse 25.x compatibility.
+#
+# IMPORTANT - Version Compatibility:
+# ClickHouse 25.x introduced breaking changes:
+#   - system.zookeeper_connection: 'zookeeper_path' column removed
+#   - system.processes: 'query_duration_ms' column removed (use 'elapsed')
+#   - system.query_metric_log: May not be available in managed services
+#
+# The health check framework automatically detects your ClickHouse version
+# and uses appropriate queries. All checks are compatible with:
+#   - ClickHouse 24.x (LTS)
+#   - ClickHouse 25.x (latest)
+#   - Instaclustr managed ClickHouse (all versions)
+#
+# MANAGED SERVICE LIMITATIONS (Instaclustr):
+# Some system tables may have limited visibility in managed services:
+#   - ZooKeeper/Keeper connection info may be hidden
+#   - system.query_metric_log (ProfileEvents) may not be enabled
+#   - Some configuration settings may not be accessible
+# The health check gracefully handles missing tables/columns.
+#
+# 1. Cluster Health (cluster_health_check)
+#    - Node status and connectivity
+#    - ZooKeeper/ClickHouse Keeper connection health (when available)
+#    - Replica synchronization status
+#    - Distributed DDL queue monitoring
+#
+# 2. Error Tracking (check_errors)
+#    - System errors from system.errors
+#    - Error log analysis from system.error_log
+#    - Error rate trending
+#    - Critical error detection
+#
+# 3. Backup Monitoring (check_backups)
+#    - Recent backup status from system.backups
+#    - Backup age and freshness
+#    - Backup failure detection
+#    - Data protection validation
+#
+# 4. Configuration Analysis (check_configuration)
+#    - Configuration drift detection
+#    - Security configuration review
+#    - Resource limit validation
+#    - Best practice compliance
+#
+# 5. Query Performance (check_query_performance)
+#    - Slow query identification
+#    - Query failure rate analysis
+#    - P95/P99 latency tracking
+#    - Detailed ProfileEvents bottleneck analysis:
+#      * I/O intensive queries
+#      * CPU intensive queries
+#      * Lock contention queries
+#      * Inefficient query patterns (poor filtering)
+#      * Merge intensive queries
+#
+# 6. Dictionary Health (check_dictionaries)
+#    - Dictionary load status
+#    - Failed dictionary detection
+#    - Stale dictionary monitoring
+#    - Memory consumption tracking
+#    - Reload performance analysis
+#
+# 7. Table Statistics (check_table_statistics)
+#    - Table size and row counts
+#    - Partition health
+#    - Compression ratios
+#    - Table engine analysis
+#
+# 8. Replication Status (check_replication_status)
+#    - Replica health per table
+#    - Replication queue depth
+#    - Replication lag detection
+#    - Fetch/send queue analysis
+#
+# 9. Node Metrics (check_node_metrics)
+#    - CPU and memory utilization
+#    - Disk space consumption
+#    - Network connections
+#    - Query execution stats
+# ============================================================================
+
+# ============================================================================
+# REPORT SETTINGS
+# ============================================================================
+
+# Output format: asciidoc, markdown, json
+output_format: asciidoc
+
+# Show query details in reports
+show_qry: true
+
+# Limit number of rows displayed in tables
+row_limit: 10
+
+# Include metadata in output
+include_metadata: true
+
+# ============================================================================
+# AI-POWERED ANALYSIS (OPTIONAL)
+# ============================================================================
+# Enable AI to provide intelligent recommendations, trend analysis,
+# and actionable insights based on health check findings.
+# ============================================================================
+
+# Master switch for AI analysis
+ai_analyze: true
+
+# Run AI analysis integrated with main report generation
+# If false, AI analysis runs separately after health check completes
+ai_run_integrated: true
+
+# AI Provider Configuration
+# Supported providers: xAI, anthropic, openai
+ai_provider: xAI
+ai_endpoint: https://api.x.ai/
+ai_api_key: your_xai_api_key_here
+ai_model: grok-4
+
+# Alternative providers:
+# Anthropic Claude:
+#   ai_provider: anthropic
+#   ai_endpoint: https://api.anthropic.com/
+#   ai_model: claude-3-5-sonnet-20241022
+#
+# OpenAI:
+#   ai_provider: openai
+#   ai_endpoint: https://api.openai.com/v1/
+#   ai_model: gpt-4-turbo
+
+# AI request headers (optional)
+ai_user_header: "X-User-ID"
+
+# Temperature: Controls randomness (0.0-1.0)
+# Lower = more focused and deterministic
+# Higher = more creative and varied
+ai_temperature: 0.1
+
+# Maximum tokens in AI response
+ai_max_output_tokens: 20000
+
+# Maximum tokens to send in prompt (for cost control)
+ai_max_prompt_tokens: 12000
+
+# ============================================================================
+# TREND ANALYSIS & HISTORICAL TRACKING (OPTIONAL)
+# ============================================================================
+# Ship health check findings to PostgreSQL database for trend analysis
+# and historical tracking. Enables:
+#   - Time-series analysis of metrics
+#   - Trend detection (degradation, improvements)
+#   - Historical comparison
+#   - Predictive insights
+# ============================================================================
+
+# Enable trend shipping (requires PostgreSQL database)
+# trend_shipper_enabled: true
+
+# PostgreSQL connection for trend database
+# trend_db_host: "localhost"
+# trend_db_port: 5432
+# trend_db_name: "health_trends"
+# trend_db_user: "postgres"
+# trend_db_password: "your_postgres_password"
+
+# Trend retention period (days)
+# trend_retention_days: 90
+
+# ============================================================================
+# RULE-BASED ANALYSIS (AUTOMATIC)
+# ============================================================================
+# Health checks automatically evaluate findings against JSON rule files
+# located in plugins/clickhouse/rules/
+#
+# Available rule files:
+#   - cluster_health.json (node failures, ZooKeeper issues, replicas)
+#   - errors.json (error rates, critical errors, error patterns)
+#   - backups.json (backup failures, stale backups, no backups)
+#   - configuration.json (config drift, security issues, resource limits)
+#   - query_performance.json (slow queries, bottlenecks, failure rates)
+#   - dictionaries.json (dictionary failures, stale data, memory issues)
+#   - replication_status.json (replica health, queue depth, lag)
+#
+# Rules define:
+#   - Severity levels (critical, high, medium, low)
+#   - Score impacts (for overall health score)
+#   - Reasoning templates
+#   - Actionable recommendations
+# ============================================================================
+
+# ============================================================================
+# CHECK-SPECIFIC CONFIGURATION (OPTIONAL)
+# ============================================================================
+# Override default thresholds for specific checks
+# ============================================================================
+
+# Query Performance thresholds
+# p99_latency_threshold_ms: 5000        # P99 query latency warning (ms)
+# max_query_failure_rate_percent: 5    # Query failure rate warning (%)
+
+# Backup thresholds
+# max_backup_age_hours: 24             # Maximum hours since last backup
+# backup_analysis_days: 7              # Days to analyze for backup trends
+
+# Dictionary thresholds
+# max_dictionary_reload_seconds: 300   # Maximum reload time before warning
+# max_dictionary_stale_hours: 24       # Hours before dictionary is stale
+# large_dictionary_mb: 100             # MB threshold for large dictionary
+
+# Configuration thresholds
+# config_drift_warning_threshold: 50   # Changed settings warning
+# config_drift_critical_threshold: 100 # Changed settings critical
+
+# Disk usage thresholds (per node)
+# disk_usage_warning_percent: 70       # Disk usage warning (%)
+# disk_usage_critical_percent: 85      # Disk usage critical (%)
+
+# Memory usage thresholds (per node)
+# memory_usage_warning_percent: 80     # Memory usage warning (%)
+# memory_usage_critical_percent: 90    # Memory usage critical (%)
+
+# ============================================================================
+# EXAMPLE: CLUSTER DISCOVERED INFORMATION
+# ============================================================================
+# This information is discovered automatically when you connect:
+#
+# Cluster Name: Instaclustr ClickHouse Production
+# Version: 25.3.6 (or 24.3.x LTS)
+# Nodes: 3
+# Environment: managed (Instaclustr)
+# Contact Points:
+#   - 10.0.1.100.clickhouse.instaclustr.com:8443
+#   - 10.0.1.101.clickhouse.instaclustr.com:8443
+#   - 10.0.1.102.clickhouse.instaclustr.com:8443
+#
+# Available Health Checks:
+#   SQL-Based: 9 checks (work on all clusters, version-aware)
+#   API-Based: 5 checks (managed clusters only)
+#   SSH-Based: 0 checks (requires SSH - not available)
+#
+# Monitoring Capabilities:
+#   - System tables: 50+ tables available
+#   - Version detection: Automatic (24.x, 25.x compatibility)
+#   - Instaclustr API: Cluster-wide metrics
+#   - Service discovery: Automatic node discovery
+#   - Per-node metrics: Individual node monitoring
+#   - ProfileEvents: Detailed query execution metrics (if enabled)
+#   - Trend analysis: Historical tracking support
+#
+# Version Compatibility:
+#   - ClickHouse 24.x LTS: Full support
+#   - ClickHouse 25.x: Full support (version-aware queries)
+#   - Older versions: May have limited feature support
+# ============================================================================
+
+# ============================================================================
+# TROUBLESHOOTING
+# ============================================================================
+#
+# Connection Issues:
+#   HTTP Protocol:
+#     - Verify firewall allows your IP on port 8443 (HTTPS) or 8123 (HTTP)
+#     - Check credentials in Instaclustr Console
+#     - Verify SSL/TLS certificate if using secure: true
+#     - Test with: curl -k https://host:8443/ping
+#
+#   Native Protocol:
+#     - Verify firewall allows your IP on port 9440 (secure) or 9000
+#     - Native protocol may be blocked by some firewalls
+#     - Consider using HTTP protocol if native fails
+#
+#   Private IPs:
+#     - Ensure VPC peering is configured
+#     - Verify security groups allow traffic
+#     - Test connectivity: ping 10.0.1.100
+#
+# Instaclustr API Issues:
+#   - 401 Unauthorized: Check API key in Account Settings
+#   - 403 Forbidden: Verify API key has correct permissions
+#   - 404 Not Found: Verify cluster ID is correct
+#   - 429 Rate Limit: Reduce check frequency
+#
+# Query Performance:
+#   - Enable system.query_metric_log for detailed ProfileEvents analysis
+#   - Set log_query_threads=1 in server configuration
+#   - Use EXPLAIN to understand query execution plans
+#
+# Dictionary Issues:
+#   - Check system.dictionaries for load status
+#   - Test reload: SYSTEM RELOAD DICTIONARY <name>
+#   - Verify source connectivity for external dictionaries
+#
+# AI Analysis Issues:
+#   - Verify AI provider API key is valid
+#   - Check endpoint URL matches provider
+#   - Ensure token limits are appropriate for model
+#
+# For additional help:
+#   - Instaclustr Support: https://support.instaclustr.com
+#   - ClickHouse Documentation: https://clickhouse.com/docs
+#   - Instaclustr ClickHouse Guide: https://www.instaclustr.com/support/documentation/clickhouse/
+#   - Plugin README: plugins/clickhouse/README.adoc
+# ============================================================================

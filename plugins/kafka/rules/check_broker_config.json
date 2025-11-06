@@ -1,0 +1,163 @@
+{
+  "critical_config_issues": {
+    "metric_keywords": ["broker_config", "kafka"],
+    "rules": [
+      {
+        "expression": "any(issue.get('severity') == 'critical' and issue.get('setting') == 'unclean.leader.election.enable' for issue in data.get('issues', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has unclean leader election ENABLED. This CAN CAUSE DATA LOSS when a broker fails.",
+        "recommendations": [
+          "IMMEDIATE: Set 'unclean.leader.election.enable=false' to prevent data loss",
+          "Unclean leader election allows out-of-sync replicas to become leaders",
+          "This setting trades availability for durability - NEVER use in production",
+          "Review documentation on leader election and ISR before changing",
+          "Plan configuration change during maintenance window"
+        ]
+      },
+      {
+        "expression": "any(issue.get('severity') == 'critical' and 'min.insync.replicas' in issue.get('setting', '') for issue in data.get('issues', []))",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} has critical min.insync.replicas configuration. Setting >= replication.factor will BLOCK ALL WRITES.",
+        "recommendations": [
+          "IMMEDIATE: Fix min.insync.replicas configuration",
+          "min.insync.replicas must be < replication.factor",
+          "Common safe setting: min.insync.replicas = replication.factor - 1",
+          "This misconfiguration will cause producer failures",
+          "Test configuration in non-production environment first"
+        ]
+      }
+    ]
+  },
+  "config_warnings": {
+    "metric_keywords": ["broker_config"],
+    "rules": [
+      {
+        "expression": "any(issue.get('severity') == 'warning' and 'auto.create.topics' in issue.get('setting', '') for issue in data.get('issues', []))",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has auto topic creation enabled. This can lead to accidental topic creation from typos.",
+        "recommendations": [
+          "Disable auto.create.topics.enable for production environments",
+          "Use explicit topic creation with proper configurations",
+          "Prevents accidental topics with default (often incorrect) settings",
+          "Improves governance and control over topic management"
+        ]
+      },
+      {
+        "expression": "any(issue.get('severity') == 'warning' and 'replication.factor' in issue.get('setting', '') for issue in data.get('issues', []))",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has low default replication factor. This reduces fault tolerance.",
+        "recommendations": [
+          "Set default.replication.factor to at least 3 for production",
+          "Higher replication provides better fault tolerance",
+          "Review existing topics and increase replication where needed",
+          "Consider cluster size when setting replication factor"
+        ]
+      }
+    ]
+  },
+  "config_optimization": {
+    "metric_keywords": ["broker_config"],
+    "rules": [
+      {
+        "expression": "any(issue.get('severity') == 'info' and 'thread' in issue.get('setting', '') for issue in data.get('issues', []))",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} may have suboptimal thread pool settings.",
+        "recommendations": [
+          "Review num.network.threads and num.io.threads for your workload",
+          "Network threads typically 3-8, I/O threads typically 8-16",
+          "Tune based on actual throughput and CPU usage patterns",
+          "Test changes under load before deploying to production"
+        ]
+      },
+      {
+        "expression": "any(issue.get('severity') == 'info' and 'compression' in issue.get('setting', '') for issue in data.get('issues', []))",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Broker {data.get('broker_id')} may benefit from compression configuration review.",
+        "recommendations": [
+          "Consider enabling compression (lz4, snappy, gzip, zstd)",
+          "Compression reduces disk and network usage at CPU cost",
+          "lz4 and snappy offer good balance of speed and compression",
+          "Test compression impact on your specific workload"
+        ]
+      },
+      {
+        "expression": "any(issue.get('severity') == 'info' and 'segment' in issue.get('setting', '') for issue in data.get('issues', []))",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Broker {data.get('broker_id')} has small log segments which may cause excessive file handles.",
+        "recommendations": [
+          "Consider increasing log.segment.bytes to 512MB-1GB",
+          "Larger segments reduce file handle usage",
+          "Balance against retention and compaction requirements",
+          "Monitor file descriptor usage after changes"
+        ]
+      }
+    ]
+  },
+  "broker_config_health": {
+    "metric_keywords": ["broker_config"],
+    "data_conditions": [
+      {"key": "broker_id", "exists": true},
+      {"key": "critical_count", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('critical_count', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} has {data.get('critical_count')} critical configuration issue(s) that require immediate attention",
+        "recommendations": [
+          "Review and fix critical configuration issues immediately",
+          "Critical config issues can cause data loss or service outages",
+          "Test all configuration changes in staging first"
+        ]
+      },
+      {
+        "expression": "data.get('warning_count', 0) > 0",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has {data.get('warning_count')} configuration warning(s)",
+        "recommendations": [
+          "Review configuration warnings for best practices",
+          "Plan remediation within next maintenance window",
+          "Document configuration decisions and rationale"
+        ]
+      },
+      {
+        "expression": "data.get('info_count', 0) >= 3",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} has {data.get('info_count')} configuration optimization opportunities",
+        "recommendations": [
+          "Review info-level suggestions for performance tuning",
+          "Consider optimizations during next major upgrade",
+          "Benchmark before and after configuration changes"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_config_issues": {
+    "metric_keywords": ["broker_config"],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_broker_config', {}).get('broker_config', {}).get('warning_brokers', [])) >= 2",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_broker_config', {}).get('broker_config', {}).get('warning_brokers', []))}) have configuration issues. Cluster-wide configuration review needed.",
+        "recommendations": [
+          "Perform cluster-wide configuration audit",
+          "Standardize configurations across all brokers",
+          "Use configuration management tools (Ansible, Chef, Puppet)",
+          "Establish configuration baselines and version control",
+          "Plan coordinated configuration updates"
+        ]
+      }
+    ]
+  }
+}

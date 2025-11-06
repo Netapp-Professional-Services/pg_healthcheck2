@@ -1,0 +1,62 @@
+{
+  "critical_disk_space": {
+    "metric_keywords": ["disk_usage", "data"],
+    "data_conditions": [{"key": "disk_name", "exists": true}, {"key": "used_percent", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('used_percent', 0) >= 95",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Disk {data.get('disk_name')} is critically full at {data.get('used_percent'):.1f}% ({data.get('free_gb'):.2f} GB free).",
+        "recommendations": [
+          "URGENT: Free up disk space immediately",
+          "Drop old partitions or run OPTIMIZE TABLE FINAL to reclaim space",
+          "Delete temporary files and old logs",
+          "Add storage capacity or expand to new disks",
+          "Check keep_free_space settings"
+        ]
+      },
+      {
+        "expression": "data.get('used_percent', 0) >= 90",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Disk {data.get('disk_name')} is running low on space at {data.get('used_percent'):.1f}%.",
+        "recommendations": [
+          "Plan to free up disk space soon",
+          "Review data retention policies",
+          "Implement TTL for automatic data cleanup",
+          "Monitor disk usage trends for capacity planning"
+        ]
+      },
+      {
+        "expression": "data.get('used_percent', 0) >= 80",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Disk {data.get('disk_name')} usage is at {data.get('used_percent'):.1f}%.",
+        "recommendations": [
+          "Monitor disk usage trends",
+          "Plan for capacity expansion",
+          "Review and implement data lifecycle policies"
+        ]
+      }
+    ]
+  },
+  "disk_space_growth_warning": {
+    "metric_keywords": ["disk_usage", "data"],
+    "data_conditions": [{"key": "total_used_gb", "exists": true}, {"key": "total_capacity_gb", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_used_gb', 0) / data.get('total_capacity_gb', 1) * 100 >= 85",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Overall cluster storage is at {(data.get('total_used_gb', 0) / data.get('total_capacity_gb', 1) * 100):.1f}%.",
+        "recommendations": [
+          "Review data retention across all databases",
+          "Implement automated cleanup policies",
+          "Plan for storage expansion",
+          "Consider tiered storage (hot/warm/cold)"
+        ]
+      }
+    ]
+  }
+}

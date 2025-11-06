@@ -1,0 +1,307 @@
+{
+  "high_query_failure_rate": {
+    "metric_keywords": ["query_performance", "metadata"],
+    "data_conditions": [
+      {"key": "total_queries", "exists": true},
+      {"key": "failed_queries", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_queries', 0) > 0 and (data.get('failed_queries', 0) / data.get('total_queries', 1)) > 0.10",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Query failure rate is {(data.get('failed_queries', 0) / data.get('total_queries', 1)) * 100:.1f}% ({data.get('failed_queries')} of {data.get('total_queries')} queries failed). Query reliability is severely impacted.",
+        "recommendations": [
+          "Immediate investigation required - high query failure rate indicates systemic issue",
+          "Review error patterns in system.query_log for common failure causes",
+          "Check for resource exhaustion (memory, disk space, connections)",
+          "Verify network connectivity and cluster health",
+          "Review recent configuration or schema changes",
+          "Monitor error_log for detailed failure diagnostics"
+        ]
+      },
+      {
+        "expression": "data.get('total_queries', 0) > 0 and (data.get('failed_queries', 0) / data.get('total_queries', 1)) > 0.05",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Query failure rate is {(data.get('failed_queries', 0) / data.get('total_queries', 1)) * 100:.1f}% ({data.get('failed_queries')} of {data.get('total_queries')} queries failed). Elevated failure rate requires attention.",
+        "recommendations": [
+          "Investigate query failure patterns to identify common issues",
+          "Review failed queries for syntax errors or invalid parameters",
+          "Check resource limits and quotas",
+          "Monitor for intermittent connectivity issues"
+        ]
+      }
+    ]
+  },
+
+  "slow_p99_latency": {
+    "metric_keywords": ["query_performance", "metadata"],
+    "data_conditions": [{"key": "p99_duration_ms", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('p99_duration_ms', 0) > 30000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "P99 query latency is {data.get('p99_duration_ms') / 1000:.1f} seconds. Performance is critically degraded.",
+        "recommendations": [
+          "Critical performance degradation - P99 latency exceeds 30 seconds",
+          "Identify and optimize slowest queries immediately",
+          "Review query execution plans with EXPLAIN",
+          "Check for missing or ineffective indices",
+          "Verify cluster resources (CPU, memory, disk I/O) are not saturated",
+          "Consider query result caching for repeated queries"
+        ]
+      },
+      {
+        "expression": "data.get('p99_duration_ms', 0) > 10000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "P99 query latency is {data.get('p99_duration_ms') / 1000:.1f} seconds. Query performance is degraded.",
+        "recommendations": [
+          "P99 latency exceeds 10 seconds - query optimization needed",
+          "Analyze slow queries using system.query_log",
+          "Review table partitioning and data distribution",
+          "Consider materialized views for complex aggregations",
+          "Optimize JOIN operations and WHERE clause filtering"
+        ]
+      },
+      {
+        "expression": "data.get('p99_duration_ms', 0) > 5000",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "P99 query latency is {data.get('p99_duration_ms') / 1000:.1f} seconds. Performance could be improved.",
+        "recommendations": [
+          "P99 latency exceeds 5 seconds - optimization opportunities exist",
+          "Review query patterns for improvement potential",
+          "Consider adding indices for frequently filtered columns",
+          "Test query performance with realistic data volumes"
+        ]
+      }
+    ]
+  },
+
+  "io_intensive_queries_detected": {
+    "metric_keywords": ["query_io_intensive", "metadata"],
+    "data_conditions": [{"key": "count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 10",
+        "level": "high",
+        "score": 8,
+        "reasoning": "{data.get('count')} I/O intensive queries detected. Excessive disk operations are impacting performance.",
+        "recommendations": [
+          "Multiple queries performing excessive disk I/O operations",
+          "Add missing indices to reduce full table scans",
+          "Optimize WHERE clause filtering to minimize data read",
+          "Review table engine choice - ensure using appropriate MergeTree variant",
+          "Verify partition pruning is working (queries should use partition key)",
+          "Consider SSD storage for I/O-bound workloads",
+          "Use PREWHERE for early filtering on large tables"
+        ]
+      },
+      {
+        "expression": "data.get('count', 0) > 5",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "{data.get('count')} I/O intensive queries detected. Disk operations may be limiting performance.",
+        "recommendations": [
+          "Several queries showing high I/O activity",
+          "Review query execution plans for full table scans",
+          "Optimize data filtering and indexing strategy",
+          "Monitor disk I/O metrics for bottlenecks"
+        ]
+      }
+    ]
+  },
+
+  "cpu_intensive_queries_detected": {
+    "metric_keywords": ["query_cpu_intensive", "metadata"],
+    "data_conditions": [{"key": "count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 10",
+        "level": "high",
+        "score": 8,
+        "reasoning": "{data.get('count')} CPU intensive queries detected. Computational load is high.",
+        "recommendations": [
+          "Multiple queries consuming excessive CPU resources",
+          "Optimize complex aggregations and GROUP BY operations",
+          "Use materialized views for frequently-computed aggregations",
+          "Pre-compute expensive calculations where possible",
+          "Simplify JOIN complexity - review query logic",
+          "Consider projections to accelerate aggregation queries",
+          "Review max_threads setting for parallel query execution"
+        ]
+      },
+      {
+        "expression": "data.get('count', 0) > 5",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "{data.get('count')} CPU intensive queries detected. Computational optimization needed.",
+        "recommendations": [
+          "Several queries showing high CPU utilization",
+          "Review aggregation and calculation efficiency",
+          "Consider caching computed results",
+          "Optimize algorithmic complexity where possible"
+        ]
+      }
+    ]
+  },
+
+  "lock_contention_detected": {
+    "metric_keywords": ["query_lock_contention", "metadata"],
+    "data_conditions": [{"key": "count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 10",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "{data.get('count')} queries experiencing lock contention. Concurrency is severely impacted.",
+        "recommendations": [
+          "Critical: Multiple queries experiencing high lock contention",
+          "Batch UPDATE/DELETE operations to reduce lock duration",
+          "Review concurrent write patterns to same tables",
+          "Consider using ReplacingMergeTree for UPDATE-heavy workloads",
+          "Optimize queries to hold locks for shorter duration",
+          "Review max_concurrent_queries setting",
+          "Separate read and write workloads if possible"
+        ]
+      },
+      {
+        "expression": "data.get('count', 0) > 5",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('count')} queries experiencing lock contention. Concurrency issues detected.",
+        "recommendations": [
+          "Lock contention affecting multiple queries",
+          "Review locking patterns and optimize concurrent access",
+          "Consider table engine changes for better concurrency",
+          "Monitor lock wait times and adjust workload patterns"
+        ]
+      }
+    ]
+  },
+
+  "inefficient_queries_detected": {
+    "metric_keywords": ["query_inefficient_queries", "metadata"],
+    "data_conditions": [{"key": "count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 5",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('count')} inefficient queries detected with poor filtering ratios (scanning 1000x+ more data than returned). Query efficiency is critically poor.",
+        "recommendations": [
+          "CRITICAL: Queries scanning 1000x more data than returned",
+          "Add WHERE clause filters immediately to reduce data scanned",
+          "Create secondary indices on frequently-filtered columns",
+          "Use PREWHERE for early filtering on large tables",
+          "Implement data skipping indices for better pruning",
+          "Review query patterns - may require schema redesign",
+          "Consider partitioning strategy to improve data filtering",
+          "Educate developers on efficient query patterns"
+        ]
+      },
+      {
+        "expression": "data.get('count', 0) > 2",
+        "level": "high",
+        "score": 8,
+        "reasoning": "{data.get('count')} inefficient queries detected with poor filtering ratios. Query optimization needed.",
+        "recommendations": [
+          "Multiple queries showing poor filtering efficiency",
+          "Improve WHERE clause selectivity",
+          "Add appropriate indices for data filtering",
+          "Review query design for optimization opportunities"
+        ]
+      }
+    ]
+  },
+
+  "merge_intensive_queries_detected": {
+    "metric_keywords": ["query_merge_intensive", "metadata"],
+    "data_conditions": [{"key": "count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 10",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('count')} queries triggering excessive merge operations. Merge overhead is high.",
+        "recommendations": [
+          "Multiple queries triggering excessive merge operations",
+          "Batch INSERT operations to reduce merge overhead",
+          "Review background_pool_size setting for merge capacity",
+          "Adjust merge settings: max_bytes_to_merge_at_max_space_in_pool",
+          "Consider async_insert=1 for high-frequency small inserts",
+          "Review partition strategy - too many partitions increase merges",
+          "Monitor merge queue size in system.merges"
+        ]
+      },
+      {
+        "expression": "data.get('count', 0) > 5",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "{data.get('count')} queries triggering merge operations. Merge activity is elevated.",
+        "recommendations": [
+          "Several queries causing merge activity",
+          "Review INSERT patterns for batching opportunities",
+          "Monitor background merge capacity",
+          "Consider adjusting merge settings for workload"
+        ]
+      }
+    ]
+  },
+
+  "high_slow_query_count": {
+    "metric_keywords": ["query_performance", "metadata"],
+    "data_conditions": [{"key": "slow_queries_count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('slow_queries_count', 0) > 50",
+        "level": "high",
+        "score": 8,
+        "reasoning": "{data.get('slow_queries_count')} slow queries (>10 seconds) detected in last hour. Widespread performance issues.",
+        "recommendations": [
+          "High volume of slow queries indicates systemic performance issue",
+          "Review cluster resource utilization (CPU, memory, disk I/O)",
+          "Identify common patterns in slow queries for targeted optimization",
+          "Check for recent configuration changes or data volume growth",
+          "Use EXPLAIN to analyze execution plans for slow queries",
+          "Consider scaling cluster if resource-constrained"
+        ]
+      },
+      {
+        "expression": "data.get('slow_queries_count', 0) > 20",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "{data.get('slow_queries_count')} slow queries (>10 seconds) detected in last hour. Performance optimization needed.",
+        "recommendations": [
+          "Elevated number of slow queries",
+          "Prioritize optimization of most frequently slow queries",
+          "Review indexing strategy and table structures",
+          "Monitor query patterns for regression"
+        ]
+      }
+    ]
+  },
+
+  "no_queries_executed": {
+    "metric_keywords": ["query_performance", "metadata"],
+    "data_conditions": [{"key": "total_queries", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_queries', 0) == 0",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "No queries executed in monitoring period. Either cluster is idle or query logging may not be working.",
+        "recommendations": [
+          "No query activity detected in monitoring window",
+          "Verify query_log is enabled and functioning",
+          "Check if cluster is receiving workload",
+          "Review query_log retention settings",
+          "Ensure monitoring period captures active workload times"
+        ]
+      }
+    ]
+  }
+}

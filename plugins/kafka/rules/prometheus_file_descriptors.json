@@ -1,0 +1,30 @@
+{
+  "critical_fd_exhaustion": {
+    "metric_keywords": ["prometheus_file_descriptors", "per_broker_fd", "data"],
+    "data_conditions": [{"key": "fd_usage_pct", "exists": true}],
+    "rules": [{
+      "expression": "data.get('fd_usage_pct', 0) >= 85",
+      "level": "critical",
+      "score": 10,
+      "reasoning": "🚨 Broker {data.get('node_id', 'unknown')[:8]} near FD exhaustion: {data.get('fd_usage_pct')}% ({data.get('fd_open')}/{data.get('fd_limit')} FDs)",
+      "recommendations": [
+        "URGENT: Broker will crash when FD limit reached",
+        "Increase ulimit immediately: ulimit -n 100000",
+        "Make permanent: /etc/security/limits.conf",
+        "Monitor FD growth rate",
+        "Consider reducing partitions or connections"
+      ]
+    }]
+  },
+  "warning_fd_high": {
+    "metric_keywords": ["prometheus_file_descriptors", "per_broker_fd", "data"],
+    "data_conditions": [{"key": "fd_usage_pct", "exists": true}],
+    "rules": [{
+      "expression": "data.get('fd_usage_pct', 0) >= 70 and data.get('fd_usage_pct', 0) < 85",
+      "level": "high",
+      "score": 8,
+      "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} high FD usage: {data.get('fd_usage_pct')}%",
+      "recommendations": ["Plan to increase ulimit", "Monitor FD trends", "Review partition/connection counts"]
+    }]
+  }
+}

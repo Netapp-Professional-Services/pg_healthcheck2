@@ -1,0 +1,18 @@
+{
+  "critical_failed_fetchers": {
+    "metric_keywords": ["prometheus_replica_fetcher", "per_broker_fetcher", "data"],
+    "data_conditions": [{"key": "failed_partitions", "exists": true}],
+    "rules": [{
+      "expression": "data.get('failed_partitions', 0) > 10",
+      "level": "critical",
+      "score": 9,
+      "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} has {data.get('failed_partitions')} failed replica fetcher partitions",
+      "recommendations": [
+        "Check replication health",
+        "Review broker logs for fetcher errors",
+        "Verify network connectivity",
+        "Check for stuck replicas"
+      ]
+    }]
+  }
+}
