@@ -1,0 +1,76 @@
+{
+  "critical_memory_usage": {
+    "metric_keywords": ["node_metrics", "data"],
+    "data_conditions": [{"key": "memory_percent", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('memory_percent', 0) >= 90",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Memory usage is critically high at {data.get('memory_percent'):.1f}%. Risk of OOM killer.",
+        "recommendations": [
+          "Immediate: Add more RAM or reduce query load",
+          "Kill memory-intensive queries if needed",
+          "Review max_memory_usage settings",
+          "Check for memory leaks in queries"
+        ]
+      },
+      {
+        "expression": "data.get('memory_percent', 0) >= 80",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Memory usage is high at {data.get('memory_percent'):.1f}%.",
+        "recommendations": [
+          "Monitor memory trends closely",
+          "Consider increasing server RAM",
+          "Review query memory consumption patterns"
+        ]
+      }
+    ]
+  },
+  "high_system_load": {
+    "metric_keywords": ["node_metrics", "data"],
+    "data_conditions": [{"key": "load_average_1m", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('load_average_1m', 0) > 20",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "System load is critically high at {data.get('load_average_1m'):.2f}.",
+        "recommendations": [
+          "Reduce query load immediately",
+          "Check for runaway queries or merges",
+          "Consider horizontal scaling"
+        ]
+      },
+      {
+        "expression": "data.get('load_average_1m', 0) > 10",
+        "level": "high",
+        "score": 6,
+        "reasoning": "System load is elevated at {data.get('load_average_1m'):.2f}.",
+        "recommendations": [
+          "Monitor system load trends",
+          "Review CPU-intensive operations",
+          "Consider query optimization"
+        ]
+      }
+    ]
+  },
+  "active_queries_high": {
+    "metric_keywords": ["node_metrics", "data"],
+    "data_conditions": [{"key": "active_queries", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('active_queries', 0) > 100",
+        "level": "high",
+        "score": 6,
+        "reasoning": "{data.get('active_queries')} queries currently running - system may be overloaded.",
+        "recommendations": [
+          "Review query patterns for optimization opportunities",
+          "Consider implementing query queuing",
+          "Check if queries are accumulating due to slowness"
+        ]
+      }
+    ]
+  }
+}

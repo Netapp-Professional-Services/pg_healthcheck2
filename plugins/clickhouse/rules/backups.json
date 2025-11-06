@@ -1,0 +1,225 @@
+{
+  "backup_failed": {
+    "metric_keywords": ["failed_backups", "data"],
+    "data_conditions": [{"key": "status", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('status', '') in ['BACKUP_FAILED', 'BACKUP_CANCELLED']",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Backup '{data.get('name')}' failed with status: {data.get('status')}. Error: {data.get('error', 'No error message')}",
+        "recommendations": [
+          "Investigate backup failure immediately - data protection is compromised",
+          "Review backup error message for specific failure cause",
+          "Check backup destination accessibility and permissions",
+          "Verify disk space on backup destination",
+          "Review ClickHouse server logs for additional context",
+          "Test backup command manually to reproduce and diagnose issue"
+        ]
+      }
+    ]
+  },
+  "backup_age_critical": {
+    "metric_keywords": ["backup_summary", "metadata"],
+    "data_conditions": [{"key": "hours_since_last_backup", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('hours_since_last_backup', 0) > 48",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Last successful backup was {data.get('hours_since_last_backup')} hours ago ({data.get('days_since_last_backup')} days). Data protection is critically compromised.",
+        "recommendations": [
+          "Run backup immediately - data is at risk",
+          "Verify backup schedule is configured and active",
+          "Check if backup automation (cron, systemd timer) is running",
+          "Investigate why scheduled backups are not executing",
+          "Review backup process logs for failures or stuck operations",
+          "Ensure backup infrastructure is operational"
+        ]
+      },
+      {
+        "expression": "data.get('hours_since_last_backup', 0) > 24",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Last successful backup was {data.get('hours_since_last_backup')} hours ago. Backup schedule may be disrupted.",
+        "recommendations": [
+          "Verify backup schedule is running as expected",
+          "Check backup logs for recent failures",
+          "Ensure backup automation is active and not disabled",
+          "Run manual backup to verify functionality",
+          "Monitor backup schedule for consistent execution"
+        ]
+      }
+    ]
+  },
+  "no_backups_found": {
+    "metric_keywords": ["backup_summary", "metadata"],
+    "data_conditions": [{"key": "total_backups", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_backups', 0) == 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "No backups found in the monitoring period. Data protection is not configured.",
+        "recommendations": [
+          "Configure backup strategy immediately - no data protection exists",
+          "Set up regular backup schedule using ClickHouse BACKUP command",
+          "Choose appropriate backup destination (S3, disk, etc.)",
+          "Implement automated backup scheduling (cron, systemd timer)",
+          "Test backup and restore procedures",
+          "Document backup procedures and schedule"
+        ]
+      }
+    ]
+  },
+  "high_failure_rate": {
+    "metric_keywords": ["backup_summary", "metadata"],
+    "data_conditions": [
+      {"key": "total_backups", "exists": true},
+      {"key": "failed_backups", "exists": true},
+      {"key": "successful_backups", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_backups', 0) > 0 and (data.get('failed_backups', 0) / data.get('total_backups', 1)) > 0.5",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Backup failure rate is {(data.get('failed_backups', 0) / data.get('total_backups', 1)) * 100:.1f}% ({data.get('failed_backups')} of {data.get('total_backups')} backups failed). Backup reliability is severely compromised.",
+        "recommendations": [
+          "Immediate investigation required - backup system is unreliable",
+          "Review all backup failures for common root causes",
+          "Verify backup infrastructure stability",
+          "Check backup destination capacity and accessibility",
+          "Review backup configuration for errors",
+          "Consider alternative backup strategy if current approach is failing"
+        ]
+      },
+      {
+        "expression": "data.get('total_backups', 0) > 0 and (data.get('failed_backups', 0) / data.get('total_backups', 1)) > 0.25",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Backup failure rate is {(data.get('failed_backups', 0) / data.get('total_backups', 1)) * 100:.1f}% ({data.get('failed_backups')} of {data.get('total_backups')} backups failed). Backup reliability needs improvement.",
+        "recommendations": [
+          "Investigate backup failures to improve reliability",
+          "Review backup error patterns for systemic issues",
+          "Monitor backup destination health and capacity",
+          "Verify network connectivity for remote backups",
+          "Consider increasing backup timeout settings if needed"
+        ]
+      }
+    ]
+  },
+  "backup_size_anomaly": {
+    "metric_keywords": ["backup_summary", "data"],
+    "data_conditions": [{"key": "total_size", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_size', 0) == 0 and data.get('status', '') == 'BACKUP_COMPLETE'",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Backup '{data.get('name')}' completed with zero size. This may indicate an empty backup or configuration issue.",
+        "recommendations": [
+          "Verify backup captured actual data",
+          "Check backup scope configuration (databases, tables included)",
+          "Review backup command for correct table/database selection",
+          "Validate backup is not empty by attempting restore to test environment",
+          "Check if source data exists and is accessible"
+        ]
+      }
+    ]
+  },
+  "backup_duration_long": {
+    "metric_keywords": ["backup_summary", "data"],
+    "data_conditions": [{"key": "duration_seconds", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('duration_seconds', 0) > 7200",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Backup '{data.get('name')}' took {data.get('duration_seconds') / 3600:.1f} hours to complete. Long backup duration may impact operations.",
+        "recommendations": [
+          "Review backup performance - long duration may indicate issues",
+          "Consider incremental backups to reduce backup time",
+          "Check network bandwidth for remote backup destinations",
+          "Verify backup destination performance (disk I/O, network)",
+          "Review data volume growth and adjust backup strategy",
+          "Consider backup compression settings for better performance"
+        ]
+      }
+    ]
+  },
+  "recent_backup_failure": {
+    "metric_keywords": ["backup_summary", "data"],
+    "data_conditions": [
+      {"key": "status", "exists": true},
+      {"key": "start_time", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('status', '') in ['BACKUP_FAILED', 'BACKUP_CANCELLED'] and (datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(data.get('start_time', '2000-01-01T00:00:00+00:00'))).total_seconds() < 3600",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Recent backup '{data.get('name')}' failed within the last hour. Immediate attention required.",
+        "recommendations": [
+          "Investigate recent backup failure immediately",
+          "Check backup logs for failure details",
+          "Verify backup infrastructure is operational",
+          "Run manual backup to test system",
+          "Review recent changes that may have affected backup"
+        ]
+      }
+    ]
+  },
+  "multiple_failed_backups": {
+    "metric_keywords": ["backup_summary", "metadata"],
+    "data_conditions": [{"key": "failed_backups", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('failed_backups', 0) > 5",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "{data.get('failed_backups')} backups have failed in the monitoring period. Backup system requires immediate attention.",
+        "recommendations": [
+          "Multiple backup failures detected - systemic issue likely",
+          "Review all failure error messages for common patterns",
+          "Check backup infrastructure health (storage, network, credentials)",
+          "Verify backup destination has sufficient capacity",
+          "Review ClickHouse server health and resource availability",
+          "Consider temporary increase in backup monitoring frequency"
+        ]
+      },
+      {
+        "expression": "data.get('failed_backups', 0) > 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('failed_backups')} backups have failed in the monitoring period. Investigation needed.",
+        "recommendations": [
+          "Multiple backup failures indicate potential issue",
+          "Review failure patterns for root cause",
+          "Check backup destination accessibility and capacity",
+          "Verify backup configuration is correct",
+          "Monitor backup operations more closely"
+        ]
+      }
+    ]
+  },
+  "backup_missing_metadata": {
+    "metric_keywords": ["backup_summary", "data"],
+    "data_conditions": [{"key": "status", "value": "BACKUP_COMPLETE"}],
+    "rules": [
+      {
+        "expression": "data.get('num_files', 0) == 0 and data.get('status', '') == 'BACKUP_COMPLETE'",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Backup '{data.get('name')}' completed but contains zero files. This may indicate an incomplete or invalid backup.",
+        "recommendations": [
+          "Verify backup integrity - zero files may indicate problem",
+          "Test restore from this backup to validate usability",
+          "Review backup command and scope configuration",
+          "Check if backup captured intended data",
+          "Investigate backup process for configuration errors"
+        ]
+      }
+    ]
+  }
+}

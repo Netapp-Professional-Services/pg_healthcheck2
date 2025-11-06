@@ -1,0 +1,262 @@
+{
+  "critical_gc_pauses": {
+    "metric_keywords": ["gc_pauses", "kafka", "jvm"],
+    "rules": [
+      {
+        "expression": "data.get('max_pause_ms', 0) >= 5000",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has EXTREME GC pause: {data.get('max_pause_ms'):.1f}ms (max). GC pauses >5s cause severe application stalls and timeouts.",
+        "recommendations": [
+          "IMMEDIATE: This indicates severe heap pressure or memory leak",
+          "Review heap dump immediately: jmap -dump:live,format=b,file=/tmp/heap.bin <pid>",
+          "Analyze with jhat or Eclipse MAT to find memory leak",
+          "Check for runaway object creation or retained references",
+          "Consider emergency heap increase if running out of memory",
+          "This level of pause will cause message timeouts and rebalancing"
+        ]
+      },
+      {
+        "expression": "data.get('max_pause_ms', 0) >= 2000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} has very long GC pause: {data.get('max_pause_ms'):.1f}ms (max), {data.get('avg_pause_ms'):.1f}ms (avg). GC pauses >2s cause serious processing delays.",
+        "recommendations": [
+          "URGENT: Investigate heap pressure immediately",
+          "Long GC pauses indicate heap exhaustion approaching",
+          "Analyze heap usage patterns and allocation rate",
+          "Check for memory leaks in producer/consumer clients",
+          "Review JVM memory settings: -Xms and -Xmx",
+          "Consider increasing heap size if consistently high usage"
+        ]
+      },
+      {
+        "expression": "data.get('max_pause_ms', 0) >= 1000",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical GC pause: {data.get('max_pause_ms'):.1f}ms (max). Pauses >1s can trigger timeouts and impact SLAs.",
+        "recommendations": [
+          "Review heap size settings: GC pauses >1s indicate heap pressure",
+          "Analyze heap dumps: Use jmap/jhat to identify memory usage patterns",
+          "Tune GC settings: Consider G1GC with appropriate pause time goals",
+          "Check for memory leaks: Review producer/consumer client behaviors",
+          "Monitor heap usage trends: Use JMX or Prometheus for continuous monitoring",
+          "Consider heap increase: If consistently high usage, add more heap memory"
+        ]
+      }
+    ]
+  },
+  "high_gc_pauses": {
+    "metric_keywords": ["gc_pauses"],
+    "rules": [
+      {
+        "expression": "data.get('max_pause_ms', 0) >= 500 and data.get('max_pause_ms', 0) < 1000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has elevated GC pause: {data.get('max_pause_ms'):.1f}ms (max), {data.get('avg_pause_ms'):.1f}ms (avg). Approaching critical threshold.",
+        "recommendations": [
+          "Optimize GC parameters: Review -XX:MaxGCPauseMillis and other G1GC settings",
+          "Monitor pause trends: Track if pauses are increasing over time",
+          "Review allocation rate: High object creation rate causes frequent GCs",
+          "Check page cache pressure: OS page cache competes with JVM heap",
+          "Plan heap tuning: Consider adjustments before reaching critical levels"
+        ]
+      },
+      {
+        "expression": "data.get('p95_pause_ms', 0) >= 500",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has high P95 GC pause: {data.get('p95_pause_ms'):.1f}ms. 95% of GCs taking >500ms indicates systemic heap pressure.",
+        "recommendations": [
+          "P95 latency indicates consistent GC pressure, not just spikes",
+          "Review heap sizing: May need larger heap to reduce GC frequency",
+          "Analyze GC logs with GCViewer or GCeasy for patterns",
+          "Check for allocation hotspots in application code",
+          "Monitor GC overhead percentage: Should be <5% of total time"
+        ]
+      }
+    ]
+  },
+  "full_gc_warnings": {
+    "metric_keywords": ["gc_pauses", "full_gc"],
+    "rules": [
+      {
+        "expression": "data.get('full_gc_count', 0) >= 20",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} has {data.get('full_gc_count')} Full GCs in sample. Excessive Full GCs indicate severe heap exhaustion or fragmentation.",
+        "recommendations": [
+          "URGENT: Excessive Full GCs indicate heap crisis",
+          "Full GCs are very expensive (can take seconds)",
+          "This indicates heap exhaustion or severe fragmentation",
+          "Review heap size: May be too small for workload",
+          "Check for memory leaks causing heap filling",
+          "Consider emergency heap increase if production impact"
+        ]
+      },
+      {
+        "expression": "data.get('full_gc_count', 0) >= 10",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has {data.get('full_gc_count')} Full GCs in sample. Full GCs indicate heap exhaustion or fragmentation.",
+        "recommendations": [
+          "Reduce Full GCs: Full GCs indicate heap exhaustion or fragmentation",
+          "Full GCs stop all application threads (stop-the-world)",
+          "Review heap settings and allocation patterns",
+          "Check if heap is sized appropriately for workload",
+          "Monitor old generation usage trends"
+        ]
+      },
+      {
+        "expression": "data.get('full_gc_count', 0) >= 5",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} has {data.get('full_gc_count')} Full GCs. Some Full GCs are normal, but monitor for increasing trend.",
+        "recommendations": [
+          "Monitor Full GC frequency over time",
+          "Occasional Full GCs can be normal for long-running JVMs",
+          "Track trend to ensure not increasing",
+          "Review if Full GC frequency correlates with specific workload patterns"
+        ]
+      }
+    ]
+  },
+  "high_gc_frequency": {
+    "metric_keywords": ["gc_pauses"],
+    "rules": [
+      {
+        "expression": "data.get('gc_count', 0) >= 100",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} has very high GC frequency: {data.get('gc_count')} GCs in log sample. High frequency indicates excessive allocation rate.",
+        "recommendations": [
+          "Very high GC frequency consumes CPU and impacts throughput",
+          "Review allocation rate: Likely creating too many short-lived objects",
+          "Check total pause time: {data.get('total_pause_ms', 0):.1f}ms total",
+          "GC overhead percentage should be <5% of runtime",
+          "Consider heap tuning to reduce GC frequency",
+          "Review application code for excessive object creation"
+        ]
+      },
+      {
+        "expression": "data.get('gc_count', 0) >= 50",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} has elevated GC frequency: {data.get('gc_count')} GCs in log sample.",
+        "recommendations": [
+          "Monitor GC frequency trends over time",
+          "Check total pause time: {data.get('total_pause_ms', 0):.1f}ms",
+          "Review if GC frequency correlates with workload spikes",
+          "Consider if heap sizing is appropriate"
+        ]
+      }
+    ]
+  },
+  "broker_gc_health": {
+    "metric_keywords": ["gc_pauses"],
+    "data_conditions": [
+      {"key": "broker_id", "exists": true},
+      {"key": "max_pause_ms", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('exceeds_critical') == True",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Broker {data.get('broker_id')} exceeds critical GC pause threshold: {data.get('max_pause_ms'):.1f}ms max pause",
+        "recommendations": [
+          "Critical GC pause threshold exceeded",
+          "Immediate heap analysis required",
+          "Review JVM memory settings and heap dumps"
+        ]
+      },
+      {
+        "expression": "data.get('exceeds_warning') == True or data.get('has_full_gc') == True",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} has GC health concerns: max pause {data.get('max_pause_ms'):.1f}ms, Full GCs: {data.get('full_gc_count', 0)}",
+        "recommendations": [
+          "Monitor GC metrics closely",
+          "Plan heap tuning or optimization",
+          "Review GC logs for patterns"
+        ]
+      },
+      {
+        "expression": "data.get('high_frequency') == True",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} has high GC frequency: {data.get('gc_count')} GCs in sample",
+        "recommendations": [
+          "High GC frequency may indicate allocation pressure",
+          "Review application allocation patterns",
+          "Consider heap sizing adjustments"
+        ]
+      }
+    ]
+  },
+  "multiple_brokers_gc_issues": {
+    "metric_keywords": ["gc_pauses"],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('critical_brokers', [])) >= 2",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('critical_brokers', []))}) have critical GC pauses. Cluster-wide memory crisis.",
+        "recommendations": [
+          "URGENT: Cluster-wide GC crisis requires immediate attention",
+          "Check for common memory leak across all brokers",
+          "Review recent deployments or configuration changes",
+          "May indicate undersized heap cluster-wide",
+          "Consider coordinated heap increase across cluster",
+          "Prepare for potential rolling restart with increased heap",
+          "Monitor for cascading failures due to GC pressure"
+        ]
+      },
+      {
+        "expression": "len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('warning_brokers', [])) >= 3",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('warning_brokers', []))}) have elevated GC pauses. Cluster-wide heap pressure detected.",
+        "recommendations": [
+          "Cluster-wide GC pressure indicates systemic issue",
+          "Review heap sizing strategy across entire cluster",
+          "Check for workload changes causing increased memory usage",
+          "Plan coordinated heap tuning across cluster",
+          "Use consistent JVM settings across all brokers",
+          "Monitor for trend: is pressure increasing over time?"
+        ]
+      }
+    ]
+  },
+  "gc_performance_optimization": {
+    "metric_keywords": ["gc_pauses"],
+    "rules": [
+      {
+        "expression": "data.get('avg_pause_ms', 0) >= 200 and data.get('avg_pause_ms', 0) < 500",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Broker {data.get('broker_id')} has average GC pause of {data.get('avg_pause_ms'):.1f}ms. Room for optimization.",
+        "recommendations": [
+          "Average GC pause is elevated but not critical",
+          "Review G1GC tuning parameters",
+          "Consider setting -XX:MaxGCPauseMillis=200",
+          "Monitor trends: ensure not degrading over time",
+          "Review allocation patterns for optimization opportunities"
+        ]
+      },
+      {
+        "expression": "data.get('total_pause_ms', 0) >= 5000",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Broker {data.get('broker_id')} spent {data.get('total_pause_ms'):.1f}ms total in GC pauses in log sample. High cumulative GC time.",
+        "recommendations": [
+          "Total GC pause time is significant",
+          "Calculate GC overhead percentage of total runtime",
+          "GC should consume <5% of total time for healthy operation",
+          "Review if this correlates with performance degradation",
+          "Consider heap and GC tuning to reduce total pause time"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "readonly_replicas": {
+    "metric_keywords": ["cluster_health", "data"],
+    "data_conditions": [{"key": "is_readonly", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('is_readonly', False) == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Replica {data.get('database')}.{data.get('table')} is in read-only mode.",
+        "recommendations": [
+          "Check ZooKeeper/ClickHouse Keeper connectivity",
+          "Review system.replication_queue for stuck operations",
+          "Verify disk space and permissions on replica node",
+          "Check network connectivity between nodes"
+        ]
+      }
+    ]
+  },
+  "expired_sessions": {
+    "metric_keywords": ["cluster_health", "data"],
+    "data_conditions": [{"key": "is_session_expired", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('is_session_expired', False) == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Replica {data.get('database')}.{data.get('table')} has expired ZooKeeper/Keeper session.",
+        "recommendations": [
+          "Restore ZooKeeper/ClickHouse Keeper connectivity immediately",
+          "Check network between ClickHouse and Keeper ensemble",
+          "Review Keeper logs for session timeout reasons",
+          "Verify Keeper ensemble is healthy"
+        ]
+      }
+    ]
+  },
+  "replication_lag": {
+    "metric_keywords": ["cluster_health", "data"],
+    "data_conditions": [{"key": "log_delay", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('log_delay', 0) > 10000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Replica {data.get('database')}.{data.get('table')} has significant replication lag: {data.get('log_delay')} log entries behind.",
+        "recommendations": [
+          "Check if replica node is overloaded",
+          "Review network bandwidth between nodes",
+          "Monitor system.replication_queue for bottlenecks",
+          "Consider increasing replication resources"
+        ]
+      },
+      {
+        "expression": "data.get('log_delay', 0) > 1000",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Replica {data.get('database')}.{data.get('table')} has replication lag: {data.get('log_delay')} log entries behind.",
+        "recommendations": [
+          "Monitor replication lag trends",
+          "Check replica node resource utilization",
+          "Review replication queue for slow operations"
+        ]
+      }
+    ]
+  },
+  "low_active_replicas": {
+    "metric_keywords": ["cluster_health", "data"],
+    "data_conditions": [{"key": "active_replicas", "exists": true}, {"key": "total_replicas", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_replicas', 0) > 1 and data.get('active_replicas', 0) < data.get('total_replicas', 0)",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Table {data.get('database')}.{data.get('table')} has only {data.get('active_replicas')} of {data.get('total_replicas')} replicas active.",
+        "recommendations": [
+          "Investigate inactive replica nodes",
+          "Check node availability and connectivity",
+          "Review system.replicas for replica status details",
+          "Verify all nodes in cluster are operational"
+        ]
+      }
+    ]
+  },
+  "zookeeper_expired_session": {
+    "metric_keywords": ["zookeeper_connection", "data"],
+    "data_conditions": [{"key": "is_expired", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('is_expired', False) == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "ZooKeeper/Keeper connection '{data.get('name')}' to {data.get('host')}:{data.get('port')} has expired session.",
+        "recommendations": [
+          "Check ZooKeeper/ClickHouse Keeper service availability immediately",
+          "Verify network connectivity between ClickHouse and Keeper ensemble",
+          "Review Keeper logs for session timeout reasons",
+          "Check if Keeper ensemble has sufficient resources and maintains quorum",
+          "Review firewall rules between ClickHouse and Keeper nodes"
+        ]
+      }
+    ]
+  },
+  "zookeeper_low_uptime": {
+    "metric_keywords": ["zookeeper_connection", "data"],
+    "data_conditions": [{"key": "session_uptime_seconds", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('session_uptime_seconds', 3600) < 300",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "ZooKeeper/Keeper connection '{data.get('name')}' has low session uptime: {data.get('session_uptime_seconds')} seconds. Recent reconnection detected.",
+        "recommendations": [
+          "Monitor for frequent session reconnections",
+          "Check network stability between ClickHouse and Keeper",
+          "Review Keeper health and resource utilization",
+          "Investigate recent changes to network or Keeper configuration"
+        ]
+      }
+    ]
+  },
+  "zookeeper_multiple_expired": {
+    "metric_keywords": ["zookeeper_connection", "metadata"],
+    "data_conditions": [{"key": "expired_sessions", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('expired_sessions', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('expired_sessions')} ZooKeeper/Keeper session(s) expired. Replication will be affected.",
+        "recommendations": [
+          "Restore ZooKeeper/Keeper connectivity immediately - replication is compromised",
+          "Check if Keeper ensemble is operational and has quorum",
+          "Verify network connectivity between all ClickHouse nodes and Keeper",
+          "Review Keeper ensemble resource utilization (CPU, memory, disk)",
+          "Check for recent configuration changes that may have affected connectivity",
+          "Review system.replicas for read-only or session-expired replicas"
+        ]
+      }
+    ]
+  }
+}

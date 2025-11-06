@@ -1,0 +1,336 @@
+{
+  "dictionaries_failed": {
+    "metric_keywords": ["dictionary_status", "metadata"],
+    "data_conditions": [
+      {"key": "failed_count", "exists": true},
+      {"key": "total_dictionaries", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('failed_count', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('failed_count')} of {data.get('total_dictionaries')} dictionaries failed to load. Queries using failed dictionaries will fail.",
+        "recommendations": [
+          "Critical: Dictionary failures cause query failures",
+          "Review error messages for each failed dictionary in system.dictionaries",
+          "Check source system connectivity and credentials",
+          "Verify dictionary SQL queries are syntactically correct",
+          "Check for schema changes in source systems",
+          "Review dictionary configuration for syntax errors",
+          "Test dictionary reload manually: SYSTEM RELOAD DICTIONARY <name>",
+          "Check ClickHouse server logs for detailed error information"
+        ]
+      }
+    ]
+  },
+
+  "dictionaries_with_exceptions": {
+    "metric_keywords": ["dictionary_status", "metadata"],
+    "data_conditions": [
+      {"key": "exception_count", "exists": true},
+      {"key": "total_dictionaries", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('exception_count', 0) > 5",
+        "level": "high",
+        "score": 8,
+        "reasoning": "{data.get('exception_count')} dictionaries have recent exceptions. Multiple dictionary issues detected.",
+        "recommendations": [
+          "Multiple dictionaries experiencing errors",
+          "Review exception messages in system.dictionaries",
+          "Check for common root cause (network, credentials, source system)",
+          "Verify source systems are accessible and operational",
+          "Review dictionary configuration for systemic issues",
+          "Consider implementing retry logic for transient failures"
+        ]
+      },
+      {
+        "expression": "data.get('exception_count', 0) > 0",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "{data.get('exception_count')} dictionaries have recent exceptions.",
+        "recommendations": [
+          "Review exception details for affected dictionaries",
+          "Check if exceptions are transient or persistent",
+          "Verify source system availability",
+          "Monitor for pattern of recurring exceptions"
+        ]
+      }
+    ]
+  },
+
+  "high_dictionary_memory_usage": {
+    "metric_keywords": ["dictionary_status", "metadata"],
+    "data_conditions": [{"key": "total_memory_bytes", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_memory_bytes', 0) > 10 * 1024**3",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Dictionaries consuming {data.get('total_memory_bytes') / (1024**3):.1f} GB of memory. High memory usage detected.",
+        "recommendations": [
+          "Dictionaries consuming significant memory resources",
+          "Review dictionary sizes for optimization opportunities",
+          "Consider using flat dictionaries for smaller datasets (<1M rows)",
+          "Implement dictionary partitioning for very large datasets",
+          "Use cache dictionaries with appropriate lifetime for infrequently-updated data",
+          "Consider using hashed dictionaries instead of flat for better memory efficiency",
+          "Monitor memory trends to plan capacity",
+          "Review if all dictionary attributes are necessary"
+        ]
+      },
+      {
+        "expression": "data.get('total_memory_bytes', 0) > 5 * 1024**3",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Dictionaries consuming {data.get('total_memory_bytes') / (1024**3):.1f} GB of memory. Monitor memory usage.",
+        "recommendations": [
+          "Monitor dictionary memory consumption trends",
+          "Review large dictionaries for optimization potential",
+          "Consider memory capacity planning for growth"
+        ]
+      }
+    ]
+  },
+
+  "dictionaries_stale": {
+    "metric_keywords": ["stale_dictionaries", "metadata"],
+    "data_conditions": [{"key": "count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 5",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('count')} dictionaries are stale (not updated in {data.get('max_hours', 24)}+ hours). Data may be outdated.",
+        "recommendations": [
+          "Multiple stale dictionaries detected - data freshness impacted",
+          "Verify dictionary reload schedule is configured correctly",
+          "Check if source systems are updating data as expected",
+          "Review dictionary lifetime settings in configuration",
+          "Implement monitoring alerts for stale dictionaries",
+          "Test manual reload: SYSTEM RELOAD DICTIONARIES",
+          "Check if dictionary update jobs are running",
+          "Verify network connectivity to source systems"
+        ]
+      },
+      {
+        "expression": "data.get('count', 0) > 0",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "{data.get('count')} dictionaries are stale (not updated in {data.get('max_hours', 24)}+ hours).",
+        "recommendations": [
+          "Review stale dictionary update patterns",
+          "Verify dictionary reload configuration",
+          "Check source data update frequency",
+          "Consider adjusting dictionary lifetime settings"
+        ]
+      }
+    ]
+  },
+
+  "high_dictionary_failure_rate": {
+    "metric_keywords": ["dictionary_status", "metadata"],
+    "data_conditions": [
+      {"key": "failed_count", "exists": true},
+      {"key": "total_dictionaries", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_dictionaries', 0) > 0 and (data.get('failed_count', 0) / data.get('total_dictionaries', 1)) > 0.5",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Dictionary failure rate is {(data.get('failed_count', 0) / data.get('total_dictionaries', 1)) * 100:.1f}% ({data.get('failed_count')} of {data.get('total_dictionaries')}). Dictionary system is severely degraded.",
+        "recommendations": [
+          "CRITICAL: More than 50% of dictionaries failed",
+          "Likely systemic issue affecting multiple dictionaries",
+          "Check ClickHouse server health and resource availability",
+          "Verify network connectivity to all source systems",
+          "Review recent configuration or infrastructure changes",
+          "Check authentication credentials for source connections",
+          "Review ClickHouse server logs for systemic errors",
+          "Consider emergency maintenance to restore dictionary functionality"
+        ]
+      },
+      {
+        "expression": "data.get('total_dictionaries', 0) > 0 and (data.get('failed_count', 0) / data.get('total_dictionaries', 1)) > 0.25",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Dictionary failure rate is {(data.get('failed_count', 0) / data.get('total_dictionaries', 1)) * 100:.1f}% ({data.get('failed_count')} of {data.get('total_dictionaries')}). Significant dictionary issues.",
+        "recommendations": [
+          "High dictionary failure rate indicates systemic problem",
+          "Review common failure patterns across dictionaries",
+          "Check for infrastructure or network issues",
+          "Verify source system availability"
+        ]
+      }
+    ]
+  },
+
+  "no_dictionaries_configured": {
+    "metric_keywords": ["dictionary_status", "metadata"],
+    "data_conditions": [{"key": "total_dictionaries", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('total_dictionaries', 0) == 0",
+        "level": "low",
+        "score": 2,
+        "reasoning": "No dictionaries configured. This is informational - dictionaries may not be needed for this workload.",
+        "recommendations": [
+          "No dictionaries detected - this is normal if not using dictionary features",
+          "Consider dictionaries for lookup enrichment and JOIN optimization",
+          "Dictionaries can significantly improve query performance for lookup operations",
+          "Review query patterns to identify dictionary opportunities"
+        ]
+      }
+    ]
+  },
+
+  "dictionary_load_performance_degraded": {
+    "metric_keywords": ["dictionary_status", "metadata"],
+    "data_conditions": [
+      {"key": "avg_loading_duration_ms", "exists": true},
+      {"key": "total_dictionaries", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('avg_loading_duration_ms', 0) > 300000",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Average dictionary load time is {data.get('avg_loading_duration_ms') / 1000:.1f} seconds. Dictionary reload performance is degraded.",
+        "recommendations": [
+          "Dictionary reload times are excessive (>5 minutes average)",
+          "Slow reloads impact dictionary availability during updates",
+          "Review source query performance - optimize source SQL",
+          "Check network latency to source systems",
+          "Consider implementing dictionary partitioning",
+          "Review dictionary data volume growth trends",
+          "Check source system load and capacity",
+          "Consider increasing source connection pool size"
+        ]
+      },
+      {
+        "expression": "data.get('avg_loading_duration_ms', 0) > 120000",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Average dictionary load time is {data.get('avg_loading_duration_ms') / 1000:.1f} seconds. Monitor reload performance.",
+        "recommendations": [
+          "Dictionary reload times are elevated (>2 minutes average)",
+          "Review source query optimization opportunities",
+          "Monitor for performance degradation trends",
+          "Check network performance to source systems"
+        ]
+      }
+    ]
+  },
+
+  "single_dictionary_too_large": {
+    "metric_keywords": ["dictionary_status", "data"],
+    "data_conditions": [
+      {"key": "memory_bytes", "exists": true},
+      {"key": "database", "exists": true},
+      {"key": "name", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('memory_bytes', 0) > 5 * 1024**3",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Dictionary {data.get('database')}.{data.get('name')} is consuming {data.get('memory_bytes') / (1024**3):.1f} GB. Very large dictionary detected.",
+        "recommendations": [
+          "Individual dictionary consuming excessive memory (>5 GB)",
+          "Review if all attributes in dictionary are necessary",
+          "Consider implementing dictionary partitioning by time or key range",
+          "Use hashed dictionary type instead of flat for better memory efficiency",
+          "Implement data retention policy to limit dictionary size",
+          "Consider using cache dictionary with shorter lifetime",
+          "Review source data filtering - reduce rows if possible",
+          "Monitor memory capacity for this dictionary's growth"
+        ]
+      },
+      {
+        "expression": "data.get('memory_bytes', 0) > 2 * 1024**3",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Dictionary {data.get('database')}.{data.get('name')} is consuming {data.get('memory_bytes') / (1024**3):.1f} GB. Large dictionary detected.",
+        "recommendations": [
+          "Large dictionary consuming significant memory (>2 GB)",
+          "Review dictionary optimization opportunities",
+          "Monitor memory usage trends for capacity planning",
+          "Consider partitioning strategy for very large datasets"
+        ]
+      }
+    ]
+  },
+
+  "dictionary_loading_stuck": {
+    "metric_keywords": ["dictionary_status", "data"],
+    "data_conditions": [
+      {"key": "status", "value": "LOADING"},
+      {"key": "loading_start_time", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('status') == 'LOADING' and 'loading_start_time' in data",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Dictionary {data.get('database')}.{data.get('name')} is stuck in LOADING state. May indicate hung reload operation.",
+        "recommendations": [
+          "Dictionary stuck in LOADING state - may indicate problem",
+          "Check if source query is taking unusually long",
+          "Review source system performance and query execution",
+          "Check for locks or blocks on source system",
+          "Verify network connectivity to source",
+          "Consider query timeout settings",
+          "May need to restart ClickHouse if truly stuck",
+          "Review ClickHouse server logs for additional context"
+        ]
+      }
+    ]
+  },
+
+  "dictionary_health_critical": {
+    "metric_keywords": ["dictionary_status", "metadata"],
+    "data_conditions": [{"key": "critical_count", "exists": true}],
+    "rules": [
+      {
+        "expression": "data.get('critical_count', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "{data.get('critical_count')} dictionaries in critical health state. Immediate attention required.",
+        "recommendations": [
+          "Multiple dictionaries in critical health state",
+          "Review all critical dictionaries for common issues",
+          "Prioritize critical dictionary resolution by query impact",
+          "Check for systemic infrastructure or configuration problems",
+          "Implement emergency response procedures for dictionary failures"
+        ]
+      }
+    ]
+  },
+
+  "dictionary_element_count_anomaly": {
+    "metric_keywords": ["dictionary_status", "data"],
+    "data_conditions": [
+      {"key": "element_count", "exists": true},
+      {"key": "status", "value": "LOADED"}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('status') == 'LOADED' and data.get('element_count', 0) == 0",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Dictionary {data.get('database')}.{data.get('name')} loaded successfully but contains zero elements. This may indicate empty source data.",
+        "recommendations": [
+          "Dictionary loaded but contains no data",
+          "Verify source system has data available",
+          "Check dictionary source query filters",
+          "Review source query for correctness",
+          "Check if source table/view is empty",
+          "Verify dictionary configuration references correct source"
+        ]
+      }
+    ]
+  }
+}

@@ -50,9 +50,9 @@ def _get_cluster_info(connector, settings):
     """Gets cluster-level metadata including version, cluster ID, and broker count."""
     try:
         cluster_metadata = connector.admin_client.describe_cluster()
-        
-        # Extract version
-        version = _detect_kafka_version(connector, cluster_metadata)
+
+        # Extract version from connector (uses config or auto-detection)
+        version = connector.version_info.get('version_string', 'Unknown')
         
         brokers = cluster_metadata.get('brokers', [])
         broker_count = len(brokers)

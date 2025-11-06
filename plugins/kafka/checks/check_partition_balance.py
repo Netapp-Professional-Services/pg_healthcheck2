@@ -29,6 +29,13 @@ def run_partition_balance(connector, settings):
             structured_data["partition_balance"] = {"status": "error", "data": []}
             return "\n".join(adoc_content), structured_data
 
+        # Check if logs_raw is an error dict instead of a list
+        if isinstance(logs_raw, dict) and 'error' in logs_raw:
+            error_msg = f"[ERROR]\n====\nFailed to get partition distribution: {logs_raw['error']}\n====\n"
+            adoc_content.append(error_msg)
+            structured_data["partition_balance"] = {"status": "error", "data": []}
+            return "\n".join(adoc_content), structured_data
+
         broker_replica_counts = Counter(item.get('broker_id') for item in logs_raw)
         total_replicas = sum(broker_replica_counts.values())
         average = total_replicas / num_brokers if num_brokers > 0 else 0

@@ -1,0 +1,87 @@
+{
+  "critical_offline_partitions": {
+    "metric_keywords": ["prometheus_offline_partitions", "per_broker_offline", "data"],
+    "data_conditions": [
+      { "key": "offline_partitions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('offline_partitions', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "🚨 EMERGENCY: Broker {data.get('node_id', 'unknown')[:8]} has {data.get('offline_partitions')} offline partition(s) - data is completely inaccessible",
+        "recommendations": [
+          "🚨 IMMEDIATE ACTION REQUIRED - DATA UNAVAILABLE 🚨",
+          "Offline partitions mean ALL replicas are down - this is more severe than under-replication",
+          "Check broker {data.get('node_id', 'unknown')[:8]} status immediately",
+          "Review broker logs: grep 'OFFLINE\\|FATAL\\|ERROR' /var/log/kafka/server.log",
+          "Check disk health: df -h && smartctl -a /dev/sdX",
+          "Verify network connectivity to this broker",
+          "Identify affected topics: kafka-topics.sh --describe --under-replicated-partitions",
+          "If broker is down: restart immediately",
+          "If disk is full: free up space or expand",
+          "If corruption: may require log segment recovery (risk of data loss)",
+          "Notify application teams - producers and consumers will experience failures"
+        ]
+      }
+    ]
+  },
+
+  "cluster_offline_partitions": {
+    "metric_keywords": ["prometheus_offline_partitions", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_offline_partitions', 0) >= 10",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "🚨 CATASTROPHIC: {data.get('total_offline_partitions')} total offline partitions across cluster - widespread data unavailability",
+        "recommendations": [
+          "🚨 CLUSTER-WIDE EMERGENCY 🚨",
+          "Multiple partitions offline indicates systemic issue",
+          "Check if this is a cluster-wide outage or cascading failure",
+          "Verify all brokers are operational and reachable",
+          "Check for infrastructure issues (network partition, storage failure)",
+          "Review recent changes (upgrades, configuration changes, restarts)",
+          "Identify affected topics and notify application owners immediately",
+          "Consider if this is related to insufficient replication factor",
+          "If brokers are healthy, check for widespread disk or filesystem issues",
+          "Escalate to senior engineers and management - potential major incident"
+        ]
+      },
+      {
+        "expression": "data.get('total_offline_partitions', 0) > 0 and data.get('total_offline_partitions', 0) < 10",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "🚨 CRITICAL: {data.get('total_offline_partitions')} offline partition(s) - data unavailable",
+        "recommendations": [
+          "Offline partitions require immediate attention",
+          "Check affected brokers and partitions",
+          "Review replication configuration for impacted topics",
+          "Investigate root cause (broker failure, disk issue, corruption)",
+          "Plan recovery strategy based on root cause",
+          "Document incident for post-mortem analysis"
+        ]
+      }
+    ]
+  },
+
+  "healthy_all_online": {
+    "metric_keywords": ["prometheus_offline_partitions", "cluster_aggregate"],
+    "rules": [
+      {
+        "expression": "data.get('total_offline_partitions', 0) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "All partitions are online across {data.get('total_brokers', 0)} brokers - data is fully accessible",
+        "recommendations": [
+          "Partition availability is healthy",
+          "Continue monitoring for broker failures",
+          "Ensure replication factor is adequate (≥3 for critical topics)",
+          "Verify alerting is configured for offline partitions",
+          "Maintain broker health monitoring",
+          "Review disaster recovery procedures periodically"
+        ]
+      }
+    ]
+  }
+}

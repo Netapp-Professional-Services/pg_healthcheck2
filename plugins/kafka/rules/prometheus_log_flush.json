@@ -1,0 +1,12 @@
+{
+  "log_flush_info": {
+    "metric_keywords": ["prometheus_log_flush", "cluster_aggregate"],
+    "rules": [{
+      "expression": "data.get('broker_count', 0) > 0",
+      "level": "info",
+      "score": 0,
+      "reasoning": "Log flush metrics collected - monitor for disk I/O health",
+      "recommendations": ["Monitor flush rate and time trends", "High flush time indicates disk bottleneck"]
+    }]
+  }
+}

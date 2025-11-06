@@ -74,22 +74,21 @@ def get_unique_targets(db_config, accessible_company_ids):
     """Fetches unique targets accessible by the user to populate filters."""
     if not accessible_company_ids:
         return []
-    
+
     conn = None
     targets = []
     try:
         conn = psycopg2.connect(**db_config)
         cursor = conn.cursor()
-        query = """
-            SELECT DISTINCT c.company_name, hcr.target_host, hcr.target_port, hcr.target_db_name
-            FROM health_check_runs hcr
-            JOIN companies c ON hcr.company_id = c.id
-            WHERE hcr.company_id = ANY(%s)
-            ORDER BY c.company_name, hcr.target_host, hcr.target_port, hcr.target_db_name;
-        """
+        # Use stored procedure for analytics abstraction
+        query = "SELECT get_unique_targets(%s);"
         cursor.execute(query, (accessible_company_ids,))
-        for row in cursor.fetchall():
-            targets.append(f"{row[0]}:{row[1]}:{row[2]}:{row[3]}")
+        result = cursor.fetchone()[0]
+
+        # Parse JSONB result: [{"target": "company:host:port:database"}, ...]
+        if result:
+            for item in result:
+                targets.append(item['target'])
     except psycopg2.Error as e:
         current_app.logger.error(f"Database error fetching unique targets: {e}")
     finally:
@@ -183,43 +182,40 @@ def fetch_runs_by_ids(db_config, run_ids, accessible_company_ids):
 
     try:
         conn = psycopg2.connect(**db_config)
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        query = """
-            SELECT
-                hcr.id, hcr.run_timestamp, hcr.target_host, hcr.target_port,
-                hcr.target_db_name, hcr.encryption_mode, hcr.encrypted_data_key,
-                decrypted.decrypted_findings
-            FROM health_check_runs hcr
-            JOIN decrypt_run_findings(%(run_ids)s) AS decrypted ON hcr.id = decrypted.run_id
-            WHERE hcr.id = ANY(%(run_ids)s) AND hcr.company_id = ANY(%(company_ids)s);
-        """
-        cursor.execute(query, {'run_ids': run_ids, 'company_ids': accessible_company_ids})
-        
-        for row in cursor.fetchall():
-            findings_data = row['decrypted_findings']
-            
-            if row['encryption_mode'] == 'kms':
-                try:
-                    encrypted_blob = findings_data.encode('utf-8')
-                    plaintext_key = decrypt_kms_data_key(row['encrypted_data_key'], config)
-                    cipher_suite = Fernet(plaintext_key)
-                    decrypted_json_text = cipher_suite.decrypt(encrypted_blob).decode('utf-8')
-                    findings_data = json.loads(decrypted_json_text)
-                except Exception as e:
-                    current_app.logger.error(f"Failed to decrypt KMS data for run {row['id']}: {e}")
-                    findings_data = {"error": "Failed to decrypt KMS data."}
+        cursor = conn.cursor()
+        # Use stored procedure for analytics abstraction
+        query = "SELECT get_runs_by_ids(%s, %s);"
+        cursor.execute(query, (run_ids, accessible_company_ids))
+        result = cursor.fetchone()[0]
 
-            runs.append({
-                "run_timestamp": row['run_timestamp'].isoformat(),
-                "findings": findings_data,
-                "target_host": row['target_host'],
-                "target_port": row['target_port'],
-                "target_db_name": row['target_db_name']
-            })
+        # Parse JSONB result: array of run objects
+        if result:
+            for run_obj in result:
+                findings_data = run_obj['decrypted_findings']
+
+                # Handle KMS decryption at application layer
+                if run_obj.get('encryption_mode') == 'kms':
+                    try:
+                        encrypted_blob = findings_data.encode('utf-8')
+                        plaintext_key = decrypt_kms_data_key(run_obj['encrypted_data_key'], config)
+                        cipher_suite = Fernet(plaintext_key)
+                        decrypted_json_text = cipher_suite.decrypt(encrypted_blob).decode('utf-8')
+                        findings_data = json.loads(decrypted_json_text)
+                    except Exception as e:
+                        current_app.logger.error(f"Failed to decrypt KMS data for run {run_obj['id']}: {e}")
+                        findings_data = {"error": "Failed to decrypt KMS data."}
+
+                runs.append({
+                    "run_timestamp": run_obj['run_timestamp'],
+                    "findings": findings_data,
+                    "target_host": run_obj['target_host'],
+                    "target_port": run_obj['target_port'],
+                    "target_db_name": run_obj['target_db_name']
+                })
 
     except Exception as e:
         current_app.logger.error(f"Error fetching or decrypting runs: {e}")
     finally:
         if conn: conn.close()
-    
+
     return sorted(runs, key=lambda x: x['run_timestamp'], reverse=True)
