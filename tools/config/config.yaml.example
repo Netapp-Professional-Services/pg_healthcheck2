@@ -2,7 +2,7 @@
 ai_provider: openai  # or google, grok, arbitrary
 ai_endpoint: https://your_ai_endpoint.com/  # https://your-corporate-llm-proxy.com/, https://api.x.ai/, https://generativelanguage.googleapis.com
 
-ai_api_key: ${AI_API_KEY}  # Or hardcode if not using env vars
+ai_api_key: sk_5767b4c31e4db5dc935556271be2d1717cbe2502720d7855dd94e52a94c7620d  # Or hardcode if not using env vars
 ai_temperature: 0.1 # The lower the better
 ai_max_output_tokens: 16384 # Maximum number of tokens (words/pieces of words) the AI should generate in its response.
 ai_timeout: 300  # 5 minutes
@@ -68,13 +68,13 @@ integration_tests:
     
     # Cassandra external server
     cassandra:
-      enabled: false  # Set to true to use this config
-      host: "cassandra.test.local"
+      enabled: true  # Set to true to use this config
+      host: "172.172.163.8"
       port: 9042
-      user: "cassandra"
-      password: "secret"
-      keyspace: "test_keyspace"
-      datacenter: "datacenter1"
+      user: "hc_user"
+      password: "G311d210m@rines"
+      keyspace: "halliburton"
+      datacenter: "AZURE_AZ_EAST_US"
       
       # SSH configuration (required for nodetool checks)
       ssh:

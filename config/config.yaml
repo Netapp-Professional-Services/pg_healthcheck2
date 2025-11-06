@@ -11,7 +11,10 @@ run_settings: true          # Set to true to run the pgset module in Appendix
 show_avail_ext: true        # Set to true to show available extensions in Appendix
 
 #  Connection / Settings
-host: 35.155.195.35
+host:
+  - 20.115.88.255
+  - 172.172.163.8
+  - 20.55.99.10
 port: 9042
 database: system
 user: hc_user
@@ -49,7 +52,7 @@ trend_analysis:
     query_performance_degradation: 0.2  # Alert if query time increases > 20%
     failed_modules_increase: 0.1  # Alert if failed modules increase > 10%
 
-ai_api_key: "sk_631dc11b42effc746d06d07b16fc646e13bf87c570679feb25d88fb3a8a5bc7a" # key for authentication with the AIcle endpoint
+ai_api_key: "sk_5767b4c31e4db5dc935556271be2d1717cbe2502720d7855dd94e52a94c7620d" # key for authentication with the AIcle endpoint
 ai_endpoint: "https://llm-proxy-api.ai.openeng.netapp.com/"
 ai_model: gpt-4-turbo
 ai_user: ldifelic
