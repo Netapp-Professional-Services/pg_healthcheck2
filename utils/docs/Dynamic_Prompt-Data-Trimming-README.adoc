@@ -1,0 +1,795 @@
+= Dynamic Prompt Generation and Trimming Logic
+:toc: left
+:toclevels: 3
+:source-highlighter: rouge
+:icons: font
+
+An overview of the budgeting and summarization process used by `dynamic_prompt_generator.py`.
+
+== Overview
+
+The primary goal of the `dynamic_prompt_generator.py` script is to analyze a comprehensive JSON file of database health check findings and produce a concise, context-aware prompt for an AI model. Its most critical function is to intelligently trim down the findings to ensure the final prompt respects a configurable token limit, a process we refined to handle various scenarios correctly.
+
+This document describes the final, corrected logic for this "balancing act."
+
+== Prompt Budget Calculation
+
+The script's behavior is driven by the `ai_max_prompt_tokens` setting. The script calculates a character budget for the main JSON data, reserving a portion of the total budget for the prompt's instructions and summaries.
+
+[source,python]
+----
+# Reserve 4000 characters (~1000 tokens) for prompt instructions, headers, and summaries.
+RESERVED_BUFFER_FOR_PROMPT_OVERHEAD = 4000 
+
+max_prompt_tokens = settings.get('ai_max_prompt_tokens', 8000)
+# The total budget for the entire prompt string
+total_character_budget = max_prompt_tokens * TOKEN_CHARACTER_RATIO
+# The budget for just the findings_json part is the total minus our buffer
+token_budget = total_character_budget - RESERVED_BUFFER_FOR_PROMPT_OVERHEAD
+----
+
+This ensures the final, complete prompt sent to the AI adheres to the limit.
+
+
+== Prioritization and Sorting
+
+To perform the "balancing act" of including the most important information, the script uses a unified priority system.
+
+. It calculates a **priority score** for every module.
+. The base score is the module's predefined weight.
+. A significant bonus is added to the score if the module contains any findings flagged as **critical** or **high** severity.
+. All modules are then sorted into a single list based on this priority score, from highest to lowest.
+
+This ensures that modules with urgent issues are always considered for inclusion first.
+
+
+== Module Weighting: The Importance of Weights
+
+Assigning a `weight` to each check module is a crucial configuration step that directly influences the content of the AI prompt, especially when budgets are tight.
+
+=== Importance of Weights
+
+The `weight` serves as the baseline priority for a module. In cases where no "critical" or "high" severity issues are found, the `weight` is the primary factor that determines the inclusion order of modules in the prompt. A module with a higher weight is considered more important and will be processed earlier in the queue. This gives it a better chance of being included in the final prompt, either in full or in a trimmed form[cite:1].
+
+[source,python]
+.Example from plugins/postgres/checks/postgres_overview.py
+----
+def get_weight():
+    """Returns the importance score for this module."""
+    return 10 # Core configuration, highest importance
+----
+
+
+=== Default Behavior (No Weight Defined)
+
+If a weight is not explicitly defined for a check module, the script is designed to assign a default weight of **1**.
+
+[source,python]
+----
+# The priority score calculation defaults to 1 if a weight is not found.
+priority_score = module_weights.get(module_name, 1)
+----
+
+This default value effectively gives the module the lowest possible priority. As a result, it will be considered last for inclusion and is the most likely to be skipped entirely when the budget is constrained.
+
+
+== The Trimming Process
+
+The script iterates through the prioritized list of modules and adds them one by one, strictly enforcing the budget. For each module, it performs the following checks:
+
+. **Check Full Size**: It first checks if the complete, untrimmed module can fit within the remaining budget. If it fits, it's added as-is, and the script moves to the next module.
+. **Attempt to Trim**: If the full module does not fit, the script then attempts to trim it. Trimming involves reducing any long lists of data within the module down to a single item.
+. **Check Trimmed Size**: After trimming, it checks if the new, smaller version of the module can fit in the remaining budget. If it fits, it's added, and the trimming action is logged.
+. **Skip if Necessary**: If even the trimmed version of the module is too large, it is skipped entirely, and the script moves to the next module in the priority list.
+
+This process continues until the budget is filled, guaranteeing that the most important information that can fit is always included.
+
+
+== Behavior Scenarios
+
+The script's output changes dramatically based on the configured `ai_max_prompt_tokens` budget.
+
+=== Low Budget Scenario
+
+When the token limit is small (e.g., 1000-2000 tokens), the script behaves as follows:
+
+* The character budget is highly constrained.
+* The script processes the highest-priority modules first but likely finds they are too large to be included in their untrimmed form.
+* **Trimming is aggressive**: The script will immediately resort to trimming these important modules, including only their most essential data (e.g., the first item in each list).
+* **Modules are skipped**: The budget will be filled quickly by just a few high-priority, trimmed modules. Most lower-priority modules will be skipped entirely.
+* The console log will show a "Prompt Content Trimming Summary" and an info message stating the budget was enforced.
+
+=== High Budget Scenario
+
+When the token limit is large (e.g., 100,000 tokens), the behavior is much simpler:
+
+* The character budget is very generous.
+* The script processes modules in priority order, checking if the full, untrimmed version fits.
+* **No trimming occurs**: Because the budget is so large, every module will fit in its original, complete form. The conditional trimming logic is never triggered.
+* **All modules are included**: The final prompt sent to the AI will contain the complete, unfiltered findings data.
+* The console log will not show any trimming summary, as no content was shortened.
+
+
+== Complete Workflow: Findings to Prompt
+
+The `generate_dynamic_prompt()` function orchestrates a multi-stage process:
+
+=== Stage 1: Rules Processing & Issue Detection
+
+The function calls `_process_findings_recursively()` which:
+
+1. **Walks the findings tree**: Recursively navigates the nested structure of findings
+2. **Identifies metrics**: For each check result with `status: 'success'`, extracts the `data` field
+3. **Evaluates rules**: Calls `analyze_metric_severity()` for each data row
+4. **Classifies issues**: Populates three lists based on severity:
+   * `critical_issues` - Issues with `level: 'critical'`
+   * `high_priority_issues` - Issues with `level: 'high'`
+   * `medium_priority_issues` - Issues with `level: 'medium'`
+5. **Tracks module issues**: Builds `module_issue_map` counting issues per module
+
+**Example from PostgreSQL:**
+
+[source,json]
+----
+{
+  "replication_health": {
+    "status": "success",
+    "timestamp": "2025-11-12T18:45:23Z",
+    "data": [
+      {
+        "application_name": "replica_01",
+        "client_addr": "192.168.1.11",
+        "state": "streaming",
+        "replay_lag": "5 MB",
+        "replay_lag_bytes": 5242880
+      }
+    ]
+  }
+}
+----
+
+Rule evaluation checks: `data.get('replay_lag_bytes', 0) > 1048576` → **TRIGGERED** (high severity)
+
+=== Stage 2: Priority Score Calculation
+
+For each module in findings:
+
+[source,python]
+----
+priority_score = module_weights.get(module_name, 1)  # Base weight from check module
+if module_issue_map[module_name]['critical'] > 0:
+    priority_score += 1000  # Critical issue bonus
+if module_issue_map[module_name]['high'] > 0:
+    priority_score += 100   # High-priority issue bonus
+----
+
+**PostgreSQL Example Scoring:**
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Module | Base Weight | Critical Issues | High Issues | Final Priority
+
+| postgres_overview
+| 10
+| 0
+| 0
+| **10**
+
+| replication_health
+| 8
+| 0
+| 1
+| **108** (8 + 100)
+
+| vacuum_analysis
+| 8
+| 1
+| 2
+| **1108** (8 + 1000 + 100)
+
+| connection_metrics
+| 7
+| 0
+| 0
+| **7**
+
+| missing_index_opportunities
+| 5
+| 0
+| 3
+| **105** (5 + 100)
+
+| table_count
+| (no weight defined)
+| 0
+| 0
+| **1** (default)
+|===
+
+**Sorted Priority Queue (descending):**
+
+1. vacuum_analysis (1108) - Has critical issues
+2. replication_health (108) - Has high-priority issues
+3. missing_index_opportunities (105) - Has high-priority issues
+4. postgres_overview (10) - Core module, no issues
+5. connection_metrics (7) - No issues
+6. table_count (1) - Lowest priority, no weight defined
+
+=== Stage 3: Token Budget Allocation
+
+**Budget Calculation:**
+
+[source,python]
+----
+TOKEN_CHARACTER_RATIO = 4  # Approximate: 1 token ≈ 4 characters
+RESERVED_BUFFER_FOR_PROMPT_OVERHEAD = 4000  # For instructions, summaries
+
+max_prompt_tokens = settings.get('ai_max_prompt_tokens', 8000)
+total_character_budget = max_prompt_tokens * TOKEN_CHARACTER_RATIO  # 32,000 chars
+token_budget = total_character_budget - RESERVED_BUFFER_FOR_PROMPT_OVERHEAD  # 28,000 chars
+----
+
+**Budget Allocation (Single Loop):**
+
+The script processes modules from the priority queue **in descending order**, maintaining a running total of consumed characters:
+
+[source,python]
+----
+current_size = 0
+findings_for_prompt = {}
+trimmed_modules_log = {}
+
+for module in sorted_modules:  # Ordered by priority
+    module_data = copy.deepcopy(module['data'])
+    original_size = len(json.dumps(module_data))
+
+    # Decision tree (see diagram below)
+    if (current_size + original_size) <= token_budget:
+        # INCLUDE FULL MODULE
+        findings_for_prompt[module_name] = module_data
+        current_size += original_size
+    else:
+        # ATTEMPT TO TRIM
+        # (trim lists to single item)
+        trimmed_size = len(json.dumps(module_data))
+
+        if (current_size + trimmed_size) <= token_budget:
+            # INCLUDE TRIMMED MODULE
+            findings_for_prompt[module_name] = module_data
+            current_size += trimmed_size
+            trimmed_modules_log[module_name] = [...]
+        else:
+            # SKIP MODULE
+            pass
+----
+
+=== Stage 4: Template Rendering
+
+The final prompt is rendered using Jinja2 with these variables:
+
+[source,python]
+----
+template.render(
+    findings_json=json.dumps(findings_for_prompt, indent=2),
+    db_version=db_metadata.get('version'),
+    database_name=db_metadata.get('db_name'),
+    environment=db_metadata.get('environment'),
+    environment_details=db_metadata.get('environment_details'),
+    analysis_timestamp=datetime.utcnow().isoformat() + "Z",
+    critical_issues=critical_issues,
+    high_priority_issues=high_priority_issues,
+    medium_priority_issues=medium_priority_issues
+)
+----
+
+**Template Example (default_prompt.j2):**
+
+[source,jinja2]
+----
+You are an expert PostgreSQL health check analyst.
+
+**Analysis Context:**
+- PostgreSQL Version: {{ db_version }}
+- Target Database: {{ database_name }}
+- Environment: {{ environment }}
+- Analysis Timestamp: {{ analysis_timestamp }}
+
+**Pre-Analysis Summary of Key Findings**
+
+{% if critical_issues %}
+**Critical Issues Detected:**
+{% for issue in critical_issues -%}
+- Metric: {{ issue.metric }} - Reason: {{ issue.analysis.reasoning }}
+{% endfor %}
+{% endif %}
+
+Here is the full structured findings data:
+
+{{ findings_json }}
+----
+
+== Trimming Decision Diagram
+
+The following diagram illustrates the exact decision-making process used when allocating modules to the prompt budget, using PostgreSQL as the example.
+
+[plantuml, trimming-decision-flow, svg]
+----
+@startuml
+
+title Trimming Decision Process - PostgreSQL Example
+
+start
+
+:Load all structured findings;
+note right
+  Example modules:
+  - vacuum_analysis
+  - replication_health
+  - postgres_overview
+  - connection_metrics
+  - table_count
+end note
+
+:Evaluate rules against findings\nPopulate issue lists\n(critical, high, medium);
+note right
+  vacuum_analysis → 1 critical, 2 high
+  replication_health → 1 high
+  missing_index_opportunities → 3 high
+  Others → no issues
+end note
+
+:Calculate priority scores\nfor all modules;
+note right
+  Priority Formula:
+  base_weight +
+  (1000 if critical > 0) +
+  (100 if high > 0)
+
+  Results:
+  vacuum_analysis: 1108
+  replication_health: 108
+  missing_index_opportunities: 105
+  postgres_overview: 10
+  connection_metrics: 7
+  table_count: 1 (default)
+end note
+
+:Sort modules by priority\n(descending);
+
+:Initialize budget\nmax_tokens = 8000\nbudget = (8000 x 4) - 4000\n= 28,000 characters;
+
+partition "Single Loop: Process Modules in Priority Order" {
+
+  :current_size = 0\nfindings_for_prompt = {}\ntrimmed_modules_log = {};
+
+  while (More modules in queue?) is (yes)
+    :Get next module\nfrom sorted list;
+    note right
+      First iteration:
+      vacuum_analysis (priority 1108)
+    end note
+
+    :module_data = deepcopy(original);
+    :original_size = len(json.dumps(module_data));
+
+    if (current_size + original_size\n<= token_budget?) then (yes)
+      #D5E8D4:**INCLUDE FULL**\nAdd to findings_for_prompt\nUpdate current_size;
+      note right
+        Best case: Module fits entirely
+        No data loss
+      end note
+
+    else (no - won't fit)
+      :Attempt trimming\nReduce all lists to 1 item;
+      note right
+        Example:
+        data: [item1, item2, item50]
+        becomes
+        data: [item1]
+      end note
+
+      :trimmed_size = len(json.dumps(module_data));
+
+      if (current_size + trimmed_size\n<= token_budget?) then (yes)
+        #FFFFAA:**INCLUDE TRIMMED**\nAdd to findings_for_prompt\nUpdate current_size\nLog trimming action;
+        note right
+          Partial inclusion
+          Preserves structure
+          Loses detail
+        end note
+
+      else (no - still too large)
+        #F8CECC:**SKIP MODULE**\nDo not add\nMove to next;
+        note right
+          Module excluded entirely
+          Lower priority modules
+          more likely to be skipped
+        end note
+
+      endif
+    endif
+
+  endwhile (no)
+}
+
+:Generate final prompt\nusing Jinja2 template;
+
+:Return prompt + metadata;
+note right
+  Includes:
+  - Rendered prompt string
+  - findings_for_prompt (trimmed data)
+  - critical_issues list
+  - high_priority_issues list
+  - medium_priority_issues list
+  - rule_application_stats
+end note
+
+stop
+
+@enduml
+----
+
+=== Diagram Explanation
+
+The diagram shows three possible outcomes for each module:
+
+1. **✅ INCLUDE FULL** (Green) - Module fits within remaining budget with all data intact
+2. **⚠️ INCLUDE TRIMMED** (Yellow) - Module doesn't fit fully, but trimmed version fits (lists reduced to 1 item)
+3. **❌ SKIP MODULE** (Red) - Even trimmed version is too large, module excluded entirely
+
+**Key Observations:**
+
+* **Priority order is crucial**: High-priority modules (with critical/high issues) are processed first, giving them first access to the budget
+* **All-or-nothing for untrimmed**: Script always tries to include the full module first
+* **Graceful degradation**: Trimming preserves structure while reducing size
+* **Budget enforcement**: Once budget is exhausted, remaining modules are skipped
+* **Trimming is logged**: Console output shows which modules were trimmed and by how much
+
+**PostgreSQL Example Walkthrough (8000 token budget):**
+
+Assume these module sizes:
+
+[cols="2,1,1,1", options="header"]
+|===
+| Module (Priority Order) | Original Size | Trimmed Size | Decision
+
+| vacuum_analysis (1108)
+| 8,000 chars
+| 2,500 chars
+| ✅ INCLUDE FULL (budget: 28,000)
+
+| replication_health (108)
+| 15,000 chars
+| 3,000 chars
+| ⚠️ INCLUDE TRIMMED (budget: 20,000 → 17,000)
+
+| missing_index_opportunities (105)
+| 20,000 chars
+| 4,000 chars
+| ⚠️ INCLUDE TRIMMED (budget: 17,000 → 13,000)
+
+| postgres_overview (10)
+| 12,000 chars
+| 8,000 chars
+| ⚠️ INCLUDE TRIMMED (budget: 13,000 → 5,000)
+
+| connection_metrics (7)
+| 6,000 chars
+| 1,500 chars
+| ❌ SKIP (trimmed still too large: 5,000 < 6,000)
+
+| table_count (1)
+| 3,000 chars
+| 800 chars
+| ❌ SKIP (already at budget)
+|===
+
+**Console Output:**
+
+----
+--- Prompt Content Trimming Summary ---
+Module 'replication_health':
+  - List 'lag_data' trimmed from 15 to 1 items.
+Module 'missing_index_opportunities':
+  - List 'unused_indexes' trimmed from 127 to 1 items.
+Module 'postgres_overview':
+  - List 'configuration_params' trimmed from 50 to 1 items.
+
+[INFO] Token budget enforced. Some modules may have been skipped or trimmed to meet the 8000 token limit.
+----
+
+== Advanced Topics
+
+=== Rule Evaluation Process
+
+The `analyze_metric_severity()` function evaluates rules using Python's `eval()` with a controlled namespace:
+
+[source,python]
+----
+expression_result = eval(
+    rule['expression'],
+    {
+        "data": data_row,           # Current metric data
+        "settings": settings,        # Config settings
+        "all_structured_findings": all_findings  # Full findings context
+    }
+)
+----
+
+**Example Rule (check_replication_lag.json):**
+
+[source,json]
+----
+{
+  "replication_lag_high": {
+    "metric_keywords": ["replication_health", "replication_lag"],
+    "data_conditions": [
+      {"key": "replay_lag_bytes", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('replay_lag_bytes', 0) > 10485760",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Replication lag of {data.get('replay_lag')} exceeds 10 MB threshold",
+        "recommendations": [
+          "Investigate network latency between primary and replica",
+          "Check for long-running transactions blocking WAL application",
+          "Review replica hardware capacity (CPU, I/O)"
+        ]
+      }
+    ]
+  }
+}
+----
+
+**Rule Matching Logic:**
+
+1. **Keyword match**: Check if metric name contains any of `metric_keywords`
+2. **Condition check**: Verify all `data_conditions` are met (keys exist in data)
+3. **Expression evaluation**: Execute the `expression` with data context
+4. **Result handling**: If expression returns `True`, issue is triggered
+
+=== Module Issue Map Structure
+
+The `module_issue_map` tracks issue counts per module:
+
+[source,python]
+----
+{
+  "vacuum_analysis": {
+    "critical": 1,
+    "high": 2,
+    "medium": 0
+  },
+  "replication_health": {
+    "critical": 0,
+    "high": 1,
+    "medium": 0
+  }
+}
+----
+
+This map is used to boost priority scores during the budgeting process.
+
+=== Trimming Implementation Details
+
+The trimming logic targets list-like data structures:
+
+[source,python]
+----
+for sub_report_name, sub_report_data in module_data.items():
+    if (isinstance(sub_report_data, dict) and
+        'data' in sub_report_data and
+        isinstance(sub_report_data['data'], list) and
+        len(sub_report_data['data']) > 1):
+
+        original_len = len(sub_report_data['data'])
+        sub_report_data['data'] = sub_report_data['data'][:1]  # Keep only first item
+        trim_details.append(
+            f"  - List '{sub_report_name}' trimmed from {original_len} to 1 items."
+        )
+----
+
+**What Gets Trimmed:**
+
+* ✅ Lists in `data` fields (e.g., `"data": [item1, item2, ...]` → `"data": [item1]`)
+* ❌ Scalar values (strings, numbers, booleans) - never trimmed
+* ❌ Nested objects - structure preserved
+* ❌ Status and metadata fields - always preserved
+
+**Example Before/After Trimming:**
+
+**Before (original_size = 15,000 chars):**
+[source,json]
+----
+{
+  "replication_health": {
+    "status": "success",
+    "timestamp": "2025-11-12T18:45:23Z",
+    "data": [
+      {
+        "application_name": "replica_01",
+        "client_addr": "192.168.1.11",
+        "replay_lag": "5 MB",
+        "replay_lag_bytes": 5242880
+      },
+      {
+        "application_name": "replica_02",
+        "client_addr": "192.168.1.12",
+        "replay_lag": "2 MB",
+        "replay_lag_bytes": 2097152
+      },
+      // ... 13 more replicas
+    ]
+  }
+}
+----
+
+**After (trimmed_size = 3,000 chars):**
+[source,json]
+----
+{
+  "replication_health": {
+    "status": "success",
+    "timestamp": "2025-11-12T18:45:23Z",
+    "data": [
+      {
+        "application_name": "replica_01",
+        "client_addr": "192.168.1.11",
+        "replay_lag": "5 MB",
+        "replay_lag_bytes": 5242880
+      }
+    ]
+  }
+}
+----
+
+The AI still receives:
+
+* ✅ Structure of the data
+* ✅ Example of the issue (first replica with lag)
+* ✅ Metadata (status, timestamp)
+* ❌ Details on all 15 replicas (not needed for general analysis)
+
+== Configuration Reference
+
+=== Settings Parameters
+
+[cols="2,3,1,2", options="header"]
+|===
+| Parameter | Description | Default | Example
+
+| `ai_max_prompt_tokens`
+| Maximum tokens for entire prompt (includes overhead)
+| 8000
+| 8000, 32000, 100000
+
+| `ai_temperature`
+| AI model temperature (creativity vs consistency)
+| 0.7
+| 0.1 (factual), 0.9 (creative)
+
+| `ai_max_output_tokens`
+| Maximum tokens in AI response
+| 2048
+| 2048, 4096, 8192
+
+| `prompt_template`
+| Jinja2 template filename
+| default_prompt.j2
+| executive_summary_template.j2
+|===
+
+=== Module Weight Guidelines
+
+Recommended weight ranges:
+
+[cols="1,3,2", options="header"]
+|===
+| Weight | Use Case | Examples
+
+| 10
+| Core system configuration and health
+| postgres_overview, system_metrics
+
+| 8-9
+| Critical performance/reliability areas
+| replication_health, vacuum_analysis, transaction_wraparound
+
+| 6-7
+| Important operational metrics
+| connection_metrics, checkpoint, autovacuum_config
+
+| 4-5
+| Optimization opportunities
+| missing_index_opportunities, query_analysis
+
+| 2-3
+| Informational/nice-to-have
+| table_count, extensions_list
+
+| 1 (default)
+| Low priority or experimental
+| Any check without explicit weight
+|===
+
+== Troubleshooting
+
+=== Issue: Important module was skipped
+
+**Symptoms:**
+* Module with critical issues not included in prompt
+* AI analysis misses key problems
+
+**Diagnosis:**
+1. Check console output for trimming summary
+2. Verify module has `get_weight()` function defined
+3. Compare module size to budget
+
+**Solutions:**
+* Increase `ai_max_prompt_tokens` setting
+* Add or increase module's weight value
+* Reduce size of module's output (fewer rows in queries)
+
+=== Issue: All modules are being trimmed
+
+**Symptoms:**
+* Trimming summary shows many modules trimmed
+* AI responses lack detail
+
+**Diagnosis:**
+* Budget is too small for dataset size
+* Many modules produce large result sets
+
+**Solutions:**
+* Increase `ai_max_prompt_tokens` to 32000 or 100000
+* Optimize check queries to return fewer rows
+* Use `row_limit` settings in config to cap result sizes
+
+=== Issue: No trimming occurring but should be
+
+**Symptoms:**
+* Budget seems adequate but no trimming logged
+* Prompt size smaller than expected
+
+**Diagnosis:**
+* Modules are naturally small (good!)
+* Budget is larger than total findings size
+
+**Solutions:**
+* No action needed - this is optimal behavior
+* Consider reducing `ai_max_prompt_tokens` to save AI costs
+
+== Performance Considerations
+
+=== Time Complexity
+
+* **Rule evaluation**: O(R × F) where R = number of rules, F = number of findings
+* **Priority sorting**: O(M log M) where M = number of modules
+* **Budget allocation**: O(M) single pass through sorted modules
+* **Trimming**: O(D) where D = data items within a module
+
+**Total**: O(R × F + M log M) - dominated by rule evaluation
+
+=== Space Complexity
+
+* **Deep copy overhead**: Each module is deep-copied before trimming (prevents mutation)
+* **Findings storage**: Original findings remain intact
+* **Trimmed findings**: Separate dictionary for prompt data
+
+**Memory usage**: ~2x the original findings size during processing
+
+=== Optimization Tips
+
+1. **Reduce result set sizes**: Use `LIMIT` clauses in check queries
+2. **Optimize rules**: Avoid expensive operations in rule expressions
+3. **Increase module weights**: Ensure important data has high priority
+4. **Monitor trimming logs**: Adjust budget based on actual needs
+
+== Related Documentation
+
+* link:dynamic_prompt_generator.py[Source Code - Dynamic Prompt Generator]
+* link:../docs/architecture_flow.adoc[Main Architectural Flow Documentation]
+---
