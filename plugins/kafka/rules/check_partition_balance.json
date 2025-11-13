@@ -1,6 +1,10 @@
 {
   "imbalanced_replicas": {
-    "metric_keywords": ["partition_balance", "distribution", "deviation"],
+    "metric_keywords": [
+      "partition_balance",
+      "distribution",
+      "deviation"
+    ],
     "rules": [
       {
         "expression": "data.get('deviation', 0) > 20",
@@ -21,6 +25,16 @@
           "Monitor broker loads and consider rebalancing if deviation persists.",
           "Ensure all brokers have similar hardware capacity for balanced distribution."
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "deviation",
+        "exists": true
       }
     ]
   }

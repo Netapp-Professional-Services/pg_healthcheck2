@@ -1,8 +1,19 @@
 {
   "critical_produce_purgatory": {
-    "metric_keywords": ["prometheus_purgatory", "per_broker_purgatory", "data"],
+    "metric_keywords": [
+      "prometheus_purgatory",
+      "per_broker_purgatory",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "produce_purgatory", "exists": true }
+      {
+        "key": "produce_purgatory",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -21,9 +32,20 @@
     ]
   },
   "warning_produce_purgatory": {
-    "metric_keywords": ["prometheus_purgatory", "per_broker_purgatory", "data"],
+    "metric_keywords": [
+      "prometheus_purgatory",
+      "per_broker_purgatory",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "produce_purgatory", "exists": true }
+      {
+        "key": "produce_purgatory",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -40,9 +62,20 @@
     ]
   },
   "critical_fetch_purgatory": {
-    "metric_keywords": ["prometheus_purgatory", "per_broker_purgatory", "data"],
+    "metric_keywords": [
+      "prometheus_purgatory",
+      "per_broker_purgatory",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "fetch_purgatory", "exists": true }
+      {
+        "key": "fetch_purgatory",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -60,7 +93,10 @@
     ]
   },
   "healthy_purgatory": {
-    "metric_keywords": ["prometheus_purgatory", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_purgatory",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_produce_purgatory', 0) < 50 and data.get('avg_fetch_purgatory', 0) < 50",
@@ -72,6 +108,16 @@
           "Continue monitoring for spikes",
           "Typical values should be < 100 requests"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_fetch_purgatory",
+        "exists": true
+      },
+      {
+        "key": "avg_produce_purgatory",
+        "exists": true
       }
     ]
   }

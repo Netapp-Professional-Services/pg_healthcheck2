@@ -1,8 +1,19 @@
 {
   "critical_under_replicated_partitions": {
-    "metric_keywords": ["prometheus_under_replicated", "per_broker_urp", "data"],
+    "metric_keywords": [
+      "prometheus_under_replicated",
+      "per_broker_urp",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "under_replicated_partitions", "exists": true }
+      {
+        "key": "under_replicated_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -21,11 +32,21 @@
       }
     ]
   },
-
   "warning_under_replicated_partitions": {
-    "metric_keywords": ["prometheus_under_replicated", "per_broker_urp", "data"],
+    "metric_keywords": [
+      "prometheus_under_replicated",
+      "per_broker_urp",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "under_replicated_partitions", "exists": true }
+      {
+        "key": "under_replicated_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -43,9 +64,11 @@
       }
     ]
   },
-
   "cluster_urp_pressure": {
-    "metric_keywords": ["prometheus_under_replicated", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_under_replicated",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('total_under_replicated_partitions', 0) >= 20",
@@ -76,11 +99,23 @@
           "Check for specific topics with replication issues"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "brokers_with_urp",
+        "exists": true
+      },
+      {
+        "key": "total_under_replicated_partitions",
+        "exists": true
+      }
     ]
   },
-
   "healthy_replication": {
-    "metric_keywords": ["prometheus_under_replicated", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_under_replicated",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('total_under_replicated_partitions', 0) == 0",
@@ -93,6 +128,16 @@
           "Review min.insync.replicas settings periodically",
           "Ensure rack awareness is properly configured for availability"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "total_brokers",
+        "exists": true
+      },
+      {
+        "key": "total_under_replicated_partitions",
+        "exists": true
       }
     ]
   }

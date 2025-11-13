@@ -1,16 +1,18 @@
 """
-Kafka Purgatory Size Check (Prometheus - Instaclustr)
+Kafka Purgatory Size Check (Unified Adaptive)
 
-Monitors produce and fetch purgatory sizes from Instaclustr Prometheus endpoints.
+Monitors produce and fetch purgatory sizes using adaptive collection strategy.
 Large purgatory sizes indicate requests waiting for acknowledgment or data.
 
 Health Check: prometheus_purgatory
-Source: Instaclustr Prometheus endpoints
-Requires: instaclustr_prometheus_enabled: true
+Collection Methods (in order of preference):
+1. Instaclustr Prometheus API
+2. Local Prometheus JMX Exporter (port 7500)
+3. Standard JMX (port 9999)
 
 Metrics:
-- ic_node_produce_purgatory_size
-- ic_node_fetch_purgatory_size
+- ic_node_produce_purgatory_size / kafka_server_delayedoperationpurgatory_purgatorysize{delayedOperation="Produce"}
+- ic_node_fetch_purgatory_size / kafka_server_delayedoperationpurgatory_purgatorysize{delayedOperation="Fetch"}
 
 IMPORTANCE:
 - High produce purgatory: Producers waiting for acks (acks=all with slow replicas)
@@ -21,6 +23,8 @@ IMPORTANCE:
 import logging
 from datetime import datetime
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.metric_collection_strategies import collect_metric_adaptive
+from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
 logger = logging.getLogger(__name__)
 
@@ -32,21 +36,19 @@ def get_weight():
 
 def check_prometheus_purgatory(connector, settings):
     """
-    Check purgatory sizes via Prometheus (Instaclustr managed service).
+    Check purgatory sizes via adaptive collection strategy.
 
     Monitors:
     - Produce purgatory size (requests waiting for acks)
     - Fetch purgatory size (fetch requests waiting for data)
 
     Thresholds:
-    - Produce WARNING: > 100 requests
-    - Produce CRITICAL: > 500 requests
-    - Fetch WARNING: > 100 requests
-    - Fetch CRITICAL: > 500 requests
+    - WARNING: > 100 requests
+    - CRITICAL: > 500 requests
 
     Args:
-        connector: Kafka connector (not used for Prometheus checks)
-        settings: Configuration dictionary with Prometheus credentials
+        connector: Kafka connector with adaptive metric collection support
+        settings: Configuration dictionary
 
     Returns:
         tuple: (adoc_content, structured_findings)
@@ -54,188 +56,191 @@ def check_prometheus_purgatory(connector, settings):
     builder = CheckContentBuilder()
     builder.h3("Purgatory Size (Prometheus)")
 
-    if not settings.get('instaclustr_prometheus_enabled'):
-        findings = {
-            'status': 'skipped',
-            'reason': 'Prometheus monitoring not enabled',
-            'data': [],
-            'metadata': {
-                'source': 'prometheus',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-        }
-        return builder.build(), findings
-
     try:
-        from plugins.common.prometheus_client import get_instaclustr_client
+        # Get metric definitions
+        produce_purg_def = get_metric_definition('purgatory_produce')
+        fetch_purg_def = get_metric_definition('purgatory_fetch')
 
-        client = get_instaclustr_client(
-            cluster_id=settings['instaclustr_cluster_id'],
-            username=settings['instaclustr_prometheus_username'],
-            api_key=settings['instaclustr_prometheus_api_key'],
-            prometheus_base_url=settings.get('instaclustr_prometheus_base_url')
-        )
-
-        all_metrics = client.scrape_all_nodes()
-
-        if not all_metrics:
-            builder.error("❌ No metrics available from Prometheus")
+        if not produce_purg_def or not fetch_purg_def:
+            builder.error("❌ Purgatory metric definitions not found")
             findings = {
                 'status': 'error',
-                'error_message': 'No metrics available',
+                'error_message': 'Metric definitions not found',
                 'data': [],
-                'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}
+                'metadata': {'timestamp': datetime.utcnow().isoformat() + 'Z'}
             }
             return builder.build(), findings
 
-        produce_purg_metrics = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_produce_purgatory_size$')
-        fetch_purg_metrics = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_fetch_purgatory_size$')
+        # Collect both metrics adaptively
+        produce_result = collect_metric_adaptive(produce_purg_def, connector, settings)
+        fetch_result = collect_metric_adaptive(fetch_purg_def, connector, settings)
 
-        if not (produce_purg_metrics or fetch_purg_metrics):
-            builder.text("ℹ️  Purgatory metrics not found (may not be available)")
+        if not produce_result and not fetch_result:
+            builder.warning(
+                "⚠️ Could not collect purgatory metrics\n\n"
+                "*Tried collection methods:*\n"
+                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
+                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
+                "3. Standard JMX - Not available or SSH unavailable"
+            )
             findings = {
-                'status': 'info',
-                'message': 'Purgatory metrics not available',
+                'status': 'skipped',
+                'reason': 'Unable to collect purgatory metrics using any method',
                 'data': [],
-                'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}
+                'metadata': {
+                    'attempted_methods': ['instaclustr_prometheus', 'local_prometheus', 'jmx'],
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                }
             }
             return builder.build(), findings
 
+        # Extract data
+        method = produce_result.get('method') if produce_result else fetch_result.get('method')
+        produce_metrics = produce_result.get('node_metrics', {}) if produce_result else {}
+        fetch_metrics = fetch_result.get('node_metrics', {}) if fetch_result else {}
+
+        # Get thresholds
         produce_warning = settings.get('kafka_produce_purgatory_warning', 100)
         produce_critical = settings.get('kafka_produce_purgatory_critical', 500)
         fetch_warning = settings.get('kafka_fetch_purgatory_warning', 100)
         fetch_critical = settings.get('kafka_fetch_purgatory_critical', 500)
 
-        broker_data = {}
+        # Combine broker data
+        all_hosts = set(produce_metrics.keys()) | set(fetch_metrics.keys())
+        node_data = []
+        critical_brokers = []
+        warning_brokers = []
 
-        for metric in produce_purg_metrics:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-            if node_id not in broker_data:
-                broker_data[node_id] = {
-                    'node_id': node_id,
-                    'public_ip': target_labels.get('PublicIp', 'unknown'),
-                    'rack': target_labels.get('Rack', 'unknown')
-                }
-            broker_data[node_id]['produce_purgatory'] = int(metric['value'])
+        for host in all_hosts:
+            produce_size = produce_metrics.get(host, 0)
+            fetch_size = fetch_metrics.get(host, 0)
 
-        for metric in fetch_purg_metrics:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-            if node_id in broker_data:
-                broker_data[node_id]['fetch_purgatory'] = int(metric['value'])
+            broker_entry = {
+                'node_id': host,
+                'host': host,
+                'produce_purgatory_size': int(produce_size),
+                'fetch_purgatory_size': int(fetch_size)
+            }
+            node_data.append(broker_entry)
 
-        if not broker_data:
+            # Check thresholds
+            if produce_size >= produce_critical or fetch_size >= fetch_critical:
+                critical_brokers.append(broker_entry)
+            elif produce_size >= produce_warning or fetch_size >= fetch_warning:
+                warning_brokers.append(broker_entry)
+
+        if not node_data:
             builder.error("❌ No broker data available")
-            findings = {'status': 'error', 'error_message': 'No broker data', 'data': [], 'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}}
+            findings = {
+                'status': 'error',
+                'error_message': 'No broker data available',
+                'data': [],
+                'metadata': {'method': method, 'timestamp': datetime.utcnow().isoformat() + 'Z'}
+            }
             return builder.build(), findings
 
-        node_data = list(broker_data.values())
-        critical_produce = []
-        warning_produce = []
-        critical_fetch = []
-        warning_fetch = []
-
-        for broker in node_data:
-            prod_purg = broker.get('produce_purgatory', 0)
-            fetch_purg = broker.get('fetch_purgatory', 0)
-
-            if prod_purg >= produce_critical:
-                critical_produce.append({'node_id': broker['node_id'], 'public_ip': broker['public_ip'], 'produce_purgatory': prod_purg})
-            elif prod_purg >= produce_warning:
-                warning_produce.append({'node_id': broker['node_id'], 'public_ip': broker['public_ip'], 'produce_purgatory': prod_purg})
-
-            if fetch_purg >= fetch_critical:
-                critical_fetch.append({'node_id': broker['node_id'], 'public_ip': broker['public_ip'], 'fetch_purgatory': fetch_purg})
-            elif fetch_purg >= fetch_warning:
-                warning_fetch.append({'node_id': broker['node_id'], 'public_ip': broker['public_ip'], 'fetch_purgatory': fetch_purg})
-
-        if critical_produce or critical_fetch:
+        # Determine overall status
+        if critical_brokers:
             status = 'critical'
-            severity = 9
-            issues = []
-            if critical_produce:
-                issues.append(f"{len(critical_produce)} broker(s) with critical produce purgatory")
-            if critical_fetch:
-                issues.append(f"{len(critical_fetch)} broker(s) with critical fetch purgatory")
-            message = " and ".join(issues)
-        elif warning_produce or warning_fetch:
+            severity = 8
+            message = f"🔴 {len(critical_brokers)} broker(s) with critical purgatory sizes"
+        elif warning_brokers:
             status = 'warning'
             severity = 6
-            issues = []
-            if warning_produce:
-                issues.append(f"{len(warning_produce)} broker(s) with high produce purgatory")
-            if warning_fetch:
-                issues.append(f"{len(warning_fetch)} broker(s) with high fetch purgatory")
-            message = " and ".join(issues)
+            message = f"⚠️  {len(warning_brokers)} broker(s) with high purgatory sizes"
         else:
             status = 'healthy'
             severity = 0
-            message = f"Purgatory sizes healthy across {len(node_data)} brokers"
+            message = f"✅ Purgatory sizes healthy across {len(node_data)} brokers"
 
-        avg_produce = sum(b.get('produce_purgatory', 0) for b in node_data) / len(node_data)
-        avg_fetch = sum(b.get('fetch_purgatory', 0) for b in node_data) / len(node_data)
+        # Calculate cluster aggregates
+        avg_produce = sum(b['produce_purgatory_size'] for b in node_data) / len(node_data)
+        avg_fetch = sum(b['fetch_purgatory_size'] for b in node_data) / len(node_data)
 
+        # Build structured findings
         findings = {
             'status': status,
             'severity': severity,
             'message': message,
-            'per_broker_purgatory': {
-                'status': status,
-                'data': node_data,
-                'metadata': {'source': 'prometheus', 'metrics': ['produce_purgatory', 'fetch_purgatory'], 'broker_count': len(node_data)}
+            'data': {
+                'per_broker_purgatory': node_data,
+                'cluster_aggregate': {
+                    'avg_produce_purgatory_size': round(avg_produce, 1),
+                    'avg_fetch_purgatory_size': round(avg_fetch, 1),
+                    'brokers_critical': len(critical_brokers),
+                    'brokers_warning': len(warning_brokers),
+                    'broker_count': len(node_data),
+                    'thresholds': {
+                        'produce_warning': produce_warning,
+                        'produce_critical': produce_critical,
+                        'fetch_warning': fetch_warning,
+                        'fetch_critical': fetch_critical
+                    }
+                },
+                'collection_method': method
             },
-            'cluster_aggregate': {
-                'avg_produce_purgatory': round(avg_produce, 1),
-                'avg_fetch_purgatory': round(avg_fetch, 1),
-                'broker_count': len(node_data)
+            'metadata': {
+                'source': method,
+                'metrics': ['produce_purgatory_size', 'fetch_purgatory_size'],
+                'broker_count': len(node_data),
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
         }
 
-        if critical_produce:
-            findings['critical_produce_purgatory'] = {'count': len(critical_produce), 'brokers': critical_produce, 'recommendation': 'High produce purgatory indicates slow replication or acks=all with lagging replicas'}
-        if warning_produce:
-            findings['warning_produce_purgatory'] = {'count': len(warning_produce), 'brokers': warning_produce, 'recommendation': 'Monitor produce purgatory - may indicate replication issues'}
-        if critical_fetch:
-            findings['critical_fetch_purgatory'] = {'count': len(critical_fetch), 'brokers': critical_fetch, 'recommendation': 'High fetch purgatory indicates consumers/followers waiting for data'}
-        if warning_fetch:
-            findings['warning_fetch_purgatory'] = {'count': len(warning_fetch), 'brokers': warning_fetch, 'recommendation': 'Monitor fetch purgatory - check consumer configuration'}
-
+        # Generate AsciiDoc output
         if status == 'critical':
-            builder.critical(f"⚠️  {message}")
+            builder.critical(message)
+            builder.blank()
         elif status == 'warning':
-            builder.warning(f"⚠️  {message}")
+            builder.warning(message)
+            builder.blank()
         else:
-            builder.success(f"✅ {message}")
+            builder.success(message)
+            builder.blank()
 
-        builder.blank()
         builder.text("*Cluster Summary:*")
         builder.text(f"- Avg Produce Purgatory: {round(avg_produce, 1)} requests")
         builder.text(f"- Avg Fetch Purgatory: {round(avg_fetch, 1)} requests")
+        builder.text(f"- Brokers with Issues: {len(critical_brokers)} critical, {len(warning_brokers)} warning")
         builder.text(f"- Brokers Monitored: {len(node_data)}")
+        builder.text(f"- Collection Method: {method}")
         builder.blank()
 
-        if status in ['critical', 'warning']:
+        if critical_brokers or warning_brokers:
+            builder.text("*Brokers with High Purgatory Sizes:*")
+            for broker in critical_brokers + warning_brokers:
+                symbol = "🔴" if broker in critical_brokers else "⚠️"
+                builder.text(
+                    f"{symbol} Broker {broker['node_id']}: "
+                    f"Produce {broker['produce_purgatory_size']}, Fetch {broker['fetch_purgatory_size']}"
+                )
+            builder.blank()
+
             recommendations = {
+                "high": [
+                    "Purgatory Size Issues:",
+                    "",
+                    "High Produce Purgatory:",
+                    "  • Indicates producers waiting for acks (acks=all)",
+                    "  • Check replication lag - slow replicas delay acks",
+                    "  • Review min.insync.replicas setting",
+                    "  • Consider reducing acks to 1 for lower latency (less durability)",
+                    "",
+                    "High Fetch Purgatory:",
+                    "  • Consumers/followers waiting for fetch.min.bytes",
+                    "  • Reduce fetch.min.bytes on consumers (trade bandwidth for latency)",
+                    "  • Check if brokers are low-traffic (normal for idle clusters)",
+                    "  • Ensure fetch.max.wait.ms is reasonable (default: 500ms)",
+                    "",
+                    "General Actions:",
+                    "  • Monitor purgatory growth rate over time",
+                    "  • Check for disk I/O bottlenecks causing delays",
+                    "  • Review network latency between brokers"
+                ],
                 "general": [
-                    "Purgatory Explained:",
-                    "  • Produce Purgatory: Requests waiting for acks (acks=all)",
-                    "  • Fetch Purgatory: Fetch requests waiting for fetch.min.bytes",
-                    "",
-                    "High Produce Purgatory Causes:",
-                    "  • Slow replica replication (check ISR health)",
-                    "  • acks=all with lagging replicas",
-                    "  • Network issues between brokers",
-                    "",
-                    "High Fetch Purgatory Causes:",
-                    "  • fetch.min.bytes set too high for traffic rate",
-                    "  • Low traffic periods with default fetch.min.bytes=1",
-                    "  • fetch.max.wait.ms forcing waits",
-                    "",
-                    "Solutions:",
-                    "  • Check replication health and ISR stability",
-                    "  • Review producer acks configuration",
-                    "  • Tune fetch.min.bytes and fetch.max.wait.ms for consumers"
+                    "Typical healthy values:",
+                    "  • Produce purgatory: < 100 requests",
+                    "  • Fetch purgatory: < 100 requests (can be higher on idle clusters)"
                 ]
             }
             builder.recs(recommendations)
@@ -243,6 +248,12 @@ def check_prometheus_purgatory(connector, settings):
         return builder.build(), findings
 
     except Exception as e:
-        logger.error(f"Prometheus purgatory check failed: {e}", exc_info=True)
+        logger.error(f"Purgatory check failed: {e}", exc_info=True)
         builder.error(f"❌ Check failed: {str(e)}")
-        return builder.build(), {'status': 'error', 'error_message': str(e), 'data': [], 'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}}
+        findings = {
+            'status': 'error',
+            'error_message': str(e),
+            'data': [],
+            'metadata': {'timestamp': datetime.utcnow().isoformat() + 'Z'}
+        }
+        return builder.build(), findings

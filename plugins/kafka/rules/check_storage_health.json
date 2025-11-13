@@ -1,6 +1,10 @@
 {
   "critical_broker_storage": {
-    "metric_keywords": ["storage_health", "broker_storage", "total_size_gb"],
+    "metric_keywords": [
+      "storage_health",
+      "broker_storage",
+      "total_size_gb"
+    ],
     "rules": [
       {
         "expression": "data.get('total_size_gb', 0) > 500",
@@ -25,10 +29,24 @@
           "Consider archiving old data to external storage (S3, HDFS, etc.)."
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "total_size_gb",
+        "exists": true
+      }
     ]
   },
   "oversized_partitions": {
-    "metric_keywords": ["storage_health", "partition_storage", "size_gb"],
+    "metric_keywords": [
+      "storage_health",
+      "partition_storage",
+      "size_gb"
+    ],
     "rules": [
       {
         "expression": "data.get('size_gb', 0) > 50",
@@ -40,6 +58,24 @@
           "Review partition key selection to ensure even distribution.",
           "Consider topic retention settings - this partition may be retaining too much data."
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "partition",
+        "exists": true
+      },
+      {
+        "key": "size_gb",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
       }
     ]
   }

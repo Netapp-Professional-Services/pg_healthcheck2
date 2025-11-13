@@ -1,6 +1,9 @@
 {
   "critical_cpu_load": {
-    "metric_keywords": ["cpu_load", "kafka"],
+    "metric_keywords": [
+      "cpu_load",
+      "kafka"
+    ],
     "rules": [
       {
         "expression": "data.get('max_load', 0) >= 10",
@@ -50,13 +53,55 @@
           "Review JVM GC settings for CPU efficiency"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "load_15min",
+        "exists": true
+      },
+      {
+        "key": "load_1min",
+        "exists": true
+      },
+      {
+        "key": "load_5min",
+        "exists": true
+      },
+      {
+        "key": "max_load",
+        "exists": true
+      }
     ]
   },
   "broker_cpu_health": {
-    "metric_keywords": ["cpu_load"],
+    "metric_keywords": [
+      "cpu_load"
+    ],
     "data_conditions": [
-      {"key": "broker_id", "exists": true},
-      {"key": "max_load", "exists": true}
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "max_load",
+        "exists": true
+      },
+      {
+        "key": "exceeds_critical",
+        "exists": true
+      },
+      {
+        "key": "exceeds_warning",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -82,7 +127,10 @@
     ]
   },
   "multiple_brokers_cpu_issues": {
-    "metric_keywords": ["cpu_load"],
+    "metric_keywords": [
+      "cpu_load",
+      "health_summary"
+    ],
     "rules": [
       {
         "expression": "len(all_structured_findings.get('check_cpu_load', {}).get('cpu_load', {}).get('critical_brokers', [])) >= 2",
@@ -106,6 +154,12 @@
           "Analyze traffic patterns for optimization opportunities",
           "Plan coordinated scaling across the cluster"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "warning_count",
+        "exists": true
       }
     ]
   }

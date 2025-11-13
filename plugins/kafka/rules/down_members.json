@@ -1,6 +1,11 @@
 {
   "inactive_consumer_lag": {
-    "metric_keywords": ["down_members", "down_members", "total_lag", "members"],
+    "metric_keywords": [
+      "down_members",
+      "down_members",
+      "total_lag",
+      "members"
+    ],
     "rules": [
       {
         "expression": "data.get('members', 0) == 0 and data.get('total_lag', 0) > 10000",
@@ -21,6 +26,20 @@
           "Check the status of consumer applications and restart if necessary.",
           "Monitor for recurring issues that cause consumers to go down."
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "group_id",
+        "exists": true
+      },
+      {
+        "key": "members",
+        "exists": true
+      },
+      {
+        "key": "total_lag",
+        "exists": true
       }
     ]
   }

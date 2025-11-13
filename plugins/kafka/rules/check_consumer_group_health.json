@@ -1,6 +1,9 @@
 {
   "consumer_lag_critical": {
-    "metric_keywords": ["consumer_groups", "production_data"],
+    "metric_keywords": [
+      "consumer_groups",
+      "production_data"
+    ],
     "rules": [
       {
         "expression": "data.get('total_lag', 0) > 10000 and data.get('has_offsets', False) and not data.get('is_test_consumer', False)",
@@ -16,10 +19,35 @@
           "Monitor JVM metrics if using Java consumers (GC pauses, heap usage)"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "group_id",
+        "exists": true
+      },
+      {
+        "key": "has_offsets",
+        "exists": true
+      },
+      {
+        "key": "is_test_consumer",
+        "exists": true
+      },
+      {
+        "key": "max_lag",
+        "exists": true
+      },
+      {
+        "key": "total_lag",
+        "exists": true
+      }
     ]
   },
   "consumer_lag_warning": {
-    "metric_keywords": ["consumer_groups", "production_data"],
+    "metric_keywords": [
+      "consumer_groups",
+      "production_data"
+    ],
     "rules": [
       {
         "expression": "data.get('total_lag', 0) > 5000 and data.get('total_lag', 0) <= 10000 and data.get('has_offsets', False) and not data.get('is_test_consumer', False)",
@@ -34,10 +62,35 @@
           "Check for network latency or broker performance issues"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "group_id",
+        "exists": true
+      },
+      {
+        "key": "has_offsets",
+        "exists": true
+      },
+      {
+        "key": "is_test_consumer",
+        "exists": true
+      },
+      {
+        "key": "max_lag",
+        "exists": true
+      },
+      {
+        "key": "total_lag",
+        "exists": true
+      }
     ]
   },
   "consumer_unstable_state": {
-    "metric_keywords": ["consumer_groups", "production_data"],
+    "metric_keywords": [
+      "consumer_groups",
+      "production_data"
+    ],
     "rules": [
       {
         "expression": "data.get('state', 'Unknown') != 'Stable' and not data.get('is_test_consumer', False)",
@@ -52,10 +105,31 @@
           "Monitor for repeated state transitions which indicate ongoing instability"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "group_id",
+        "exists": true
+      },
+      {
+        "key": "is_test_consumer",
+        "exists": true
+      },
+      {
+        "key": "members",
+        "exists": true
+      },
+      {
+        "key": "state",
+        "exists": true
+      }
     ]
   },
   "consumer_low_members": {
-    "metric_keywords": ["consumer_groups", "production_data"],
+    "metric_keywords": [
+      "consumer_groups",
+      "production_data"
+    ],
     "rules": [
       {
         "expression": "data.get('members', 0) < 2 and not data.get('is_test_consumer', False)",
@@ -70,10 +144,31 @@
           "Set up alerts for member count dropping below minimum threshold"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "group_id",
+        "exists": true
+      },
+      {
+        "key": "is_test_consumer",
+        "exists": true
+      },
+      {
+        "key": "members",
+        "exists": true
+      },
+      {
+        "key": "state",
+        "exists": true
+      }
     ]
   },
   "consumer_no_offsets": {
-    "metric_keywords": ["consumer_groups", "production_data"],
+    "metric_keywords": [
+      "consumer_groups",
+      "production_data"
+    ],
     "rules": [
       {
         "expression": "not data.get('has_offsets', False) and data.get('state') == 'Stable' and not data.get('is_test_consumer', False)",
@@ -87,6 +182,28 @@
           "Verify consumers are successfully connecting to Kafka and subscribing to topics",
           "Check consumer configuration for enable.auto.commit setting"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "group_id",
+        "exists": true
+      },
+      {
+        "key": "has_offsets",
+        "exists": true
+      },
+      {
+        "key": "is_test_consumer",
+        "exists": true
+      },
+      {
+        "key": "members",
+        "exists": true
+      },
+      {
+        "key": "state",
+        "exists": true
       }
     ]
   }

@@ -1,8 +1,19 @@
 {
   "critical_broker_overload": {
-    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "metric_keywords": [
+      "prometheus_partition_balance",
+      "per_broker_partitions",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "total_partitions", "exists": true }
+      {
+        "key": "total_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -22,11 +33,21 @@
       }
     ]
   },
-
   "warning_broker_high_partitions": {
-    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "metric_keywords": [
+      "prometheus_partition_balance",
+      "per_broker_partitions",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "total_partitions", "exists": true }
+      {
+        "key": "total_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -44,11 +65,25 @@
       }
     ]
   },
-
   "critical_partition_imbalance": {
-    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "metric_keywords": [
+      "prometheus_partition_balance",
+      "per_broker_partitions",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "partition_deviation_pct", "exists": true }
+      {
+        "key": "partition_deviation_pct",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      },
+      {
+        "key": "total_partitions",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -67,11 +102,21 @@
       }
     ]
   },
-
   "warning_partition_imbalance": {
-    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "metric_keywords": [
+      "prometheus_partition_balance",
+      "per_broker_partitions",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "partition_deviation_pct", "exists": true }
+      {
+        "key": "partition_deviation_pct",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -89,11 +134,25 @@
       }
     ]
   },
-
   "critical_leader_imbalance": {
-    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "metric_keywords": [
+      "prometheus_partition_balance",
+      "per_broker_partitions",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "leader_deviation_pct", "exists": true }
+      {
+        "key": "leader_deviation_pct",
+        "exists": true
+      },
+      {
+        "key": "leader_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -112,11 +171,21 @@
       }
     ]
   },
-
   "warning_leader_imbalance": {
-    "metric_keywords": ["prometheus_partition_balance", "per_broker_partitions", "data"],
+    "metric_keywords": [
+      "prometheus_partition_balance",
+      "per_broker_partitions",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "leader_deviation_pct", "exists": true }
+      {
+        "key": "leader_deviation_pct",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -134,9 +203,11 @@
       }
     ]
   },
-
   "healthy_partition_balance": {
-    "metric_keywords": ["prometheus_partition_balance", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_partition_balance",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_partitions_per_broker', 0) < 1000",
@@ -150,6 +221,12 @@
           "Plan for rebalancing when adding/removing brokers",
           "Recommended: Run preferred leader election periodically (e.g., weekly)"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_partitions_per_broker",
+        "exists": true
       }
     ]
   }

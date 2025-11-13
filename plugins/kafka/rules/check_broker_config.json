@@ -1,6 +1,9 @@
 {
   "critical_config_issues": {
-    "metric_keywords": ["broker_config", "kafka"],
+    "metric_keywords": [
+      "broker_config",
+      "kafka"
+    ],
     "rules": [
       {
         "expression": "any(issue.get('severity') == 'critical' and issue.get('setting') == 'unclean.leader.election.enable' for issue in data.get('issues', []))",
@@ -28,10 +31,26 @@
           "Test configuration in non-production environment first"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "issues",
+        "exists": true
+      }
     ]
   },
   "config_warnings": {
-    "metric_keywords": ["broker_config"],
+    "metric_keywords": [
+      "broker_config"
+    ],
     "rules": [
       {
         "expression": "any(issue.get('severity') == 'warning' and 'auto.create.topics' in issue.get('setting', '') for issue in data.get('issues', []))",
@@ -57,10 +76,22 @@
           "Consider cluster size when setting replication factor"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "issues",
+        "exists": true
+      }
     ]
   },
   "config_optimization": {
-    "metric_keywords": ["broker_config"],
+    "metric_keywords": [
+      "broker_config"
+    ],
     "rules": [
       {
         "expression": "any(issue.get('severity') == 'info' and 'thread' in issue.get('setting', '') for issue in data.get('issues', []))",
@@ -98,13 +129,39 @@
           "Monitor file descriptor usage after changes"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "issues",
+        "exists": true
+      }
     ]
   },
   "broker_config_health": {
-    "metric_keywords": ["broker_config"],
+    "metric_keywords": [
+      "broker_config"
+    ],
     "data_conditions": [
-      {"key": "broker_id", "exists": true},
-      {"key": "critical_count", "exists": true}
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "critical_count",
+        "exists": true
+      },
+      {
+        "key": "info_count",
+        "exists": true
+      },
+      {
+        "key": "warning_count",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -143,7 +200,13 @@
     ]
   },
   "multiple_brokers_config_issues": {
-    "metric_keywords": ["broker_config"],
+    "metric_keywords": [
+      "broker_config",
+      "health_summary"
+    ],
+    "data_conditions": [
+      {"key": "warning_count", "exists": true}
+    ],
     "rules": [
       {
         "expression": "len(all_structured_findings.get('check_broker_config', {}).get('broker_config', {}).get('warning_brokers', [])) >= 2",

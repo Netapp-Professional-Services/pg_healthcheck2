@@ -1,6 +1,9 @@
 {
   "critical_fetch_purgatory": {
-    "metric_keywords": ["purgatory_size", "data"],
+    "metric_keywords": [
+      "purgatory_size",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('fetch_purgatory_size', 0) >= 500",
@@ -27,10 +30,27 @@
           "Verify consumer group is actively consuming from all partitions"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "fetch_purgatory_size",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      }
     ]
   },
   "critical_produce_purgatory": {
-    "metric_keywords": ["purgatory_size", "data"],
+    "metric_keywords": [
+      "purgatory_size",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('produce_purgatory_size', 0) >= 500",
@@ -58,10 +78,26 @@
           "Verify network connectivity between brokers"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "produce_purgatory_size",
+        "exists": true
+      }
     ]
   },
   "cluster_wide_purgatory_issues": {
-    "metric_keywords": ["purgatory_summary"],
+    "metric_keywords": [
+      "purgatory_summary"
+    ],
     "rules": [
       {
         "expression": "data.get('critical_broker_count', 0) >= 2",
@@ -101,10 +137,26 @@
           "Review recent workload changes or traffic spikes"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "critical_broker_count",
+        "exists": true
+      },
+      {
+        "key": "has_cluster_wide_issue",
+        "exists": true
+      },
+      {
+        "key": "warning_broker_count",
+        "exists": true
+      }
     ]
   },
   "excessive_total_purgatory": {
-    "metric_keywords": ["purgatory_summary"],
+    "metric_keywords": [
+      "purgatory_summary"
+    ],
     "rules": [
       {
         "expression": "data.get('total_fetch_purgatory', 0) >= 1000",
@@ -132,10 +184,23 @@
           "Consider if all topics truly need acks=all durability guarantee"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "total_fetch_purgatory",
+        "exists": true
+      },
+      {
+        "key": "total_produce_purgatory",
+        "exists": true
+      }
     ]
   },
   "individual_broker_imbalance": {
-    "metric_keywords": ["purgatory_size", "data"],
+    "metric_keywords": [
+      "purgatory_size",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('fetch_purgatory_size', 0) > 0 and data.get('fetch_purgatory_size', 0) >= (all_structured_findings.get('check_purgatory_size', {}).get('purgatory_summary', {}).get('data', [{}])[0].get('max_fetch_purgatory', 0) * 0.8)",
@@ -161,10 +226,31 @@
           "Verify follower replicas on other brokers are keeping up"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "fetch_purgatory_size",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "produce_purgatory_size",
+        "exists": true
+      }
     ]
   },
   "zero_purgatory_with_high_throughput": {
-    "metric_keywords": ["purgatory_size", "data"],
+    "metric_keywords": [
+      "purgatory_size",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('fetch_purgatory_size', 0) == 0 and data.get('produce_purgatory_size', 0) == 0",
@@ -176,10 +262,30 @@
           "Keep track of purgatory trends over time to detect early degradation"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "fetch_purgatory_size",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "produce_purgatory_size",
+        "exists": true
+      }
     ]
   },
   "purgatory_collection_errors": {
-    "metric_keywords": ["purgatory_size"],
+    "metric_keywords": [
+      "purgatory_size"
+    ],
     "rules": [
       {
         "expression": "data.get('status', '') == 'error'",
@@ -219,10 +325,30 @@
           "Review kafka-run-class path configuration in settings"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "brokers_checked",
+        "exists": true
+      },
+      {
+        "key": "details",
+        "exists": true
+      },
+      {
+        "key": "errors",
+        "exists": true
+      },
+      {
+        "key": "status",
+        "exists": true
+      }
     ]
   },
   "purgatory_monitoring_health": {
-    "metric_keywords": ["purgatory_size"],
+    "metric_keywords": [
+      "purgatory_size"
+    ],
     "rules": [
       {
         "expression": "data.get('brokers_checked', 0) > 0 and len(data.get('critical_brokers', [])) == 0 and len(data.get('warning_brokers', [])) == 0",
@@ -233,6 +359,20 @@
           "Continue monitoring purgatory metrics to maintain healthy state",
           "Keep track of purgatory trends over time to detect early degradation"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "brokers_checked",
+        "exists": true
+      },
+      {
+        "key": "critical_brokers",
+        "exists": true
+      },
+      {
+        "key": "warning_brokers",
+        "exists": true
       }
     ]
   }

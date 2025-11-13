@@ -93,7 +93,11 @@ REPORT_SECTIONS = [
     {
         'title': 'Performance Deep Dive',
         'actions': [
+            # Comprehensive query analysis - strategic workload overview (weight: 7)
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_comprehensive_query_analysis', 'function': 'check_comprehensive_query_analysis'},
 
+            # Query optimization opportunities - actionable recommendations with index suggestions (weight: 8)
+            {'type': 'module', 'module': 'plugins.postgres.checks.check_query_optimization_opportunities', 'function': 'check_query_optimization_opportunities'},
 
             {'type': 'module', 'module': 'plugins.postgres.checks.deep_query_analysis', 'function': 'run_deep_query_analysis'},
 #            {'type': 'module', 'module': 'plugins.postgres.checks.query_analysis', 'function': 'run_query_analysis'},

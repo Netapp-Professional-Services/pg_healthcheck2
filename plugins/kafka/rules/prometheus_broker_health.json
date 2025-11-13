@@ -1,8 +1,19 @@
 {
   "critical_cpu_broker": {
-    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "metric_keywords": [
+      "prometheus_broker_health",
+      "per_broker_metrics",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "cpu_utilization", "exists": true }
+      {
+        "key": "cpu_utilization",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -20,11 +31,21 @@
       }
     ]
   },
-
   "warning_cpu_broker": {
-    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "metric_keywords": [
+      "prometheus_broker_health",
+      "per_broker_metrics",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "cpu_utilization", "exists": true }
+      {
+        "key": "cpu_utilization",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -41,11 +62,25 @@
       }
     ]
   },
-
   "critical_disk_broker": {
-    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "metric_keywords": [
+      "prometheus_broker_health",
+      "per_broker_metrics",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "disk_utilization", "exists": true }
+      {
+        "key": "disk_utilization",
+        "exists": true
+      },
+      {
+        "key": "disk_available_gb",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -64,11 +99,25 @@
       }
     ]
   },
-
   "warning_disk_broker": {
-    "metric_keywords": ["prometheus_broker_health", "per_broker_metrics", "data"],
+    "metric_keywords": [
+      "prometheus_broker_health",
+      "per_broker_metrics",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "disk_utilization", "exists": true }
+      {
+        "key": "disk_utilization",
+        "exists": true
+      },
+      {
+        "key": "disk_available_gb",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -86,9 +135,11 @@
       }
     ]
   },
-
   "cluster_cpu_pressure": {
-    "metric_keywords": ["prometheus_broker_health", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_broker_health",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_cpu_utilization', 0) >= 80",
@@ -103,11 +154,23 @@
           "Consider adding more brokers to distribute load"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_cpu_utilization",
+        "exists": true
+      },
+      {
+        "key": "broker_count",
+        "exists": true
+      }
     ]
   },
-
   "cluster_disk_pressure": {
-    "metric_keywords": ["prometheus_broker_health", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_broker_health",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_disk_utilization', 0) >= 80",
@@ -122,11 +185,23 @@
           "Consider adding more brokers with additional storage"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_disk_utilization",
+        "exists": true
+      },
+      {
+        "key": "broker_count",
+        "exists": true
+      }
     ]
   },
-
   "healthy_broker_resources": {
-    "metric_keywords": ["prometheus_broker_health", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_broker_health",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_cpu_utilization', 0) < 60 and data.get('avg_disk_utilization', 0) < 70",
@@ -139,6 +214,16 @@
           "Maintain current capacity planning approach",
           "Ensure alerting is configured for resource thresholds"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_cpu_utilization",
+        "exists": true
+      },
+      {
+        "key": "avg_disk_utilization",
+        "exists": true
       }
     ]
   }

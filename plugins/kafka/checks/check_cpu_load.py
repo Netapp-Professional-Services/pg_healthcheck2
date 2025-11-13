@@ -5,7 +5,6 @@ Checks CPU load averages across all Kafka broker nodes via SSH.
 """
 
 from plugins.common.check_helpers import require_ssh, CheckContentBuilder
-from plugins.kafka.utils.qrylib.cpu_load_queries import get_cpu_load_query
 import re
 import logging
 
@@ -57,23 +56,33 @@ def run_cpu_load_check(connector, settings):
             broker_id = ssh_host_to_node.get(ssh_host, ssh_host)
 
             try:
-                # Execute query via connector (uses qrylib)
-                query = get_cpu_load_query(connector)
-                formatted, raw = connector.execute_query(query, return_raw=True)
-
-                if "[ERROR]" in formatted or (isinstance(raw, dict) and 'error' in raw):
-                    error_msg = raw.get('error', 'Unknown error') if isinstance(raw, dict) else formatted
-                    logger.warning(f"uptime command failed on {ssh_host}: {error_msg}")
+                # Get SSH manager for this host
+                ssh_manager = connector.get_ssh_manager(ssh_host)
+                if not ssh_manager:
                     errors.append({
                         'host': ssh_host,
                         'broker_id': broker_id,
-                        'error': f"uptime command failed: {error_msg}"
+                        'error': 'SSH manager not available'
+                    })
+                    continue
+
+                ssh_manager.ensure_connected()
+
+                # Execute uptime command directly
+                command = "uptime"
+                stdout, stderr, exit_code = ssh_manager.execute_command(command)
+
+                if exit_code != 0:
+                    logger.warning(f"uptime command failed on {ssh_host}: {stderr}")
+                    errors.append({
+                        'host': ssh_host,
+                        'broker_id': broker_id,
+                        'error': f"uptime command failed: {stderr}"
                     })
                     continue
 
                 # Parse uptime output
                 # Example: " 10:23:45 up 5 days,  3:21,  2 users,  load average: 0.52, 0.58, 0.59"
-                stdout = raw if isinstance(raw, str) else str(raw)
                 load_match = re.search(r'load average:\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)', stdout)
 
                 if not load_match:

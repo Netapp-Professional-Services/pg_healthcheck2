@@ -1,29 +1,62 @@
 {
   "critical_handler_saturation": {
-    "metric_keywords": ["prometheus_request_handler", "per_broker_handler", "data"],
-    "data_conditions": [{"key": "handler_idle_pct", "exists": true}],
-    "rules": [{
-      "expression": "data.get('handler_idle_pct', 100) < 10",
-      "level": "critical",
-      "score": 9,
-      "reasoning": "🚨 Broker {data.get('node_id', 'unknown')[:8]} request handlers saturated: {data.get('handler_idle_pct')}% idle (broker overloaded)",
-      "recommendations": [
-        "Broker is overloaded - handlers have no idle time",
-        "This explains latency spikes",
-        "Consider scaling up instance or adding brokers",
-        "Review partition distribution"
-      ]
-    }]
+    "metric_keywords": [
+      "prometheus_request_handler",
+      "per_broker_handler",
+      "data"
+    ],
+    "data_conditions": [
+      {
+        "key": "handler_idle_pct",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('handler_idle_pct', 100) < 10",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "\ud83d\udea8 Broker {data.get('node_id', 'unknown')[:8]} request handlers saturated: {data.get('handler_idle_pct')}% idle (broker overloaded)",
+        "recommendations": [
+          "Broker is overloaded - handlers have no idle time",
+          "This explains latency spikes",
+          "Consider scaling up instance or adding brokers",
+          "Review partition distribution"
+        ]
+      }
+    ]
   },
   "warning_handler_load": {
-    "metric_keywords": ["prometheus_request_handler", "per_broker_handler", "data"],
-    "data_conditions": [{"key": "handler_idle_pct", "exists": true}],
-    "rules": [{
-      "expression": "data.get('handler_idle_pct', 100) < 30 and data.get('handler_idle_pct', 100) >= 10",
-      "level": "high",
-      "score": 7,
-      "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} request handlers under load: {data.get('handler_idle_pct')}% idle",
-      "recommendations": ["Monitor handler load", "Plan for capacity if trend continues"]
-    }]
+    "metric_keywords": [
+      "prometheus_request_handler",
+      "per_broker_handler",
+      "data"
+    ],
+    "data_conditions": [
+      {
+        "key": "handler_idle_pct",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('handler_idle_pct', 100) < 30 and data.get('handler_idle_pct', 100) >= 10",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Broker {data.get('node_id', 'unknown')[:8]} request handlers under load: {data.get('handler_idle_pct')}% idle",
+        "recommendations": [
+          "Monitor handler load",
+          "Plan for capacity if trend continues"
+        ]
+      }
+    ]
   }
 }

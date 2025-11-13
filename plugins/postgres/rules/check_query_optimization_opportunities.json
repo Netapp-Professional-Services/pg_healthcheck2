@@ -1,0 +1,147 @@
+{
+  "critical_optimization_opportunities": {
+    "metric_keywords": [
+      "query_optimization_opportunities"
+    ],
+    "data_conditions": [
+      {
+        "key": "query_details",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "any(float(q.get('percent_of_cluster_cpu', 0)) > 10.0 for q in data.get('query_details', []))",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "One or more queries are consuming >10% of total cluster CPU - immediate optimization required.",
+        "recommendations": [
+          "URGENT: Single query dominating cluster resources",
+          "Run EXPLAIN (ANALYZE, BUFFERS) immediately to identify bottleneck",
+          "Check for missing indexes on large tables",
+          "Consider emergency query kill if impacting production",
+          "Review application code for inefficient ORM queries",
+          "Implement query result caching if appropriate"
+        ]
+      },
+      {
+        "expression": "len([q for q in data.get('query_details', []) if float(q.get('percent_of_cluster_cpu', 0)) > 5.0]) >= 3",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Multiple queries (3+) each consuming >5% of cluster CPU indicates systemic optimization needs.",
+        "recommendations": [
+          "Schedule optimization sprint to address top resource consumers",
+          "Create indexes for queries with high sequential scan correlation",
+          "Review application architecture for query efficiency",
+          "Consider read replicas to offload analytical queries",
+          "Implement connection pooling if not already in place"
+        ]
+      }
+    ]
+  },
+  "missing_index_opportunities": {
+    "metric_keywords": [
+      "query_optimization_opportunities"
+    ],
+    "data_conditions": [
+      {
+        "key": "high_seqscan_tables",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "any(float(t.get('seq_scan_percent', 0)) > 90 and int(t.get('n_live_tup', 0)) > 10000 for t in data.get('high_seqscan_tables', []))",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Large tables (>10K rows) with >90% sequential scans indicate critical missing index opportunities.",
+        "recommendations": [
+          "Review query patterns accessing these tables",
+          "Create indexes on frequently filtered columns (WHERE clauses)",
+          "Use EXPLAIN to verify sequential scans before index creation",
+          "Create indexes with CONCURRENTLY to avoid table locks",
+          "Monitor index usage after creation with pg_stat_user_indexes"
+        ]
+      }
+    ]
+  },
+  "user_service_optimization_planning": {
+    "metric_keywords": [
+      "query_optimization_opportunities"
+    ],
+    "data_conditions": [
+      {
+        "key": "user_aggregation",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "len([u for u in data.get('user_aggregation', []) if float(u.get('percent_of_cluster_cpu', 0)) > 10.0]) > 0",
+        "level": "high",
+        "score": 7,
+        "reasoning": "One or more users/services consuming >10% of cluster CPU - needs team coordination for optimization.",
+        "recommendations": [
+          "Identify team/service owners for high-consuming users",
+          "Schedule optimization meetings with responsible teams",
+          "Review application query patterns and ORM configuration",
+          "Consider dedicated read replicas for specific services",
+          "Implement query performance budgets per service"
+        ]
+      }
+    ]
+  },
+  "slow_high_frequency_queries": {
+    "metric_keywords": [
+      "query_optimization_opportunities"
+    ],
+    "data_conditions": [
+      {
+        "key": "query_details",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "any(float(q.get('avg_exec_time_ms', 0)) > 500 and float(q.get('calls_per_hour', 0)) > 1000 for q in data.get('query_details', []))",
+        "level": "high",
+        "score": 8,
+        "reasoning": "High-frequency queries (>1000/hour) with >500ms avg execution time are impacting user experience and consuming excessive resources.",
+        "recommendations": [
+          "These queries have highest optimization ROI (frequency × time savings)",
+          "Run EXPLAIN (ANALYZE, BUFFERS) to identify slow operations",
+          "Check for missing indexes causing sequential scans",
+          "Consider query result caching at application layer (Redis, memcached)",
+          "Review if query complexity can be reduced",
+          "Implement connection pooling to reduce connection overhead"
+        ]
+      }
+    ]
+  },
+  "temp_file_heavy_queries": {
+    "metric_keywords": [
+      "query_optimization_opportunities"
+    ],
+    "data_conditions": [
+      {
+        "key": "query_details",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "any(float(q.get('temp_written_mb', 0)) > 100 for q in data.get('query_details', []))",
+        "level": "medium",
+        "score": 7,
+        "reasoning": "Queries writing >100MB to temp files indicate work_mem is insufficient, causing disk spills.",
+        "recommendations": [
+          "Run EXPLAIN (ANALYZE, BUFFERS) to verify disk spills",
+          "Look for 'Sort Method: external merge Disk' in execution plan",
+          "Increase work_mem for specific roles: ALTER ROLE <user> SET work_mem = '128MB';",
+          "WARNING: work_mem × max_connections must fit in available RAM",
+          "Consider query rewriting to reduce memory requirements"
+        ]
+      }
+    ]
+  }
+}

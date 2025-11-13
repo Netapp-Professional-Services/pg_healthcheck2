@@ -1,0 +1,695 @@
+= Database Health Check Tool: Architectural Flow
+:toc: left
+:toclevels: 3
+:sectlinks:
+:icons: font
+:source-highlighter: highlightjs
+
+== Overview
+
+This document traces the complete execution flow of the Database Health Check Tool from startup through report generation, AI analysis, and trend shipping.
+
+== High-Level Flow Diagram
+
+[plantuml, architectural-flow, svg]
+----
+@startuml
+skinparam backgroundColor transparent
+skinparam sequenceMessageAlign center
+skinparam defaultFontSize 12
+skinparam BoxPadding 10
+
+actor User
+participant "main.py\n**HealthCheck**" as Main
+participant "config.yaml" as Config
+participant "discover_plugins()" as Discovery
+participant "plugins/postgres\n**PostgresPlugin**" as Plugin
+participant "plugins/postgres\n**connector.py**" as Connector
+participant "plugins/postgres\n**reports/default.py**" as ReportDef
+participant "utils\n**ReportBuilder**" as Builder
+participant "plugins/postgres\n**checks/check_*.py**" as Checks
+participant "plugins/postgres\n**rules/*.json**" as Rules
+participant "utils\n**dynamic_prompt_generator**" as PromptGen
+participant "utils\n**run_recommendation**" as AI
+participant "output_handlers\n**trend_shipper**" as Shipper
+participant "PostgreSQL\n**Trends DB**" as TrendsDB
+
+== Phase 1: Initialization ==
+
+User -> Main: python main.py\n--config config/postgres.yaml
+activate Main
+
+Main -> Config: load_settings()
+activate Config
+Config --> Main: settings dict\n{db_type: 'postgres',\nai_analyze: true,\ntrend_storage_enabled: true}
+deactivate Config
+
+Main -> Discovery: discover_plugins()
+activate Discovery
+note right of Discovery
+  Scans plugins/ directory
+  Looks for BasePlugin subclasses
+end note
+Discovery -> Plugin: import & instantiate
+activate Plugin
+Plugin --> Discovery: plugin_instance\n(technology_name='postgres')
+Discovery --> Main: {postgres: PostgresPlugin}
+deactivate Discovery
+
+Main -> Plugin: get_connector(settings)
+Plugin -> Connector: __init__(settings)
+activate Connector
+Connector -> Connector: connect() to PostgreSQL
+Connector --> Plugin: connector instance
+deactivate Connector
+Plugin --> Main: connector
+
+Main -> Plugin: get_report_definition(None)
+Plugin -> ReportDef: load REPORT_SECTIONS
+activate ReportDef
+ReportDef --> Plugin: report_sections list
+deactivate ReportDef
+Plugin --> Main: report_sections
+
+== Phase 2: Report Building ==
+
+Main -> Builder: ReportBuilder(connector, settings,\nreport_sections, active_plugin)
+activate Builder
+
+loop for each section in report_sections
+    Builder -> Builder: process_section(section)
+
+    loop for each action in section.actions
+        alt action.type == 'module'
+            Builder -> Checks: import & call\ncheck_function(connector, settings)
+            activate Checks
+
+            note right of Checks
+              Example: check_bloat.py
+
+              1. Query PostgreSQL
+              2. Analyze results
+              3. Format AsciiDoc
+              4. Build structured JSON
+            end note
+
+            Checks -> Connector: execute_query(sql)
+            activate Connector
+            Connector --> Checks: query results
+            deactivate Connector
+
+            Checks --> Builder: (adoc_content, structured_data)
+            deactivate Checks
+
+            Builder -> Builder: append adoc_content
+            Builder -> Builder: store structured_data\nin all_structured_findings
+
+        else action.type == 'header' or 'text'
+            Builder -> Builder: render template
+        end
+    end
+end
+
+Builder --> Main: adoc_content\nall_structured_findings
+deactivate Builder
+
+== Phase 3: Rules Processing ==
+
+Main -> Plugin: get_rules_config()
+activate Plugin
+Plugin -> Rules: load JSON rule files
+activate Rules
+note right of Rules
+  Rules define thresholds
+  and recommendations:
+
+  {
+    "bloat_tables": {
+      "metric_keywords": ["bloat"],
+      "rules": [{
+        "expression": "data.get('bloat_pct') > 20",
+        "level": "high",
+        "reasoning": "...",
+        "recommendations": [...]
+      }]
+    }
+  }
+end note
+Rules --> Plugin: rules_config dict
+deactivate Rules
+Plugin --> Main: rules_config
+deactivate Plugin
+
+Main -> PromptGen: generate_dynamic_prompt(\nall_structured_findings,\nrules_config,\nsettings)
+activate PromptGen
+
+PromptGen -> PromptGen: _process_findings_recursively()
+note right of PromptGen
+  For each finding:
+  1. Match against rule keywords
+  2. Evaluate rule expressions
+  3. Collect triggered rules
+  4. Build severity-based prompt
+end note
+
+PromptGen --> Main: (prompt_text, triggered_rules)
+deactivate PromptGen
+
+Main -> Main: store triggered_rules\nin analysis_output
+
+== Phase 4: AI Analysis (Optional) ==
+
+alt settings.ai_analyze == true
+    Main -> AI: run_recommendation(\nprompt_text,\nsettings)
+    activate AI
+
+    note right of AI
+      Sends prompt to:
+      - xAI Grok
+      - OpenAI
+      - Other configured provider
+    end note
+
+    AI -> AI: call AI API
+    AI --> Main: ai_response_text
+    deactivate AI
+
+    Main -> Main: append ai_response to adoc
+    Main -> Main: store ai_response in analysis_output
+end
+
+== Phase 5: Output Generation ==
+
+Main -> Main: write_output()
+activate Main
+
+Main -> Main: sanitize company_name
+Main -> Main: create output directory\nadoc_out/{company}/
+
+Main -> Main: write health_check.adoc
+note right of Main
+  Full AsciiDoc report with:
+  - All check results
+  - AI analysis (if enabled)
+  - Metadata
+end note
+
+Main -> Main: write structured_health_check_findings.json
+note right of Main
+  Complete JSON with:
+  - all_structured_findings
+  - analysis_output
+  - triggered_rules
+  - metadata
+end note
+
+deactivate Main
+
+== Phase 6: Trend Shipping (Optional) ==
+
+alt settings.trend_storage_enabled == true
+    Main -> Shipper: ship_health_check_data(\nsettings,\nall_structured_findings,\nadoc_content,\nanalysis_output)
+    activate Shipper
+
+    Shipper -> Shipper: prepare_health_check_record()
+    note right of Shipper
+      Build record with:
+      - company_name
+      - db_technology
+      - run_timestamp
+      - structured_findings (JSON)
+      - adoc_report_text
+      - triggered_rules
+      - ai_analysis
+    end note
+
+    Shipper -> TrendsDB: INSERT INTO health_check_runs
+    activate TrendsDB
+    TrendsDB --> Shipper: run_id
+    deactivate TrendsDB
+
+    loop for each triggered_rule
+        Shipper -> TrendsDB: INSERT INTO health_check_triggered_rules\n(run_id, rule_name, severity,\nreasoning, recommendations)
+        activate TrendsDB
+        TrendsDB --> Shipper: OK
+        deactivate TrendsDB
+    end
+
+    Shipper --> Main: success
+    deactivate Shipper
+end
+
+Main --> User: ✅ Health check complete\nReport: adoc_out/{company}/health_check.adoc
+deactivate Main
+
+@enduml
+----
+
+== Component Details
+
+=== 1. Main Entry Point (main.py)
+
+The `HealthCheck` class orchestrates the entire process:
+
+[source,python]
+----
+class HealthCheck:
+    def __init__(self, config_file, report_config_file=None):
+        self.settings = self.load_settings(config_file)
+        self.available_plugins = discover_plugins()
+        self.active_plugin = self.available_plugins.get(self.settings['db_type'])
+        self.connector = self.active_plugin.get_connector(self.settings)
+        self.report_sections = self.active_plugin.get_report_definition(report_config_file)
+----
+
+*Key Methods:*
+
+- `load_settings()` - Parses config.yaml
+- `run()` - Main execution loop
+- `build_report()` - Calls ReportBuilder
+- `perform_analysis()` - Triggers AI analysis
+- `write_output()` - Generates files
+
+=== 2. Plugin Discovery
+
+The `discover_plugins()` function dynamically loads all plugins:
+
+[source,python]
+----
+def discover_plugins():
+    plugins_path = Path(__file__).parent / "plugins"
+    discovered_plugins = {}
+    for _, name, _ in pkgutil.iter_modules([str(plugins_path)]):
+        if name != "base":
+            module = importlib.import_module(f'plugins.{name}')
+            # Find BasePlugin subclasses
+            # Instantiate and register by technology_name
+----
+
+*Discovered:* postgres, cassandra, kafka, mysql, opensearch, valkey, clickhouse, mongodb
+
+=== 3. PostgreSQL Plugin Structure
+
+[source]
+----
+plugins/postgres/
+├── __init__.py              # PostgresPlugin class
+├── connector.py             # PostgreSQL connection logic
+├── checks/                  # Health check modules
+│   ├── check_bloat.py
+│   ├── check_unused_indexes.py
+│   ├── check_transaction_wraparound.py
+│   └── ...
+├── rules/                   # JSON rule definitions
+│   ├── check_bloat.json
+│   ├── check_unused_indexes.json
+│   └── ...
+├── reports/                 # Report definitions
+│   └── default.py           # REPORT_SECTIONS list
+└── utils/
+    └── qrylib/              # SQL query libraries
+        ├── bloat_queries.py
+        └── ...
+----
+
+=== 4. Report Definition (reports/default.py)
+
+Defines the structure and order of checks:
+
+[source,python]
+----
+REPORT_SECTIONS = [
+    {
+        'title': 'Database Overview',
+        'actions': [
+            {'type': 'module', 'module': 'checks.check_database_overview', 'function': 'run'},
+            {'type': 'header', 'file': 'overview_header.j2'}
+        ]
+    },
+    {
+        'title': 'Table Bloat Analysis',
+        'actions': [
+            {'type': 'module', 'module': 'checks.check_bloat', 'function': 'run'}
+        ]
+    },
+    # ...
+]
+----
+
+=== 5. Check Module Pattern
+
+Every check module follows this pattern:
+
+[source,python]
+----
+def run(connector, settings):
+    """
+    Execute check and return results.
+
+    Returns:
+        tuple: (adoc_content: str, structured_findings: dict)
+    """
+    # 1. Execute SQL query
+    results = connector.execute_query(BLOAT_QUERY)
+
+    # 2. Format AsciiDoc output
+    builder = CheckContentBuilder()
+    builder.h3("Table Bloat Analysis")
+    builder.table(results)
+    adoc_content = builder.build()
+
+    # 3. Build structured JSON
+    structured_findings = {
+        'status': 'success',
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'data': {
+            'bloated_tables': results,
+            'total_bloat_gb': sum(r['bloat_gb'] for r in results)
+        }
+    }
+
+    return adoc_content, structured_findings
+----
+
+=== 6. Rules Engine
+
+Rules are JSON files that define evaluation criteria:
+
+[source,json]
+----
+{
+  "bloat_tables": {
+    "metric_keywords": ["bloat", "table"],
+    "data_conditions": [
+      {"key": "bloated_tables", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_bloat_gb', 0) > 100",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Over 100GB of table bloat detected...",
+        "recommendations": [
+          "Run VACUUM FULL on bloated tables",
+          "Schedule regular VACUUM maintenance"
+        ]
+      }
+    ]
+  }
+}
+----
+
+*Expression Evaluation:*
+
+The `dynamic_prompt_generator.py` evaluates expressions using Python's `eval()`:
+
+[source,python]
+----
+result = eval(rule['expression'], {"data": data_row, "__builtins__": {}})
+----
+
+=== 7. AI Integration Flow
+
+[source,python]
+----
+# 1. Generate prompt from triggered rules
+prompt, triggered_rules = generate_dynamic_prompt(
+    all_structured_findings,
+    rules_config,
+    settings
+)
+
+# 2. Send to AI provider (if enabled)
+if settings.get('ai_analyze'):
+    ai_response = run_recommendation(prompt, settings)
+
+# 3. Append to report
+adoc_content += f"\n\n== AI Analysis\n\n{ai_response}"
+----
+
+*AI Providers Supported:*
+
+- xAI Grok
+- OpenAI (GPT-4, GPT-3.5)
+- Anthropic Claude
+- Custom endpoints
+
+=== 8. Trend Shipping
+
+The `trend_shipper.py` stores results in PostgreSQL for trending:
+
+[source,python]
+----
+def ship_health_check_data(settings, structured_findings, adoc_content, analysis_output):
+    # Connect to trends database
+    conn = psycopg2.connect(settings['trend_database'])
+
+    # Insert health check run
+    run_id = conn.execute("""
+        INSERT INTO health_check_runs
+        (company_name, db_technology, structured_findings_json, adoc_report_text)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+    """, (company, tech, json.dumps(structured_findings), adoc_content))
+
+    # Insert triggered rules
+    for rule in analysis_output.get('triggered_rules', []):
+        conn.execute("""
+            INSERT INTO health_check_triggered_rules
+            (run_id, rule_name, severity, reasoning, recommendations)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (run_id, rule['name'], rule['level'], rule['reasoning'],
+              json.dumps(rule['recommendations'])))
+----
+
+== Data Flow Summary
+
+=== Input Files
+
+[cols="2,3,5",options="header"]
+|===
+| File | Purpose | Key Fields
+
+| `config/postgres.yaml`
+| Main configuration
+| `db_type`, `host`, `port`, `database`, `ai_analyze`, `trend_storage_enabled`
+
+| `plugins/postgres/reports/default.py`
+| Report structure
+| `REPORT_SECTIONS` list defining check order
+
+| `plugins/postgres/rules/*.json`
+| Rule definitions
+| `metric_keywords`, `rules`, `expression`, `recommendations`
+|===
+
+=== Output Files
+
+[cols="2,3,5",options="header"]
+|===
+| File | Format | Contents
+
+| `adoc_out/{company}/health_check.adoc`
+| AsciiDoc
+| Complete formatted report with all checks and AI analysis
+
+| `adoc_out/{company}/structured_health_check_findings.json`
+| JSON
+| All structured findings, triggered rules, metadata
+|===
+
+=== Database Schema (Trends)
+
+[cols="2,8",options="header"]
+|===
+| Table | Purpose
+
+| `health_check_runs`
+| Stores each health check execution with full JSON and AsciiDoc
+
+| `health_check_triggered_rules`
+| Tracks which rules triggered in each run for trend analysis
+
+| `companies`
+| Company definitions for multi-tenancy
+
+| `users`
+| User accounts with role-based access
+
+| `user_ai_profiles`
+| AI provider configurations per user
+
+| `generated_ai_reports`
+| Encrypted AI-generated analysis reports
+|===
+
+== Key Design Patterns
+
+=== 1. Plugin Architecture
+
+*Benefits:*
+
+- Easy to add new database technologies
+- Each plugin encapsulates domain expertise
+- No code changes to core needed for new plugins
+
+*Implementation:*
+
+- `BasePlugin` abstract class defines interface
+- `discover_plugins()` finds and loads plugins dynamically
+- Plugins registered by `technology_name`
+
+=== 2. Structured Data First
+
+*Philosophy:*
+
+[quote]
+____
+Capture structured JSON from day one. The AsciiDoc report is just a human-readable view of the data.
+____
+
+*Benefits:*
+
+- Enables trending and historical analysis
+- Allows AI processing
+- Supports cross-customer intelligence
+- Facilitates automated decision-making
+
+=== 3. Rules Engine
+
+*Separation of Concerns:*
+
+- Checks collect data (what is)
+- Rules define thresholds (what matters)
+- AI explains implications (why it matters)
+
+*Flexibility:*
+
+- Rules can be updated without code changes
+- Severity levels drive AI prompt generation
+- Recommendations codified as data
+
+=== 4. Optional Components
+
+Everything after report building is optional:
+
+- AI analysis (`ai_analyze: false`)
+- Trend shipping (`trend_storage_enabled: false`)
+- Custom report definitions (override `default.py`)
+
+== Execution Examples
+
+=== Minimal Execution
+
+[source,bash]
+----
+# Just run health check, generate report
+python main.py --config config/postgres.yaml
+----
+
+*Flow:* Config → Plugin Discovery → Report Building → Output Files
+
+=== Full Intelligence Stack
+
+[source,yaml]
+----
+# config/postgres.yaml
+db_type: postgres
+ai_analyze: true
+trend_storage_enabled: true
+ai_provider: xai
+ai_model: grok-beta
+trend_database:
+  host: localhost
+  port: 5432
+  database: health_trends
+----
+
+[source,bash]
+----
+python main.py --config config/postgres.yaml
+----
+
+*Flow:* Config → Plugin Discovery → Report Building → Rules Processing → AI Analysis → Trend Shipping → Output Files
+
+=== Custom Report
+
+[source,bash]
+----
+# Use custom check selection
+python main.py --config config/postgres.yaml --report-config custom_report.py
+----
+
+== Performance Characteristics
+
+[cols="2,2,6",options="header"]
+|===
+| Phase | Typical Duration | Notes
+
+| Plugin Discovery
+| < 1 second
+| One-time at startup
+
+| Connection
+| < 1 second
+| Depends on network latency
+
+| Check Execution
+| 5-60 seconds
+| Depends on database size and number of checks
+
+| Rules Processing
+| < 1 second
+| Evaluates expressions against collected data
+
+| AI Analysis
+| 2-10 seconds
+| Depends on AI provider API latency
+
+| Trend Shipping
+| 1-3 seconds
+| Depends on network to trends DB
+
+| *Total*
+| *10-75 seconds*
+| *Most time spent in check execution*
+|===
+
+== Error Handling
+
+=== Graceful Degradation
+
+1. *Plugin load failure* → Skip plugin, continue with others
+2. *Check execution failure* → Mark check as failed, continue with remaining checks
+3. *AI API failure* → Skip AI analysis, continue with report
+4. *Trend shipping failure* → Log error, report still generated
+
+=== Validation
+
+- Rule expressions validated before evaluation
+- SQL queries parameterized to prevent injection
+- JSON schemas validated before storage
+- File permissions checked before write
+
+== Future Enhancements
+
+=== Planned Features
+
+1. *Real-time streaming* - WebSocket updates during execution
+2. *Distributed checks* - Run checks across multiple nodes
+3. *Custom rule editor* - Web UI for editing rules.json
+4. *Automated remediation* - Execute fixes based on triggered rules
+5. *Cross-database correlation* - Detect patterns across Postgres + Kafka + Cassandra
+
+=== Extension Points
+
+- Custom check modules (add to `plugins/{tech}/checks/`)
+- Custom AI providers (implement in `utils/run_recommendation.py`)
+- Custom output formats (extend `write_output()`)
+- Custom trend storage backends (implement shipper interface)
+
+'''
+
+*Document Version:* 1.0 +
+*Last Updated:* {docdate} +
+*Author:* Perry Clark
