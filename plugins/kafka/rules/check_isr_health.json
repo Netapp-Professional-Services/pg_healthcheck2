@@ -1,6 +1,9 @@
 {
   "affected_topics_critical": {
-    "metric_keywords": ["isr_health", "affected_topics"],
+    "metric_keywords": [
+      "isr_health",
+      "affected_topics"
+    ],
     "rules": [
       {
         "expression": "data.get('percent_under_replicated', 0) > 50",
@@ -15,10 +18,31 @@
           "Verify network connectivity between all brokers in the cluster"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "percent_under_replicated",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
+      },
+      {
+        "key": "total_partitions",
+        "exists": true
+      },
+      {
+        "key": "under_replicated_count",
+        "exists": true
+      }
     ]
   },
   "affected_topics_warning": {
-    "metric_keywords": ["isr_health", "affected_topics"],
+    "metric_keywords": [
+      "isr_health",
+      "affected_topics"
+    ],
     "rules": [
       {
         "expression": "data.get('under_replicated_count', 0) > 0 and data.get('percent_under_replicated', 0) <= 50",
@@ -32,6 +56,24 @@
           "Review retention policies - high retention can cause replication delays",
           "Set up alerts to notify when under-replication persists for > 5 minutes"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "percent_under_replicated",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
+      },
+      {
+        "key": "total_partitions",
+        "exists": true
+      },
+      {
+        "key": "under_replicated_count",
+        "exists": true
       }
     ]
   }

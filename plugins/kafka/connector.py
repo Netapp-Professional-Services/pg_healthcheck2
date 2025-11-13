@@ -25,6 +25,13 @@ class KafkaConnector(SSHSupportMixin):
         self.environment = None
         self.environment_details = {}
 
+        # Kafka mode detection (KRaft vs ZooKeeper)
+        self.kafka_mode = None  # Will be 'kraft' or 'zookeeper'
+
+        # Metric collection strategy (determined after connection)
+        self.metric_collection_strategy = None
+        self.metric_collection_details = {}
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
 
@@ -46,7 +53,10 @@ class KafkaConnector(SSHSupportMixin):
                 'request_timeout_ms': 60000,  # 60 seconds for cloud connections
                 'connections_max_idle_ms': 540000,  # 9 minutes
                 'metadata_max_age_ms': 300000,  # 5 minutes
-                'socket_options': [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
+                'socket_options': [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)],
+                # Reconnection configuration for intermittent connection issues
+                'reconnect_backoff_ms': 100,  # Initial backoff between reconnection attempts
+                'reconnect_backoff_max_ms': 10000,  # Max backoff between reconnection attempts
             }
 
             # Specify API version for newer Kafka brokers
@@ -74,32 +84,49 @@ class KafkaConnector(SSHSupportMixin):
 
                 # SSL/TLS configuration
                 if 'SSL' in security_protocol:
-                    ssl_cafile = self.settings.get('ssl_cafile')
-                    if ssl_cafile:
-                        connection_params['ssl_cafile'] = ssl_cafile
-                        logger.info(f"Using SSL CA file: {ssl_cafile}")
+                    # Check if custom SSL context is needed (for CERT_NONE)
+                    ssl_cert_reqs_setting = self.settings.get('ssl_cert_reqs')
 
-                    # Optional: client certificate for mTLS
-                    ssl_certfile = self.settings.get('ssl_certfile')
-                    ssl_keyfile = self.settings.get('ssl_keyfile')
-                    if ssl_certfile and ssl_keyfile:
-                        connection_params['ssl_certfile'] = ssl_certfile
-                        connection_params['ssl_keyfile'] = ssl_keyfile
-                        logger.info("Using mTLS with client certificate")
+                    if ssl_cert_reqs_setting is not None and ssl_cert_reqs_setting == 0:
+                        # Create custom SSL context that doesn't verify certificates
+                        import ssl
+                        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                        ssl_context.check_hostname = False
+                        ssl_context.verify_mode = ssl.CERT_NONE
+                        connection_params['ssl_context'] = ssl_context
+                        logger.info("Using SSL context with CERT_NONE (no certificate verification)")
+                    else:
+                        # Standard SSL configuration with verification
+                        ssl_cafile = self.settings.get('ssl_cafile')
+                        if ssl_cafile:
+                            connection_params['ssl_cafile'] = ssl_cafile
+                            logger.info(f"Using SSL CA file: {ssl_cafile}")
 
-                    # SSL check hostname (default True for security)
-                    if 'ssl_check_hostname' in self.settings:
-                        connection_params['ssl_check_hostname'] = self.settings['ssl_check_hostname']
+                        # Optional: client certificate for mTLS
+                        ssl_certfile = self.settings.get('ssl_certfile')
+                        ssl_keyfile = self.settings.get('ssl_keyfile')
+                        if ssl_certfile and ssl_keyfile:
+                            connection_params['ssl_certfile'] = ssl_certfile
+                            connection_params['ssl_keyfile'] = ssl_keyfile
+                            logger.info("Using mTLS with client certificate")
+
+                        # SSL check hostname (default True for security)
+                        if 'ssl_check_hostname' in self.settings:
+                            connection_params['ssl_check_hostname'] = self.settings['ssl_check_hostname']
 
             self.admin_client = KafkaAdminClient(**connection_params)
 
+            # Connect all SSH hosts (from mixin) - do this early for version detection
+            connected_ssh_hosts = self.connect_all_ssh()
+
+            # Detect version (may use SSH if available)
             self._version_info = self._get_version_info()
+
+            # Detect Kafka mode (KRaft vs ZooKeeper)
+            self._detect_kafka_mode()
 
             # Detect environment (Instaclustr vs self-hosted)
             self._detect_environment()
-
-            # Connect all SSH hosts (from mixin)
-            connected_ssh_hosts = self.connect_all_ssh()
             
             # Map SSH hosts to broker IDs
             if connected_ssh_hosts:
@@ -112,16 +139,16 @@ class KafkaConnector(SSHSupportMixin):
             try:
                 cluster = self.admin_client._client.cluster
                 cluster.request_update()
-                
+
                 brokers = list(cluster.brokers())
                 broker_count = len(brokers)
-                
+
                 # Get cluster ID
                 try:
                     cluster_id = cluster.cluster_id if hasattr(cluster, 'cluster_id') else 'Unknown'
                 except:
                     cluster_id = 'Unknown'
-                
+
                 # Get controller info
                 try:
                     controller = cluster.controller
@@ -130,12 +157,21 @@ class KafkaConnector(SSHSupportMixin):
                     controller_id = controller.nodeId if hasattr(controller, 'nodeId') else (controller.id if hasattr(controller, 'id') else -1)
                 except:
                     controller_id = -1
-                
+
+                # Cache cluster metadata for later use by checks
+                self.cluster_metadata = {
+                    'cluster_id': cluster_id,
+                    'brokers': brokers,
+                    'broker_count': broker_count,
+                    'controller_id': controller_id
+                }
+
                 print(f"   - Cluster ID: {cluster_id}")
 
-                # Display version
+                # Display version and mode
                 version = self._version_info.get('version_string', 'Unknown')
                 print(f"   - Kafka Version: {version}")
+                print(f"   - Mode: {self.kafka_mode.upper() if self.kafka_mode else 'Unknown'}")
 
                 print(f"   - Brokers: {broker_count}")
                 if controller_id != -1:
@@ -171,16 +207,20 @@ class KafkaConnector(SSHSupportMixin):
                             unmapped_hosts.append(ssh_host)
 
                     if unmapped_hosts:
-                        print(f"   ⚠️  WARNING: {len(unmapped_hosts)} SSH host(s) are not recognized as cluster brokers!")
-                        print(f"      This may indicate brokers that are down or not part of the cluster.")
+                        print(f"   ⚠️  NOTE: {len(unmapped_hosts)} SSH host(s) could not be mapped to broker IDs")
+                        print(f"      Common causes: using public IPs when brokers advertise private hostnames (AWS/cloud)")
+                        print(f"      This is normal for cloud deployments and does not affect health checks.")
                 else:
                     print(f"   - SSH: Not configured (OS-level checks unavailable)")
                     
             except Exception as e:
                 logger.warning(f"Could not retrieve detailed cluster info: {e}")
-            
+
+            # Determine metric collection strategy
+            self._determine_metric_collection_strategy()
+
             logger.info("✅ Connected to Kafka cluster")
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to Kafka: {e}")
             raise ConnectionError(f"Could not connect to Kafka: {e}")
@@ -197,21 +237,179 @@ class KafkaConnector(SSHSupportMixin):
     def _map_ssh_hosts_to_brokers(self):
         """Kafka-specific logic to map SSH hosts to broker IDs."""
         try:
+            import socket
             cluster = self.admin_client._client.cluster
             cluster.request_update()
-            
-            # Build host-to-broker mapping
+
+            # Build host-to-broker mapping with both hostname and IP resolution
             host_node_mapping = {}
             for broker in cluster.brokers():
                 broker_id = broker.nodeId if hasattr(broker, 'nodeId') else broker.id
                 broker_host = broker.host
+
+                # Add hostname mapping
                 host_node_mapping[broker_host] = broker_id
-            
+
+                # Also add IP address mapping (resolve hostname to IP)
+                try:
+                    broker_ip = socket.gethostbyname(broker_host)
+                    host_node_mapping[broker_ip] = broker_id
+                    logger.debug(f"Mapped broker {broker_id}: {broker_host} -> {broker_ip}")
+                except (socket.gaierror, socket.herror) as e:
+                    logger.debug(f"Could not resolve {broker_host} to IP: {e}")
+
             # Use mixin's mapping method
             self.map_ssh_hosts_to_nodes(host_node_mapping)
-                    
+
         except Exception as e:
             logger.warning(f"Could not map SSH hosts to broker IDs: {e}")
+
+        # After mapping, detect private listener addresses for SSH-based queries
+        self._detect_private_listeners()
+
+    def _detect_private_listeners(self):
+        """
+        Detects the private listener addresses on each broker via SSH.
+
+        This allows us to use local connections (via SSH) for more reliable
+        queries instead of routing through public network.
+
+        Also updates SSH-to-broker mapping using private listener IPs.
+
+        Stores mapping: {ssh_host: private_listener_address}
+        """
+        if not self.has_ssh_support():
+            return
+
+        self.private_listeners = {}
+        additional_mappings = {}
+
+        for host in self.get_ssh_hosts():
+            try:
+                ssh_manager = self.get_ssh_manager(host)
+                if not ssh_manager:
+                    continue
+
+                # Find the Kafka config file
+                find_cmd = "find /opt/kafka/config -name 'server*.properties' 2>/dev/null | head -1"
+                stdout, stderr, exit_code = ssh_manager.execute_command(find_cmd, timeout=5)
+
+                if exit_code != 0 or not stdout.strip():
+                    logger.debug(f"Could not find Kafka config on {host}")
+                    continue
+
+                config_file = stdout.strip()
+
+                # Extract the listeners line
+                grep_cmd = f"grep '^listeners=' {config_file}"
+                stdout, stderr, exit_code = ssh_manager.execute_command(grep_cmd, timeout=5)
+
+                if exit_code == 0 and stdout.strip():
+                    # Parse listeners=PLAINTEXT://172.31.39.13:9092
+                    listeners_line = stdout.strip()
+                    if '://' in listeners_line:
+                        # Extract the address part
+                        listener_addr = listeners_line.split('=', 1)[1]
+                        # Handle multiple listeners - take first PLAINTEXT one
+                        for listener in listener_addr.split(','):
+                            if 'PLAINTEXT://' in listener:
+                                private_addr = listener.replace('PLAINTEXT://', '').strip()
+                                self.private_listeners[host] = private_addr
+                                logger.info(f"Detected private listener on {host}: {private_addr}")
+
+                                # Extract just the IP address (without port) for broker mapping
+                                if ':' in private_addr:
+                                    private_ip = private_addr.split(':')[0]
+                                    additional_mappings[private_ip] = host
+                                    logger.debug(f"Will map private IP {private_ip} to SSH host {host}")
+                                break
+
+            except Exception as e:
+                logger.debug(f"Could not detect private listener on {host}: {e}")
+
+        # Update SSH-to-broker mappings using private IPs
+        if additional_mappings:
+            self._update_broker_mappings_with_private_ips(additional_mappings)
+
+    def _update_broker_mappings_with_private_ips(self, private_ip_mappings):
+        """
+        Updates SSH host to broker ID mappings using detected private IPs.
+
+        Args:
+            private_ip_mappings: Dict of {private_ip: ssh_host}
+        """
+        try:
+            cluster = self.admin_client._client.cluster
+            cluster.request_update()
+
+            # Build mapping from broker advertised address to broker ID
+            broker_id_by_advertised = {}
+            for broker in cluster.brokers():
+                broker_id = broker.nodeId if hasattr(broker, 'nodeId') else broker.id
+                broker_host = broker.host
+                broker_id_by_advertised[broker_host] = broker_id
+
+            # Now try to match private IPs to brokers
+            # We need to fetch the actual private addresses from the brokers
+            updated_mappings = {}
+
+            for private_ip, ssh_host in private_ip_mappings.items():
+                # Try to find which broker this private IP belongs to
+                # We'll check by querying the broker metadata
+                for broker in cluster.brokers():
+                    broker_id = broker.nodeId if hasattr(broker, 'nodeId') else broker.id
+                    # In KRaft mode, we can infer from controller/broker numbering
+                    # For now, use a heuristic: if we already have node info, use the controller ID
+                    # Otherwise, try to match by attempting a connection test
+
+                    # Simple approach: Match by querying node.id from the config
+                    try:
+                        ssh_manager = self.get_ssh_manager(ssh_host)
+                        if not ssh_manager:
+                            continue
+
+                        # Find the config file and extract node.id
+                        find_cmd = "find /opt/kafka/config -name 'server*.properties' 2>/dev/null | head -1"
+                        stdout, stderr, exit_code = ssh_manager.execute_command(find_cmd, timeout=5)
+
+                        if exit_code == 0 and stdout.strip():
+                            config_file = stdout.strip()
+                            grep_cmd = f"grep '^node.id=' {config_file} 2>/dev/null || grep '^broker.id=' {config_file}"
+                            stdout, stderr, exit_code = ssh_manager.execute_command(grep_cmd, timeout=5)
+
+                            if exit_code == 0 and stdout.strip():
+                                # Parse node.id=2 or broker.id=2
+                                node_line = stdout.strip()
+                                if '=' in node_line:
+                                    node_id_str = node_line.split('=')[1].strip()
+                                    detected_broker_id = int(node_id_str)
+
+                                    # Update the mapping
+                                    updated_mappings[ssh_host] = detected_broker_id
+                                    logger.info(f"✅ Mapped SSH host {ssh_host} to Broker ID {detected_broker_id} via private listener")
+                                    break
+                    except Exception as e:
+                        logger.debug(f"Could not extract broker ID from {ssh_host}: {e}")
+                        continue
+
+            # Apply the updated mappings
+            if updated_mappings:
+                self.map_ssh_hosts_to_nodes(updated_mappings)
+
+        except Exception as e:
+            logger.debug(f"Could not update broker mappings with private IPs: {e}")
+
+    def get_private_listener(self, host):
+        """
+        Returns the private listener address for a given SSH host.
+
+        Args:
+            host (str): The SSH host
+
+        Returns:
+            str: Private listener address (e.g., "172.31.39.13:9092") or None
+        """
+        return getattr(self, 'private_listeners', {}).get(host)
 
     def close(self):
         """Alias for disconnect()."""
@@ -222,8 +420,11 @@ class KafkaConnector(SSHSupportMixin):
         Detect the hosting environment (Instaclustr managed vs self-hosted).
 
         Detection logic:
-        1. Instaclustr: If instaclustr_cluster_id or instaclustr_prometheus_enabled is configured
-        2. Self-hosted: Default if no managed indicators
+        1. Instaclustr: If instaclustr_prometheus_enabled is True (actively using managed service)
+        2. Self-hosted: Default if no managed indicators or prometheus explicitly disabled
+
+        Note: instaclustr_cluster_id alone doesn't indicate managed - it may be in config
+        for reference even when running self-hosted with SSH access.
 
         Updates self.environment and self.environment_details
         """
@@ -232,19 +433,20 @@ class KafkaConnector(SSHSupportMixin):
             cluster_id = self.settings.get('instaclustr_cluster_id')
             prometheus_enabled = self.settings.get('instaclustr_prometheus_enabled')
 
-            if cluster_id or prometheus_enabled:
+            # Only treat as Instaclustr if Prometheus is explicitly enabled
+            if prometheus_enabled is True:
                 self.environment = 'instaclustr_managed'
                 self.environment_details = {
                     'provider': 'Instaclustr',
-                    'monitoring': 'prometheus' if prometheus_enabled else 'api',
-                    'has_prometheus_metrics': bool(prometheus_enabled)
+                    'monitoring': 'prometheus',
+                    'has_prometheus_metrics': True
                 }
                 if cluster_id:
                     self.environment_details['cluster_id'] = cluster_id
                 logger.info(f"Detected Instaclustr managed environment" + (f": {cluster_id}" if cluster_id else ""))
                 return
 
-            # Default to self-hosted
+            # Default to self-hosted (includes cases where instaclustr_prometheus_enabled: false)
             self.environment = 'self_hosted'
             self.environment_details = {
                 'provider': 'self_hosted',
@@ -256,6 +458,131 @@ class KafkaConnector(SSHSupportMixin):
             logger.warning(f"Error detecting environment: {e}. Assuming self-hosted.")
             self.environment = 'self_hosted'
             self.environment_details = {'provider': 'self_hosted'}
+
+    def _determine_metric_collection_strategy(self):
+        """
+        Determine and cache the optimal metric collection strategy.
+
+        Order of preference:
+        1. Instaclustr Prometheus API (if enabled)
+        2. Local Prometheus JMX Exporter via SSH (if SSH available)
+        3. Standard JMX via SSH (fallback)
+
+        This is determined once at connection time to avoid repeated checks.
+        """
+        try:
+            # Check Instaclustr Prometheus
+            if self.settings.get('instaclustr_prometheus_enabled') is True:
+                cluster_id = self.settings.get('instaclustr_cluster_id')
+                base_url = self.settings.get('instaclustr_prometheus_base_url')
+                if cluster_id and base_url:
+                    self.metric_collection_strategy = 'instaclustr_prometheus'
+                    self.metric_collection_details = {
+                        'method': 'instaclustr_prometheus',
+                        'cluster_id': cluster_id,
+                        'base_url': base_url,
+                        'requires_ssh': False
+                    }
+                    logger.info("Metric collection strategy: Instaclustr Prometheus API")
+                    return
+
+            # Check for Local Prometheus via SSH
+            if self.has_ssh_support() and self.get_ssh_hosts():
+                # Try to detect Prometheus JMX Exporter on first host
+                ssh_hosts = self.get_ssh_hosts()
+                if ssh_hosts:
+                    first_host = list(ssh_hosts)[0]
+                    ssh_manager = self.get_ssh_manager(first_host)
+                    if ssh_manager:
+                        # Check if Prometheus JMX exporter is running
+                        cmd = "ps aux | grep jmx_prometheus_javaagent | grep -v grep | head -1"
+                        stdout, stderr, exit_code = ssh_manager.execute_command(cmd)
+                        if exit_code == 0 and stdout and 'jmx_prometheus' in stdout:
+                            self.metric_collection_strategy = 'local_prometheus'
+                            self.metric_collection_details = {
+                                'method': 'local_prometheus',
+                                'port': 7500,  # Default Prometheus JMX port
+                                'requires_ssh': True,
+                                'ssh_hosts': len(ssh_hosts)
+                            }
+                            logger.info(f"Metric collection strategy: Local Prometheus JMX Exporter (SSH to {len(ssh_hosts)} hosts)")
+                            return
+
+                # Test JMX connectivity before assuming it's available
+                jmx_port = self.settings.get('kafka_jmx_port', 9999)
+                kafka_run_class = self.settings.get('kafka_run_class_path', '/opt/kafka/bin/kafka-run-class.sh')
+
+                # Quick JMX connection test
+                test_cmd = f"""timeout 2 {kafka_run_class} kafka.tools.JmxTool \
+  --object-name "kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec" \
+  --attributes OneMinuteRate \
+  --jmx-url service:jmx:rmi:///jndi/rmi://localhost:{jmx_port}/jmxrmi \
+  --reporting-interval 1000 2>&1 | head -5"""
+
+                stdout, stderr, exit_code = ssh_manager.execute_command(test_cmd)
+
+                # Check if JMX is working
+                jmx_available = False
+                if exit_code == 0 or 'Trying to connect to JMX' in stdout:
+                    # Check for connection errors
+                    if 'Could not connect' not in stdout and 'Connection refused' not in stdout:
+                        jmx_available = True
+
+                if jmx_available:
+                    self.metric_collection_strategy = 'jmx'
+                    self.metric_collection_details = {
+                        'method': 'jmx',
+                        'port': jmx_port,
+                        'requires_ssh': True,
+                        'ssh_hosts': len(ssh_hosts),
+                        'tested': True
+                    }
+                    logger.info(f"Metric collection strategy: Standard JMX on port {jmx_port} (SSH to {len(ssh_hosts)} hosts)")
+                    return
+                else:
+                    # JMX not available
+                    self.metric_collection_strategy = 'none'
+                    self.metric_collection_details = {
+                        'method': 'none',
+                        'reason': f'JMX not enabled on port {jmx_port}',
+                        'ssh_available': True,
+                        'tested': True
+                    }
+                    logger.warning(f"Metric collection strategy: None (JMX not enabled on port {jmx_port})")
+                    return
+
+            # No collection methods available
+            self.metric_collection_strategy = 'none'
+            self.metric_collection_details = {
+                'method': 'none',
+                'reason': 'No Prometheus API or SSH access available'
+            }
+            logger.warning("Metric collection strategy: None (no collection methods available)")
+
+        except Exception as e:
+            logger.warning(f"Error determining metric collection strategy: {e}")
+            self.metric_collection_strategy = 'unknown'
+            self.metric_collection_details = {'error': str(e)}
+
+    def has_instaclustr_prometheus(self):
+        """Check if Instaclustr Prometheus API is available."""
+        return self.metric_collection_strategy == 'instaclustr_prometheus'
+
+    def has_local_prometheus(self):
+        """Check if Local Prometheus JMX Exporter is available via SSH."""
+        return self.metric_collection_strategy == 'local_prometheus'
+
+    def has_jmx(self):
+        """Check if JMX is available via SSH."""
+        return self.metric_collection_strategy == 'jmx'
+
+    def get_metric_collection_strategy(self):
+        """Get the determined metric collection strategy."""
+        return self.metric_collection_strategy
+
+    def get_metric_collection_details(self):
+        """Get detailed information about the metric collection strategy."""
+        return self.metric_collection_details
 
     def _get_version_info(self):
         """Fetches broker version information."""
@@ -281,6 +608,7 @@ class KafkaConnector(SSHSupportMixin):
             # Note: kafka-python doesn't directly expose broker version in admin API
             # We can infer from API versions or use configured value
             version_string = 'Unknown'
+            source = 'unknown'
 
             # Check if we have API version info
             if brokers:
@@ -291,25 +619,126 @@ class KafkaConnector(SSHSupportMixin):
                     if api_versions:
                         # Rough mapping of API versions to Kafka versions
                         if api_versions >= (3, 0, 0):
-                            version_string = '3.x (KRaft)'
+                            version_string = '3.x+'
                         elif api_versions >= (2, 8, 0):
                             version_string = '2.8.x+'
                         elif api_versions >= (2, 0, 0):
                             version_string = '2.x'
                         else:
                             version_string = f'{api_versions[0]}.x'
+                        source = 'api'
                         logger.info(f"Detected Kafka version from API: {version_string}")
-                except:
-                    logger.debug("Could not detect version from API versions")
+                except Exception as e:
+                    logger.debug(f"Could not detect version from API versions: {e}")
+
+            # If API detection failed or was imprecise, try SSH-based detection
+            if (version_string == 'Unknown' or version_string.endswith('.x+') or version_string.endswith('.x')) and self.has_ssh_support():
+                try:
+                    # Get first available SSH host
+                    ssh_host = self.get_ssh_hosts()[0]
+                    ssh_manager = self.get_ssh_manager(ssh_host)
+
+                    # Check Kafka JAR file for exact version
+                    stdin, stdout, stderr = ssh_manager.client.exec_command(
+                        "ls -1 /opt/kafka/libs/kafka_*.jar 2>/dev/null | head -1"
+                    )
+                    jar_output = stdout.read().decode('utf-8').strip()
+
+                    # Parse version from JAR filename: kafka_2.13-3.9.1.jar
+                    if jar_output and 'kafka_' in jar_output:
+                        import re
+                        match = re.search(r'kafka_[\d.]+-([\d.]+)\.jar', jar_output)
+                        if match:
+                            exact_version = match.group(1)
+                            version_string = exact_version
+                            source = 'ssh'
+                            logger.info(f"Detected Kafka version from SSH JAR: {version_string}")
+                except Exception as e:
+                    logger.debug(f"Could not detect version via SSH: {e}")
 
             return {
                 'version_string': version_string,
                 'broker_count': broker_count,
-                'source': 'detected' if version_string != 'Unknown' else 'unknown'
+                'source': source
             }
         except Exception as e:
             logger.warning(f"Could not fetch version: {e}")
             return {'version_string': 'Unknown', 'broker_count': 0, 'source': 'error'}
+
+    def _detect_kafka_mode(self):
+        """
+        Detect whether Kafka is running in KRaft or ZooKeeper mode.
+
+        Detection methods:
+        1. Check configured mode in settings
+        2. Detect from Kafka version (3.0+ supports KRaft, 3.4+ KRaft is production-ready)
+        3. Check for KRaft-specific metrics/metadata
+
+        Returns:
+            str: 'kraft' or 'zookeeper'
+        """
+        # Check if explicitly configured
+        configured_mode = self.settings.get('kafka_mode')
+        if configured_mode:
+            mode = configured_mode.lower()
+            logger.info(f"Using configured Kafka mode: {mode}")
+            self.kafka_mode = mode
+            return mode
+
+        # Detect from version
+        version_str = self._version_info.get('version_string', 'Unknown')
+
+        # Parse version to determine mode
+        # KRaft mode indicators:
+        # - Kafka 3.0+ supports KRaft (preview/beta)
+        # - Kafka 3.3+ KRaft is production-ready, but ZK still supported
+        # - Kafka 4.0+ removes ZooKeeper support entirely (KRaft-only)
+
+        mode = 'zookeeper'  # Default for unknown/old versions
+
+        # Parse major version
+        import re
+        version_match = re.match(r'(\d+)\.(\d+)', version_str)
+        if version_match:
+            major = int(version_match.group(1))
+            minor = int(version_match.group(2))
+
+            if major >= 4:
+                # Kafka 4.x+ is KRaft-only
+                mode = 'kraft'
+                logger.info(f"Kafka {major}.{minor}+ detected - using KRaft mode (ZooKeeper removed)")
+            elif major == 3:
+                # Kafka 3.x can be either KRaft or ZooKeeper
+                # For 3.3+, default to KRaft (production-ready)
+                # For 3.0-3.2, need to check cluster metadata
+                if minor >= 3:
+                    mode = 'kraft'
+                    logger.info(f"Kafka 3.{minor} detected - defaulting to KRaft mode (production-ready)")
+                else:
+                    # For 3.0-3.2, try to detect actual mode
+                    try:
+                        cluster_metadata = self.admin_client._client.cluster
+                        cluster_id = cluster_metadata.cluster_id()
+                        # KRaft clusters have longer, UUID-like cluster IDs
+                        if cluster_id and len(cluster_id) > 10:
+                            mode = 'kraft'
+                            logger.info(f"Kafka 3.{minor} detected with KRaft cluster ID")
+                        else:
+                            mode = 'zookeeper'
+                            logger.info(f"Kafka 3.{minor} detected - using ZooKeeper mode")
+                    except Exception as e:
+                        # If can't determine, assume ZK for 3.0-3.2
+                        mode = 'zookeeper'
+                        logger.info(f"Kafka 3.{minor} detected - defaulting to ZooKeeper mode")
+            else:
+                # Kafka 2.x and earlier are ZooKeeper-only
+                mode = 'zookeeper'
+                logger.info(f"Kafka {major}.x detected - ZooKeeper mode only")
+        else:
+            logger.warning(f"Could not parse Kafka version '{version_str}' - defaulting to ZooKeeper mode")
+
+        self.kafka_mode = mode
+        return mode
 
     @property
     def version_info(self):
@@ -318,43 +747,75 @@ class KafkaConnector(SSHSupportMixin):
             self._version_info = self._get_version_info()
         return self._version_info
 
+    def is_kraft_mode(self):
+        """Check if running in KRaft mode."""
+        if self.kafka_mode is None:
+            self._detect_kafka_mode()
+        return self.kafka_mode == 'kraft'
+
+    def is_zookeeper_mode(self):
+        """Check if running in ZooKeeper mode."""
+        if self.kafka_mode is None:
+            self._detect_kafka_mode()
+        return self.kafka_mode == 'zookeeper'
+
     def get_db_metadata(self):
         """
         Fetches cluster-level metadata for trend analysis.
 
         Returns:
-            dict: Metadata including version, cluster_name, nodes, environment
+            dict: Metadata including version, cluster_name, nodes, environment, kafka_mode
         """
         try:
-            # Get cluster information
-            cluster_info = self.admin_client.describe_cluster()
-            cluster_id = cluster_info.get('cluster_id', 'Unknown')
-
-            # Get broker count
+            # Use cached cluster metadata from connection time
             cluster = self.admin_client._client.cluster
-            cluster.request_update()
-            brokers = list(cluster.brokers())
+
+            # Get cluster ID (it's a property, not a method)
+            cluster_id = 'Unknown'
+            if hasattr(cluster, 'cluster_id'):
+                cid = cluster.cluster_id
+                # If it's callable (older kafka-python), call it
+                if callable(cid):
+                    cluster_id = cid()
+                else:
+                    cluster_id = cid
+            if cluster_id is None:
+                cluster_id = 'Unknown'
+
+            # Get broker count from cached cluster metadata
+            brokers = list(cluster.brokers()) if hasattr(cluster, 'brokers') else []
             broker_count = len(brokers)
 
             # Use detected environment
             environment = self.environment if self.environment else 'self_hosted'
             environment_details = self.environment_details if self.environment_details else {}
 
-            return {
+            # Ensure kafka_mode is detected
+            if self.kafka_mode is None:
+                self._detect_kafka_mode()
+
+            # Build metadata dict with all relevant fields
+            metadata = {
                 'version': self.version_info.get('version_string', 'N/A'),
                 'cluster_name': cluster_id,
                 'nodes': broker_count,
                 'environment': environment,
                 'environment_details': environment_details,
+                'kafka_mode': self.kafka_mode,  # KRaft or ZooKeeper
                 'db_name': f"Cluster ID: {cluster_id}"  # Keep for backwards compatibility
             }
+
+            return metadata
         except Exception as e:
+            import traceback
             logger.warning(f"Could not fetch metadata: {e}")
+            logger.debug(traceback.format_exc())
             return {
                 'version': 'N/A',
                 'cluster_name': 'Unknown',
                 'nodes': 0,
                 'environment': 'unknown',
+                'kafka_mode': 'unknown',
                 'db_name': 'N/A'
             }
 
@@ -441,36 +902,44 @@ class KafkaConnector(SSHSupportMixin):
     def _execute_shell_command(self, command, return_raw=False):
         """
         Executes a shell command on a Kafka broker via SSH.
-        
-        Delegates to ShellExecutor which handles:
-        - Command sanitization
-        - SSH execution
-        - Output formatting
-        - Error handling
-        
+
         Args:
             command: Shell command to execute (e.g., 'df -h /var/lib/kafka')
             return_raw: If True, returns tuple (formatted, raw_data)
-        
+
         Returns:
             str or tuple: Formatted output or (formatted, raw) if return_raw=True
         """
-        if not self.ssh_manager:
+        # Check SSH availability using SSHSupportMixin
+        ssh_hosts = self.get_ssh_hosts()
+        if not ssh_hosts:
             error_msg = self.formatter.format_error(
-                "SSH not configured. Required settings: ssh_host, ssh_user, "
+                "SSH not configured. Required settings: ssh_hosts, ssh_user, "
                 "and ssh_key_file or ssh_password"
             )
             return (error_msg, {'error': 'SSH not configured'}) if return_raw else error_msg
-        
+
         try:
-            # Build JSON query for ShellExecutor
-            query = json.dumps({
-                "operation": "shell",
-                "command": command
-            })
-            
-            # Delegate to ShellExecutor (uses shared formatter)
-            return self.shell_executor.execute(query, return_raw=return_raw)
+            # Execute on first available SSH host
+            # (This maintains backward compatibility with single-host behavior)
+            ssh_manager = self.get_ssh_manager(ssh_hosts[0])
+            if not ssh_manager:
+                error_msg = self.formatter.format_error(
+                    f"SSH manager not available for host {ssh_hosts[0]}"
+                )
+                return (error_msg, {'error': 'SSH manager not available'}) if return_raw else error_msg
+
+            # Execute command
+            stdout, stderr, exit_code = ssh_manager.execute_command(command)
+
+            if exit_code != 0:
+                error_msg = self.formatter.format_error(
+                    f"Command failed with exit code {exit_code}: {stderr or stdout}"
+                )
+                return (error_msg, {'error': stderr or stdout, 'exit_code': exit_code}) if return_raw else error_msg
+
+            # Return stdout directly (already formatted as string)
+            return (stdout, stdout) if return_raw else stdout
 
         except Exception as e:
             error_msg = self.formatter.format_error(f"Shell command failed: {str(e)}")
@@ -480,17 +949,100 @@ class KafkaConnector(SSHSupportMixin):
 
     def _list_topics(self, return_raw=False):
         """Lists all user-visible topics."""
-        topics = self.admin_client.list_topics()
-        user_topics = sorted([t for t in topics if not t.startswith('__')])
-        raw = {'topics': user_topics, 'count': len(user_topics)}
-        
-        if not user_topics:
-            formatted = self.formatter.format_note("No user topics found.")
-        else:
-            formatted = f"User Topics ({len(user_topics)}):\n\n"
-            formatted += "\n".join(f"  - {t}" for t in user_topics)
-        
-        return (formatted, raw) if return_raw else formatted
+        import time
+        from kafka.errors import KafkaError
+
+        # Retry logic for intermittent connection issues
+        max_retries = 3
+        retry_delay = 1
+
+        for attempt in range(max_retries):
+            try:
+                topics = self.admin_client.list_topics()
+                user_topics = sorted([t for t in topics if not t.startswith('__')])
+                raw = {'topics': user_topics, 'count': len(user_topics)}
+
+                if not user_topics:
+                    formatted = self.formatter.format_note("No user topics found.")
+                else:
+                    formatted = f"User Topics ({len(user_topics)}):\n\n"
+                    formatted += "\n".join(f"  - {t}" for t in user_topics)
+
+                return (formatted, raw) if return_raw else formatted
+
+            except KafkaError as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Failed to list topics (attempt {attempt + 1}/{max_retries}): {e}")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    # Final attempt failed - try SSH fallback if available
+                    logger.warning(f"Admin client failed to list topics after {max_retries} attempts: {e}")
+
+                    if self.has_ssh_support():
+                        logger.info("Attempting SSH-based topic listing as fallback...")
+                        ssh_result = self._list_topics_via_ssh(return_raw=return_raw)
+                        if ssh_result:
+                            return ssh_result
+
+                    # No SSH or SSH also failed
+                    error_msg = f"Failed to list topics after {max_retries} attempts: {e}"
+                    logger.error(error_msg)
+                    formatted = self.formatter.format_error(error_msg)
+                    raw = {'error': str(e), 'topics': [], 'count': 0}
+                    return (formatted, raw) if return_raw else formatted
+
+    def _list_topics_via_ssh(self, return_raw=False):
+        """
+        Lists topics via SSH using the private listener address.
+
+        This is more reliable than admin client when public network routing is unstable.
+        Uses the first available SSH host to query topics.
+        """
+        try:
+            # Try to get topics from first available broker
+            for host in self.get_ssh_hosts():
+                ssh_manager = self.get_ssh_manager(host)
+                if not ssh_manager:
+                    continue
+
+                # Get private listener for this host
+                private_listener = self.get_private_listener(host)
+                if not private_listener:
+                    logger.debug(f"No private listener detected for {host}, skipping")
+                    continue
+
+                # Run kafka-topics.sh via SSH
+                kafka_bin = self.settings.get('kafka_run_class_path', '/opt/kafka/bin/kafka-run-class.sh').replace('kafka-run-class.sh', 'kafka-topics.sh')
+                cmd = f"{kafka_bin} --bootstrap-server {private_listener} --list 2>/dev/null"
+
+                logger.debug(f"Listing topics via SSH on {host} using {private_listener}")
+                stdout, stderr, exit_code = ssh_manager.execute_command(cmd, timeout=10)
+
+                if exit_code == 0 and stdout.strip():
+                    # Parse topic list
+                    topics = [line.strip() for line in stdout.strip().split('\n') if line.strip()]
+                    user_topics = sorted([t for t in topics if not t.startswith('__')])
+                    raw = {'topics': user_topics, 'count': len(user_topics), 'source': 'ssh'}
+
+                    if not user_topics:
+                        formatted = self.formatter.format_note("No user topics found (via SSH).")
+                    else:
+                        formatted = f"User Topics ({len(user_topics)}) [via SSH]:\n\n"
+                        formatted += "\n".join(f"  - {t}" for t in user_topics)
+
+                    logger.info(f"✅ Successfully listed {len(user_topics)} topics via SSH on {host}")
+                    return (formatted, raw) if return_raw else formatted
+                else:
+                    logger.debug(f"SSH topic listing failed on {host}: exit {exit_code}")
+
+            # All SSH attempts failed
+            logger.warning("SSH topic listing failed on all hosts")
+            return None
+
+        except Exception as e:
+            logger.warning(f"SSH topic listing failed: {e}")
+            return None
 
     def _describe_topics(self, topics, return_raw=False):
         """Gets detailed information about topics."""
@@ -631,16 +1183,28 @@ class KafkaConnector(SSHSupportMixin):
                     consumer_params['sasl_plain_password'] = self.settings.get('sasl_password')
 
                 if 'SSL' in security_protocol:
-                    ssl_cafile = self.settings.get('ssl_cafile')
-                    if ssl_cafile:
-                        consumer_params['ssl_cafile'] = ssl_cafile
-                    ssl_certfile = self.settings.get('ssl_certfile')
-                    ssl_keyfile = self.settings.get('ssl_keyfile')
-                    if ssl_certfile and ssl_keyfile:
-                        consumer_params['ssl_certfile'] = ssl_certfile
-                        consumer_params['ssl_keyfile'] = ssl_keyfile
-                    if 'ssl_check_hostname' in self.settings:
-                        consumer_params['ssl_check_hostname'] = self.settings['ssl_check_hostname']
+                    # Check if custom SSL context is needed (for CERT_NONE)
+                    ssl_cert_reqs_setting = self.settings.get('ssl_cert_reqs')
+
+                    if ssl_cert_reqs_setting is not None and ssl_cert_reqs_setting == 0:
+                        # Create custom SSL context that doesn't verify certificates
+                        import ssl
+                        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                        ssl_context.check_hostname = False
+                        ssl_context.verify_mode = ssl.CERT_NONE
+                        consumer_params['ssl_context'] = ssl_context
+                    else:
+                        # Standard SSL configuration with verification
+                        ssl_cafile = self.settings.get('ssl_cafile')
+                        if ssl_cafile:
+                            consumer_params['ssl_cafile'] = ssl_cafile
+                        ssl_certfile = self.settings.get('ssl_certfile')
+                        ssl_keyfile = self.settings.get('ssl_keyfile')
+                        if ssl_certfile and ssl_keyfile:
+                            consumer_params['ssl_certfile'] = ssl_certfile
+                            consumer_params['ssl_keyfile'] = ssl_keyfile
+                        if 'ssl_check_hostname' in self.settings:
+                            consumer_params['ssl_check_hostname'] = self.settings['ssl_check_hostname']
 
             consumer = KafkaConsumer(**consumer_params)
             end_offsets = consumer.end_offsets(partitions)

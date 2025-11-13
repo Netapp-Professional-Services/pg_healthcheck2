@@ -1,6 +1,9 @@
 {
   "critical_fd_usage": {
-    "metric_keywords": ["file_descriptors", "kafka"],
+    "metric_keywords": [
+      "file_descriptors",
+      "kafka"
+    ],
     "rules": [
       {
         "expression": "data.get('usage_pct', 0) >= 95",
@@ -50,13 +53,63 @@
           "Review socket buffer settings that affect connection count"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "fd_available",
+        "exists": true
+      },
+      {
+        "key": "fd_limit",
+        "exists": true
+      },
+      {
+        "key": "fd_used",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "usage_pct",
+        "exists": true
+      }
     ]
   },
   "broker_fd_health": {
-    "metric_keywords": ["file_descriptors"],
+    "metric_keywords": [
+      "file_descriptors"
+    ],
     "data_conditions": [
-      {"key": "broker_id", "exists": true},
-      {"key": "usage_pct", "exists": true}
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "usage_pct",
+        "exists": true
+      },
+      {
+        "key": "exceeds_critical",
+        "exists": true
+      },
+      {
+        "key": "exceeds_warning",
+        "exists": true
+      },
+      {
+        "key": "fd_limit",
+        "exists": true
+      },
+      {
+        "key": "fd_used",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -82,7 +135,10 @@
     ]
   },
   "multiple_brokers_fd_issues": {
-    "metric_keywords": ["file_descriptors"],
+    "metric_keywords": [
+      "file_descriptors",
+      "health_summary"
+    ],
     "rules": [
       {
         "expression": "len(all_structured_findings.get('check_file_descriptors', {}).get('file_descriptors', {}).get('critical_brokers', [])) >= 2",
@@ -106,6 +162,12 @@
           "Standardize nofile limits across all brokers",
           "Plan coordinated limit increases"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "warning_count",
+        "exists": true
       }
     ]
   }

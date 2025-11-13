@@ -1,6 +1,9 @@
 {
   "critical_disk_usage": {
-    "metric_keywords": ["disk_usage", "kafka"],
+    "metric_keywords": [
+      "disk_usage",
+      "kafka"
+    ],
     "rules": [
       {
         "expression": "data.get('use_percent', 0) >= 95",
@@ -50,13 +53,55 @@
           "Evaluate if any data can be archived or moved to cold storage"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "available",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "mount_point",
+        "exists": true
+      },
+      {
+        "key": "use_percent",
+        "exists": true
+      }
     ]
   },
   "broker_disk_health": {
-    "metric_keywords": ["disk_usage"],
+    "metric_keywords": [
+      "disk_usage"
+    ],
     "data_conditions": [
-      {"key": "broker_id", "exists": true},
-      {"key": "use_percent", "exists": true}
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "use_percent",
+        "exists": true
+      },
+      {
+        "key": "exceeds_critical",
+        "exists": true
+      },
+      {
+        "key": "exceeds_warning",
+        "exists": true
+      },
+      {
+        "key": "mount_point",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -82,7 +127,10 @@
     ]
   },
   "multiple_brokers_disk_issues": {
-    "metric_keywords": ["disk_usage"],
+    "metric_keywords": [
+      "disk_usage",
+      "health_summary"
+    ],
     "rules": [
       {
         "expression": "len(all_structured_findings.get('check_disk_usage', {}).get('disk_usage', {}).get('critical_brokers', [])) >= 2",
@@ -107,6 +155,12 @@
           "Plan coordinated storage expansion",
           "Review data growth trends for the entire cluster"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "warning_count",
+        "exists": true
       }
     ]
   }

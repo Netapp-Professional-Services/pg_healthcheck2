@@ -1,18 +1,17 @@
 """
-Kafka Network Errors Check (Prometheus - Instaclustr)
+Kafka Network Errors Check (Unified Adaptive)
 
-Monitors network errors from Instaclustr Prometheus endpoints.
+Monitors network errors using adaptive collection strategy.
 Network errors indicate packet loss, corruption, or infrastructure issues.
 
 Health Check: prometheus_network_errors
-Source: Instaclustr Prometheus endpoints
-Requires: instaclustr_prometheus_enabled: true
+Collection Methods (in order of preference):
+1. Instaclustr Prometheus API
+2. Local Prometheus JMX Exporter (port 7500)
+3. Standard JMX (port 9999)
 
 Metrics:
-- ic_node_networkinerrorsdelta - Receive errors delta
-- ic_node_networkouterrorsdelta - Transmit errors delta
-- ic_node_networkindroppeddelta - Receive drops delta
-- ic_node_networkoutdroppeddelta - Transmit drops delta
+- network_rx_errors, network_tx_errors, network_rx_drops, network_tx_drops
 
 CRITICAL IMPORTANCE:
 - Packet loss causes message corruption/loss
@@ -24,6 +23,8 @@ CRITICAL IMPORTANCE:
 import logging
 from datetime import datetime
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.metric_collection_strategies import collect_metric_adaptive
+from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def get_weight():
 
 def check_prometheus_network_errors(connector, settings):
     """
-    Check network errors via Prometheus (Instaclustr managed service).
+    Check network errors via adaptive collection strategy.
 
     Monitors:
     - Network receive/transmit errors
@@ -43,10 +44,10 @@ def check_prometheus_network_errors(connector, settings):
 
     Thresholds:
     - WARNING: Any errors/drops detected
-    - CRITICAL: > 100 errors/drops in measurement period
+    - CRITICAL: > 100 errors/drops
 
     Args:
-        connector: Kafka connector
+        connector: Kafka connector with adaptive metric collection support
         settings: Configuration dictionary
 
     Returns:
@@ -55,120 +56,133 @@ def check_prometheus_network_errors(connector, settings):
     builder = CheckContentBuilder()
     builder.h3("Network Errors (Prometheus)")
 
-    if not settings.get('instaclustr_prometheus_enabled'):
-        findings = {
-            'status': 'skipped',
-            'reason': 'Prometheus monitoring not enabled',
-            'data': [],
-            'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}
-        }
-        return builder.build(), findings
-
     try:
-        from plugins.common.prometheus_client import get_instaclustr_client
+        # Get metric definitions
+        rx_err_def = get_metric_definition('network_rx_errors')
+        tx_err_def = get_metric_definition('network_tx_errors')
+        rx_drop_def = get_metric_definition('network_rx_drops')
+        tx_drop_def = get_metric_definition('network_tx_drops')
 
-        client = get_instaclustr_client(
-            cluster_id=settings['instaclustr_cluster_id'],
-            username=settings['instaclustr_prometheus_username'],
-            api_key=settings['instaclustr_prometheus_api_key'],
-            prometheus_base_url=settings.get('instaclustr_prometheus_base_url')
-        )
+        # Collect all four metrics
+        rx_err_result = collect_metric_adaptive(rx_err_def, connector, settings) if rx_err_def else None
+        tx_err_result = collect_metric_adaptive(tx_err_def, connector, settings) if tx_err_def else None
+        rx_drop_result = collect_metric_adaptive(rx_drop_def, connector, settings) if rx_drop_def else None
+        tx_drop_result = collect_metric_adaptive(tx_drop_def, connector, settings) if tx_drop_def else None
 
-        all_metrics = client.scrape_all_nodes()
+        if not any([rx_err_result, tx_err_result, rx_drop_result, tx_drop_result]):
+            builder.warning(
+                "⚠️ Could not collect network error metrics\n\n"
+                "*Tried collection methods:*\n"
+                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
+                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
+                "3. Standard JMX - Not available or SSH unavailable\n\n"
+                "*Note:* Network metrics not available via JMX"
+            )
+            findings = {
+                'status': 'skipped',
+                'reason': 'Unable to collect network error metrics',
+                'data': [],
+                'metadata': {
+                    'attempted_methods': ['instaclustr_prometheus', 'local_prometheus'],
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                }
+            }
+            return builder.build(), findings
 
-        if not all_metrics:
-            builder.error("❌ No metrics available")
-            return builder.build(), {'status': 'error', 'error_message': 'No metrics', 'data': [], 'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}}
+        # Extract data
+        method = (rx_err_result or tx_err_result or rx_drop_result or tx_drop_result).get('method')
+        rx_err_metrics = rx_err_result.get('node_metrics', {}) if rx_err_result else {}
+        tx_err_metrics = tx_err_result.get('node_metrics', {}) if tx_err_result else {}
+        rx_drop_metrics = rx_drop_result.get('node_metrics', {}) if rx_drop_result else {}
+        tx_drop_metrics = tx_drop_result.get('node_metrics', {}) if tx_drop_result else {}
 
-        rx_err = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_networkinerrorsdelta$')
-        tx_err = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_networkouterrorsdelta$')
-        rx_drop = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_networkindroppeddelta$')
-        tx_drop = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_networkoutdroppeddelta$')
-
-        if not (rx_err or tx_err or rx_drop or tx_drop):
-            builder.error("❌ Network error metrics not found")
-            return builder.build(), {'status': 'error', 'error_message': 'Network metrics not found', 'data': [], 'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}}
-
+        # Get thresholds
         warning_threshold = settings.get('kafka_network_errors_warning', 1)
         critical_threshold = settings.get('kafka_network_errors_critical', 100)
 
-        broker_data = {}
-
-        for metric in rx_err:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-            if node_id not in broker_data:
-                broker_data[node_id] = {'node_id': node_id, 'public_ip': target_labels.get('PublicIp', 'unknown'), 'rack': target_labels.get('Rack', 'unknown')}
-            broker_data[node_id]['rx_errors'] = int(metric['value'])
-
-        for metric in tx_err:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-            if node_id in broker_data:
-                broker_data[node_id]['tx_errors'] = int(metric['value'])
-
-        for metric in rx_drop:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-            if node_id in broker_data:
-                broker_data[node_id]['rx_drops'] = int(metric['value'])
-
-        for metric in tx_drop:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-            if node_id in broker_data:
-                broker_data[node_id]['tx_drops'] = int(metric['value'])
-
-        if not broker_data:
-            builder.error("❌ No broker data")
-            return builder.build(), {'status': 'error', 'error_message': 'No data', 'data': [], 'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}}
-
-        node_data = list(broker_data.values())
+        # Combine broker data
+        all_hosts = set(rx_err_metrics.keys()) | set(tx_err_metrics.keys()) | set(rx_drop_metrics.keys()) | set(tx_drop_metrics.keys())
+        node_data = []
         critical_brokers = []
         warning_brokers = []
 
-        for broker in node_data:
-            total_errors = broker.get('rx_errors', 0) + broker.get('tx_errors', 0) + broker.get('rx_drops', 0) + broker.get('tx_drops', 0)
-            broker['total_errors'] = total_errors
+        for host in all_hosts:
+            rx_errors = int(rx_err_metrics.get(host, 0))
+            tx_errors = int(tx_err_metrics.get(host, 0))
+            rx_drops = int(rx_drop_metrics.get(host, 0))
+            tx_drops = int(tx_drop_metrics.get(host, 0))
+            total_errors = rx_errors + tx_errors + rx_drops + tx_drops
+
+            broker_entry = {
+                'node_id': host,
+                'host': host,
+                'rx_errors': rx_errors,
+                'tx_errors': tx_errors,
+                'rx_drops': rx_drops,
+                'tx_drops': tx_drops,
+                'total_errors': total_errors
+            }
+            node_data.append(broker_entry)
 
             if total_errors >= critical_threshold:
-                critical_brokers.append({'node_id': broker['node_id'], 'public_ip': broker['public_ip'], 'total_errors': total_errors, 'rx_errors': broker.get('rx_errors', 0), 'tx_errors': broker.get('tx_errors', 0), 'rx_drops': broker.get('rx_drops', 0), 'tx_drops': broker.get('tx_drops', 0)})
+                critical_brokers.append(broker_entry)
             elif total_errors >= warning_threshold:
-                warning_brokers.append({'node_id': broker['node_id'], 'public_ip': broker['public_ip'], 'total_errors': total_errors, 'rx_errors': broker.get('rx_errors', 0), 'tx_errors': broker.get('tx_errors', 0), 'rx_drops': broker.get('rx_drops', 0), 'tx_drops': broker.get('tx_drops', 0)})
+                warning_brokers.append(broker_entry)
 
+        if not node_data:
+            builder.error("❌ No broker data available")
+            findings = {
+                'status': 'error',
+                'error_message': 'No broker data available',
+                'data': [],
+                'metadata': {'method': method, 'timestamp': datetime.utcnow().isoformat() + 'Z'}
+            }
+            return builder.build(), findings
+
+        # Determine overall status
         if critical_brokers:
-            status, severity = 'critical', 10
+            status = 'critical'
+            severity = 10
             message = f"🔴 {len(critical_brokers)} broker(s) with critical network errors"
         elif warning_brokers:
-            status, severity = 'warning', 8
+            status = 'warning'
+            severity = 8
             message = f"⚠️  {len(warning_brokers)} broker(s) with network errors"
         else:
-            status, severity = 'healthy', 0
+            status = 'healthy'
+            severity = 0
             message = f"✅ No network errors detected across {len(node_data)} brokers"
 
+        # Calculate cluster aggregate
         total_errors = sum(b['total_errors'] for b in node_data)
 
+        # Build structured findings
         findings = {
             'status': status,
             'severity': severity,
             'message': message,
-            'per_broker_network': {
-                'status': status,
-                'data': node_data,
-                'metadata': {'source': 'prometheus', 'metrics': ['network_errors', 'network_drops'], 'broker_count': len(node_data)}
+            'data': {
+                'per_broker_network': node_data,
+                'cluster_aggregate': {
+                    'total_errors_cluster': total_errors,
+                    'brokers_with_errors': len(critical_brokers) + len(warning_brokers),
+                    'broker_count': len(node_data),
+                    'thresholds': {
+                        'warning': warning_threshold,
+                        'critical': critical_threshold
+                    }
+                },
+                'collection_method': method
             },
-            'cluster_aggregate': {
-                'total_errors_cluster': total_errors,
-                'brokers_with_errors': len(critical_brokers) + len(warning_brokers),
-                'broker_count': len(node_data)
+            'metadata': {
+                'source': method,
+                'metrics': ['network_errors', 'network_drops'],
+                'broker_count': len(node_data),
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
         }
 
-        if critical_brokers:
-            findings['critical_network_errors'] = {'count': len(critical_brokers), 'brokers': critical_brokers, 'recommendation': 'URGENT: Network infrastructure issues - investigate NIC/switch/cabling'}
-        if warning_brokers:
-            findings['warning_network_errors'] = {'count': len(warning_brokers), 'brokers': warning_brokers, 'recommendation': 'Monitor network health - errors detected'}
-
+        # Generate AsciiDoc output
         if status == 'critical':
             builder.critical(message)
             builder.blank()
@@ -184,13 +198,14 @@ def check_prometheus_network_errors(connector, settings):
         builder.text("*Cluster Summary:*")
         builder.text(f"- Total Errors/Drops: {total_errors}")
         builder.text(f"- Brokers with Issues: {len(critical_brokers) + len(warning_brokers)}/{len(node_data)}")
+        builder.text(f"- Collection Method: {method}")
         builder.blank()
 
         if critical_brokers or warning_brokers:
             builder.text("*Brokers with Network Issues:*")
             for broker in critical_brokers + warning_brokers:
                 symbol = "🔴" if broker in critical_brokers else "⚠️"
-                builder.text(f"{symbol} Broker {broker['node_id'][:8]} ({broker['public_ip']}):")
+                builder.text(f"{symbol} Broker {broker['node_id']}:")
                 builder.text(f"   RX Errors: {broker['rx_errors']}, TX Errors: {broker['tx_errors']}")
                 builder.text(f"   RX Drops: {broker['rx_drops']}, TX Drops: {broker['tx_drops']}")
             builder.blank()
@@ -222,7 +237,7 @@ def check_prometheus_network_errors(connector, settings):
                     "Prevention:",
                     "  • Use quality network hardware",
                     "  • Monitor network metrics proactively",
-                    "  • Ensure proper MTU configuration (jumbo frames for cluster)",
+                    "  • Ensure proper MTU configuration",
                     "  • Separate replication traffic from client traffic if possible",
                     "  • Regular network infrastructure audits"
                 ]
@@ -232,6 +247,12 @@ def check_prometheus_network_errors(connector, settings):
         return builder.build(), findings
 
     except Exception as e:
-        logger.error(f"Prometheus network errors check failed: {e}", exc_info=True)
+        logger.error(f"Network errors check failed: {e}", exc_info=True)
         builder.error(f"❌ Check failed: {str(e)}")
-        return builder.build(), {'status': 'error', 'error_message': str(e), 'data': [], 'metadata': {'source': 'prometheus', 'timestamp': datetime.utcnow().isoformat() + 'Z'}}
+        findings = {
+            'status': 'error',
+            'error_message': str(e),
+            'data': [],
+            'metadata': {'timestamp': datetime.utcnow().isoformat() + 'Z'}
+        }
+        return builder.build(), findings

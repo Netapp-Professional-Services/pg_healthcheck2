@@ -1,6 +1,9 @@
 {
   "critical_topic_config_issues": {
-    "metric_keywords": ["topic_configuration", "kafka"],
+    "metric_keywords": [
+      "topic_configuration",
+      "kafka"
+    ],
     "rules": [
       {
         "expression": "data.get('has_critical') == True and any(i.get('category') == 'min_isr' and 'BLOCK WRITES' in i.get('message', '') for i in data.get('issues', []))",
@@ -28,10 +31,30 @@
           "Plan maintenance window for replica addition"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "has_critical",
+        "exists": true
+      },
+      {
+        "key": "issues",
+        "exists": true
+      },
+      {
+        "key": "replication_factor",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
+      }
     ]
   },
   "topic_config_warnings": {
-    "metric_keywords": ["topic_configuration"],
+    "metric_keywords": [
+      "topic_configuration"
+    ],
     "rules": [
       {
         "expression": "data.get('replication_factor', 0) == 2",
@@ -69,10 +92,34 @@
           "Balance retention needs vs storage capacity"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "issues",
+        "exists": true
+      },
+      {
+        "key": "min_insync_replicas",
+        "exists": true
+      },
+      {
+        "key": "replication_factor",
+        "exists": true
+      },
+      {
+        "key": "retention_formatted",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
+      }
     ]
   },
   "topic_config_optimization": {
-    "metric_keywords": ["topic_configuration"],
+    "metric_keywords": [
+      "topic_configuration"
+    ],
     "rules": [
       {
         "expression": "data.get('compression_type') in ['producer', 'uncompressed']",
@@ -99,10 +146,27 @@
           "Balance against retention and compaction requirements"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "compression_type",
+        "exists": true
+      },
+      {
+        "key": "segment_mb",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
+      }
     ]
   },
   "multiple_topics_with_issues": {
-    "metric_keywords": ["topic_configuration"],
+    "metric_keywords": [
+      "topic_configuration",
+      "health_summary"
+    ],
     "rules": [
       {
         "expression": "len(all_structured_findings.get('check_topic_configuration', {}).get('topic_configuration', {}).get('critical_topics', [])) >= 3",
@@ -131,13 +195,31 @@
           "Document rationale for non-standard configs"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "warning_count",
+        "exists": true
+      }
     ]
   },
   "cluster_config_health": {
-    "metric_keywords": ["topic_configuration"],
+    "metric_keywords": [
+      "topic_configuration"
+    ],
     "data_conditions": [
-      {"key": "topics_checked", "exists": true},
-      {"key": "critical_count", "exists": true}
+      {
+        "key": "topics_checked",
+        "exists": true
+      },
+      {
+        "key": "critical_count",
+        "exists": true
+      },
+      {
+        "key": "warning_count",
+        "exists": true
+      }
     ],
     "rules": [
       {

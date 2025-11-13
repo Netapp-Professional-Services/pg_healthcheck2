@@ -1,0 +1,376 @@
+{
+  "high_cluster_cpu_consumption": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "high_cpu_queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "len(data.get('high_cpu_queries', [])) > 0",
+        "level": "high",
+        "score": 8,
+        "reasoning": "One or more queries are consuming >5% of total cluster CPU, indicating significant resource impact.",
+        "recommendations": [
+          "Prioritize optimization for queries with highest percent_of_total_cluster_cpu values",
+          "Calculate optimization ROI: CPU impact × execution frequency",
+          "Run EXPLAIN (ANALYZE, BUFFERS) on high-impact queries to identify bottlenecks",
+          "Look for sequential scans on large tables, missing indexes, or inefficient join strategies",
+          "Consider query rewriting: replace complex subqueries with CTEs, OR conditions with UNION ALL",
+          "Monitor optimization results by comparing statistics before and after changes"
+        ]
+      },
+      {
+        "expression": "len(data.get('high_cpu_queries', [])) >= 3",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Multiple queries (3 or more) are consuming significant cluster CPU (>5% each), indicating systemic performance issues.",
+        "recommendations": [
+          "URGENT: Cluster performance is dominated by a few resource-intensive queries",
+          "Create an optimization sprint to address top 3-5 queries by CPU impact",
+          "Review application architecture: are these queries necessary or could they be cached?",
+          "Consider read replicas to offload heavy analytical queries from primary",
+          "Implement query result caching at application layer for high-frequency queries",
+          "Review database capacity: may need vertical scaling if all queries are optimized"
+        ]
+      }
+    ]
+  },
+  "io_bound_workload": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "io_bound_queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "len(data.get('io_bound_queries', [])) > 0",
+        "level": "medium",
+        "score": 7,
+        "reasoning": "Queries are spending >20% of execution time on I/O wait, suggesting storage bottlenecks or missing indexes.",
+        "recommendations": [
+          "Run EXPLAIN (ANALYZE, BUFFERS) to identify I/O patterns",
+          "Look for 'Sort Method: external merge Disk' indicating work_mem spills",
+          "Check for sequential scans: 'Seq Scan on large_table' in query plans",
+          "Review buffer hit counts: high shared_blks_read suggests cache misses",
+          "Consider increasing work_mem to avoid disk sorts: ALTER ROLE <user> SET work_mem = '64MB';",
+          "For hash joins with multiple batches, increase work_mem to fit join in memory",
+          "Create indexes on columns used in WHERE, JOIN, and ORDER BY clauses",
+          "Review storage IOPS: may need faster disks (SSD) or increased IOPS provisioning"
+        ]
+      }
+    ]
+  },
+  "low_cache_efficiency": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "low_cache_queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "len(data.get('low_cache_queries', [])) > 0",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Queries with <90% cache hit rate are causing excessive disk reads, impacting performance.",
+        "recommendations": [
+          "Verify index coverage: queries should use indexes, not sequential scans",
+          "Run EXPLAIN to check for 'Seq Scan' on large tables (requires index creation)",
+          "Review shared_buffers size: typical setting is 25% of system RAM",
+          "For large tables with low selectivity, consider partial indexes on filtered columns",
+          "Check if queries are scanning tables larger than shared_buffers (cache won't help)",
+          "Monitor pg_statio_user_tables for tables with high heap_blks_read",
+          "Consider table partitioning for very large tables with time-based access patterns",
+          "Increase shared_buffers if cache hit rate is consistently low cluster-wide"
+        ]
+      }
+    ]
+  },
+  "excessive_temp_file_usage": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "temp_file_queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "len(data.get('temp_file_queries', [])) > 0",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Queries are writing >100MB to temp files, indicating work_mem is insufficient and causing disk spills.",
+        "recommendations": [
+          "Run EXPLAIN (ANALYZE, BUFFERS) to verify disk spills in execution plan",
+          "Look for 'Sort Method: external merge Disk: <size>MB' in plan output",
+          "Calculate required work_mem: use disk size from EXPLAIN output as minimum",
+          "Increase work_mem for specific roles to avoid global impact:",
+          "  ALTER ROLE application_user SET work_mem = '128MB';",
+          "Monitor temp file writes in pg_stat_database.temp_bytes after changes",
+          "WARNING: Setting work_mem too high can cause OOM if many queries run concurrently",
+          "Formula: work_mem × max_connections × 2 should be < available RAM",
+          "Consider query rewriting to reduce memory requirements (break into smaller steps)"
+        ]
+      },
+      {
+        "expression": "len(data.get('temp_file_queries', [])) >= 3",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Multiple queries are spilling to disk with heavy temp file usage, causing severe performance degradation.",
+        "recommendations": [
+          "URGENT: work_mem is systematically too low for your workload",
+          "Review current work_mem setting: SHOW work_mem;",
+          "Identify max temp file size: SELECT max(temp_bytes) FROM pg_stat_database;",
+          "Set work_mem based on workload needs (typical: 16-128MB per query)",
+          "For analytical workloads, consider dedicated roles with higher work_mem",
+          "Monitor system memory: ensure sufficient RAM for increased work_mem",
+          "Consider breaking complex queries into CTEs or temp tables to reduce memory pressure",
+          "For very large sorts/joins, evaluate if query can be refactored to avoid temp files"
+        ]
+      }
+    ]
+  },
+  "monitoring_overhead": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "any(q.get('username', '').lower() in ['datadog', 'newrelic', 'prometheus', 'monitoring'] and float(q.get('percent_of_total_cluster_cpu', 0)) > 2.0 for q in data.get('queries', []))",
+        "level": "medium",
+        "score": 6,
+        "reasoning": "Monitoring tools are consuming >2% of cluster CPU, indicating collection intervals may be too aggressive.",
+        "recommendations": [
+          "Review monitoring agent configuration files (e.g., datadog postgres.yaml)",
+          "Increase collection intervals for expensive queries:",
+          "  query_metrics.collection_interval: 300 (5 minutes instead of default)",
+          "  activity_queries.collection_interval: 60 (1 minute instead of 10 seconds)",
+          "Disable collection of metrics not actively used for alerting",
+          "Consider using pg_stat_statements snapshots instead of real-time collection",
+          "Monitor impact: check queries table after configuration changes",
+          "Balance monitoring fidelity vs resource cost based on environment criticality"
+        ]
+      },
+      {
+        "expression": "any(q.get('username', '').lower() in ['datadog', 'newrelic', 'prometheus', 'monitoring'] and float(q.get('percent_of_total_cluster_cpu', 0)) > 5.0 for q in data.get('queries', []))",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Monitoring tools are consuming >5% of cluster CPU - this is excessive and impacting production workload.",
+        "recommendations": [
+          "URGENT: Monitoring overhead is too high and impacting application performance",
+          "Immediately increase collection intervals to reduce query frequency",
+          "Recommended intervals: pg_stat_statements (5-10 min), pg_stat_activity (30-60 sec)",
+          "Disable custom_query collection for non-critical metrics",
+          "Review query complexity in monitoring configuration - simplify expensive queries",
+          "Consider offloading monitoring to read replica if available",
+          "Evaluate if all collected metrics are actually used in dashboards/alerts",
+          "In production: monitoring should consume <2% of cluster resources"
+        ]
+      }
+    ]
+  },
+  "frequent_high_latency_queries": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "any(float(q.get('calls_per_hour', 0)) > 1000 and (float(q.get('estimated_cpu_time_ms', 0)) / float(q.get('total_executions', 1))) > 100 for q in data.get('queries', []))",
+        "level": "high",
+        "score": 8,
+        "reasoning": "High-frequency queries (>1000/hour) with >100ms average execution time are impacting user experience and consuming significant resources.",
+        "recommendations": [
+          "Identify application endpoints triggering these queries (use query comments/tracing)",
+          "Calculate optimization value: frequency × avg_time = total time savings potential",
+          "Run EXPLAIN (ANALYZE, BUFFERS) to identify execution plan inefficiencies",
+          "Add indexes to eliminate sequential scans on frequently accessed tables",
+          "Consider caching query results at application layer (Redis, memcached)",
+          "For read-heavy queries, evaluate if data can be denormalized for faster access",
+          "Implement connection pooling to reduce connection overhead (PgBouncer)",
+          "Review if query complexity can be reduced through schema optimization"
+        ]
+      }
+    ]
+  },
+  "stale_statistics": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('queries') and data['queries'][0].get('stats_collection_start_time') and (pd.Timestamp('now', tz='UTC') - pd.Timestamp(data['queries'][0]['stats_collection_start_time'])).total_seconds() < 86400",
+        "level": "low",
+        "score": 3,
+        "reasoning": "pg_stat_statements was reset within the last 24 hours. Statistics may not represent typical workload patterns.",
+        "recommendations": [
+          "Allow statistics to accumulate for 7-14 days for stable workload characterization",
+          "Avoid resetting pg_stat_statements during normal operations",
+          "If reset was intentional (after major changes), document baseline metrics",
+          "Schedule next analysis after statistics have accumulated sufficient data",
+          "Use pg_stat_statements_reset() only when troubleshooting specific issues"
+        ]
+      },
+      {
+        "expression": "data.get('queries') and data['queries'][0].get('stats_collection_start_time') and (pd.Timestamp('now', tz='UTC') - pd.Timestamp(data['queries'][0]['stats_collection_start_time'])).total_seconds() > 2592000",
+        "level": "low",
+        "score": 3,
+        "reasoning": "pg_stat_statements has not been reset in >30 days. May include obsolete queries from old code deployments.",
+        "recommendations": [
+          "Review query list for outdated or deprecated queries",
+          "Consider resetting statistics after next application deployment to establish new baseline",
+          "Filter results by recent activity (high calls_per_hour) to focus on current workload",
+          "Document top queries before reset for historical comparison",
+          "Establish regular reset schedule aligned with major deployments (quarterly recommended)"
+        ]
+      }
+    ]
+  },
+  "high_frequency_write_workload": {
+    "metric_keywords": [
+      "comprehensive_query_analysis"
+    ],
+    "data_conditions": [
+      {
+        "key": "queries",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "any(float(q.get('calls_per_hour', 0)) > 200000 and any(op in q.get('query', '').upper() for op in ['INSERT', 'UPDATE', 'DELETE']) for q in data.get('queries', []))",
+        "level": "medium",
+        "score": 7,
+        "reasoning": "High-frequency write operations (>200K/hour) detected. At this scale, PostgreSQL may not be the optimal technology for this workload pattern.",
+        "recommendations": [
+          "ARCHITECTURAL CONSIDERATION: Event streaming platform evaluation",
+          "",
+          "Current Pattern Analysis:",
+          "  • >200,000 write operations per hour detected",
+          "  • PostgreSQL is optimized for OLTP and complex queries, not high-volume event ingestion",
+          "  • Each write operation incurs WAL logging, index maintenance, and MVCC overhead",
+          "",
+          "Technology Migration Candidates:",
+          "",
+          "1. **Apache Kafka** - Event Streaming Platform",
+          "   • Designed for millions of events/second with low latency",
+          "   • Natural fit for IoT telemetry, application logs, and event streams",
+          "   • Can feed multiple downstream consumers (PostgreSQL, analytics, ML pipelines)",
+          "   • Provides message replay and time-travel capabilities",
+          "   • Use case: Real-time event ingestion with PostgreSQL for queries/analytics",
+          "",
+          "2. **Apache Cassandra** - Wide-Column Store",
+          "   • Linear write scalability across nodes",
+          "   • Built-in TTL support for time-series data (auto-expire old events)",
+          "   • Multi-datacenter replication for globally distributed IoT devices",
+          "   • Use case: High-volume time-series data with simple key-value lookups",
+          "",
+          "3. **TimescaleDB** - PostgreSQL Extension",
+          "   • Keeps PostgreSQL compatibility and query capabilities",
+          "   • Automatic time-based partitioning (hypertables)",
+          "   • Compression for older data reduces storage by 90%+",
+          "   • Use case: Time-series workloads that need SQL and analytical queries",
+          "",
+          "Decision Framework:",
+          "  ✓ Use Trends Analysis to track write volume growth over time",
+          "  ✓ If writes continue increasing, PostgreSQL will become a bottleneck",
+          "  ✓ Consider hybrid architecture:",
+          "    - Kafka/Cassandra for event ingestion (writes)",
+          "    - PostgreSQL for complex queries and analytics (reads)",
+          "  ✓ Estimate cost: Instaclustr Kafka cluster sizing based on event rate",
+          "  ✓ Calculate ROI: Reduced PostgreSQL load + improved write latency",
+          "",
+          "Next Steps:",
+          "  1. Identify table(s) receiving high-frequency writes",
+          "  2. Analyze query patterns: Are these append-only logs or transactional updates?",
+          "  3. Review data retention requirements (can old data be archived/TTL'd?)",
+          "  4. Use trend analysis to project growth trajectory",
+          "  5. Contact Instaclustr for Kafka/Cassandra architecture consultation"
+        ]
+      },
+      {
+        "expression": "any(float(q.get('calls_per_hour', 0)) > 500000 and any(op in q.get('query', '').upper() for op in ['INSERT', 'UPDATE', 'DELETE']) for q in data.get('queries', []))",
+        "level": "high",
+        "score": 9,
+        "reasoning": "CRITICAL: Extremely high-frequency write operations (>500K/hour) detected. PostgreSQL is likely a bottleneck for this workload.",
+        "recommendations": [
+          "🚨 URGENT: Technology Migration Strongly Recommended",
+          "",
+          "Your workload is writing >500,000 events per hour (138+ events/second).",
+          "PostgreSQL was not designed for this scale of write-heavy event ingestion.",
+          "",
+          "Impact Analysis:",
+          "  • PostgreSQL must maintain ACID guarantees for every write",
+          "  • Each INSERT triggers: WAL write, index updates, MVCC row versioning, autovacuum",
+          "  • At current scale, you're likely experiencing:",
+          "    - High WAL generation (review pg_stat_database.wal_bytes)",
+          "    - Bloat accumulation requiring aggressive autovacuum",
+          "    - Index maintenance overhead slowing writes",
+          "    - Potential replication lag if using streaming replication",
+          "",
+          "Recommended Architecture:",
+          "",
+          "**Hybrid Approach (Kafka + PostgreSQL):**",
+          "  1. Kafka for event ingestion:",
+          "     • Ingest all events at source (IoT devices, application logs)",
+          "     • Kafka handles 138 events/sec easily (designed for millions/sec)",
+          "     • Provides buffering, replay, and backpressure handling",
+          "",
+          "  2. Stream processing:",
+          "     • Use Kafka Streams or Apache Flink for real-time aggregation",
+          "     • Filter, transform, and enrich events before storage",
+          "     • Batch events for efficient PostgreSQL writes (1000s → 1 batch)",
+          "",
+          "  3. PostgreSQL for analytics:",
+          "     • Store aggregated/summarized data (hourly rollups, not individual events)",
+          "     • Maintain complex query capabilities for dashboards and reporting",
+          "     • Reduce write load by 100x while keeping analytical power",
+          "",
+          "Cost-Benefit:",
+          "  • Instaclustr Kafka 3-node cluster: ~$2K/month",
+          "  • PostgreSQL savings: Reduced compute/storage needs = ~$500-1K/month",
+          "  • Performance improvement: 10-100x faster event ingestion",
+          "  • Operational benefit: PostgreSQL remains healthy for transactional queries",
+          "",
+          "Immediate Actions:",
+          "  1. Schedule Instaclustr architecture consultation (mention this health check)",
+          "  2. Identify table(s) with high INSERT rate: SELECT schemaname, tablename FROM pg_stat_user_tables ORDER BY n_tup_ins DESC LIMIT 5;",
+          "  3. Measure impact: Run EXPLAIN ANALYZE on INSERT query to see overhead",
+          "  4. Review retention: Can old event data be archived/deleted to reduce bloat?",
+          "  5. Plan migration: POC with Kafka ingestion feeding batched PostgreSQL writes"
+        ]
+      }
+    ]
+  }
+}

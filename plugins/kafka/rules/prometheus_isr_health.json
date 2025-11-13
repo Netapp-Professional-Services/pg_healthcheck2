@@ -1,8 +1,19 @@
 {
   "critical_isr_shrink_rate": {
-    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "metric_keywords": [
+      "prometheus_isr_health",
+      "per_broker_isr",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "isr_shrink_rate", "exists": true }
+      {
+        "key": "isr_shrink_rate",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -21,11 +32,21 @@
       }
     ]
   },
-
   "warning_isr_shrink_rate": {
-    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "metric_keywords": [
+      "prometheus_isr_health",
+      "per_broker_isr",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "isr_shrink_rate", "exists": true }
+      {
+        "key": "isr_shrink_rate",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -42,11 +63,21 @@
       }
     ]
   },
-
   "critical_under_min_isr": {
-    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "metric_keywords": [
+      "prometheus_isr_health",
+      "per_broker_isr",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "under_min_isr_partitions", "exists": true }
+      {
+        "key": "under_min_isr_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -59,17 +90,27 @@
           "Producers with acks=all may experience timeouts or failures",
           "Check why replicas are not keeping up with leader",
           "Review min.insync.replicas configuration for affected topics",
-          "Verify replication factor is adequate (should be ≥3 for critical topics)",
+          "Verify replication factor is adequate (should be \u22653 for critical topics)",
           "Check broker health and replication lag"
         ]
       }
     ]
   },
-
   "warning_under_min_isr": {
-    "metric_keywords": ["prometheus_isr_health", "per_broker_isr", "data"],
+    "metric_keywords": [
+      "prometheus_isr_health",
+      "per_broker_isr",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "under_min_isr_partitions", "exists": true }
+      {
+        "key": "under_min_isr_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -87,9 +128,11 @@
       }
     ]
   },
-
   "cluster_isr_instability": {
-    "metric_keywords": ["prometheus_isr_health", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_isr_health",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('total_isr_shrink_rate', 0) >= 20",
@@ -117,11 +160,19 @@
           "Verify network performance between brokers"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "total_isr_shrink_rate",
+        "exists": true
+      }
     ]
   },
-
   "cluster_under_min_isr_pressure": {
-    "metric_keywords": ["prometheus_isr_health", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_isr_health",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('total_under_min_isr_partitions', 0) >= 10",
@@ -137,11 +188,19 @@
           "Verify replication factor is adequate for all critical topics"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "total_under_min_isr_partitions",
+        "exists": true
+      }
     ]
   },
-
   "healthy_isr": {
-    "metric_keywords": ["prometheus_isr_health", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_isr_health",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('total_isr_shrink_rate', 0) < 1 and data.get('total_under_min_isr_partitions', 0) == 0",
@@ -154,6 +213,16 @@
           "Ensure min.insync.replicas is set appropriately for topic criticality",
           "Review replica.lag.time.max.ms periodically based on workload"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "total_isr_shrink_rate",
+        "exists": true
+      },
+      {
+        "key": "total_under_min_isr_partitions",
+        "exists": true
       }
     ]
   }

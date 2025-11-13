@@ -1,6 +1,9 @@
 {
   "gc_metrics_info": {
-    "metric_keywords": ["prometheus_gc_health", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_gc_health",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('broker_count', 0) > 0",
@@ -15,6 +18,12 @@
           "Consider increasing heap if GC time is consistently high",
           "Use G1GC for heaps > 4GB (default in modern Kafka)"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_count",
+        "exists": true
       }
     ]
   }

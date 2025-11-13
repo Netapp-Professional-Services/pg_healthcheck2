@@ -1,0 +1,25 @@
+{
+  "critical_unclean_elections": {
+    "metric_keywords": ["check_unclean_elections", "data"],
+    "data_conditions": [
+      {"key": "unclean_count", "exists": true}
+    ],
+    "rules": [{
+      "expression": "data.get('unclean_count', 0) > 0",
+      "level": "critical",
+      "score": 10,
+      "reasoning": "🚨 DATA LOSS EVENT: {data.get('unclean_count')} unclean leader election(s) detected - permanent data loss has occurred",
+      "recommendations": [
+        "CRITICAL: Unclean leader elections indicate PERMANENT DATA LOSS",
+        "Review broker logs to identify affected partitions",
+        "Investigate root cause: Why did all ISR members become unavailable?",
+        "Check for network partitions or cascading broker failures",
+        "Review replication configuration: min.insync.replicas, replication.factor",
+        "Consider setting unclean.leader.election.enable=false if data consistency is critical",
+        "Implement monitoring for ISR shrinks to detect issues before data loss",
+        "Ensure brokers are in different availability zones",
+        "Use acks=all for producers to ensure proper replication"
+      ]
+    }]
+  }
+}

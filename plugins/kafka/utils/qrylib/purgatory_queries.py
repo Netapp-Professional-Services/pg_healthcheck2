@@ -19,7 +19,7 @@ def get_purgatory_query(connector):
     # Get configuration from connector settings
     settings = getattr(connector, 'settings', {})
     jmx_port = settings.get('kafka_jmx_port', 9999)
-    kafka_run_class = settings.get('kafka_run_class_path', 'kafka-run-class')
+    kafka_run_class = settings.get('kafka_run_class_path', '/opt/kafka/bin/kafka-run-class.sh')
     
     # Optional sudo support (typically not needed for JMX)
     use_sudo = settings.get('kafka_jmx_use_sudo', False)

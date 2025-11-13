@@ -1,16 +1,18 @@
 """
-Kafka File Descriptor Usage Check (Prometheus - Instaclustr)
+Kafka File Descriptor Usage Check (Unified Adaptive)
 
-Monitors file descriptor usage from Instaclustr Prometheus endpoints.
+Monitors file descriptor usage using adaptive collection strategy.
 File descriptor exhaustion is a common cause of Kafka broker crashes.
 
 Health Check: prometheus_file_descriptors
-Source: Instaclustr Prometheus endpoints
-Requires: instaclustr_prometheus_enabled: true
+Collection Methods (in order of preference):
+1. Instaclustr Prometheus API
+2. Local Prometheus JMX Exporter (port 7500)
+3. Standard JMX (port 9999)
 
 Metrics:
-- ic_node_filedescriptoropencount - Current open file descriptors
-- ic_node_filedescriptorlimit - Maximum file descriptor limit
+- ic_node_filedescriptoropencount / kafka_server_kafkaserver_filedescriptoropencount
+- ic_node_filedescriptorlimit (Instaclustr only, calculated from OS for others)
 
 CRITICAL IMPORTANCE:
 - Kafka uses FDs for: log files, network connections, internal files
@@ -22,6 +24,8 @@ CRITICAL IMPORTANCE:
 import logging
 from datetime import datetime
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.metric_collection_strategies import collect_metric_adaptive
+from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +37,11 @@ def get_weight():
 
 def check_prometheus_file_descriptors(connector, settings):
     """
-    Check file descriptor usage via Prometheus (Instaclustr managed service).
+    Check file descriptor usage via adaptive collection strategy.
 
     Monitors:
     - Open file descriptor count
-    - File descriptor limit
+    - File descriptor limit (when available)
     - Usage percentage
 
     Thresholds:
@@ -45,8 +49,8 @@ def check_prometheus_file_descriptors(connector, settings):
     - CRITICAL: > 85% of limit
 
     Args:
-        connector: Kafka connector (not used for Prometheus checks)
-        settings: Configuration dictionary with Prometheus credentials
+        connector: Kafka connector with adaptive metric collection support
+        settings: Configuration dictionary
 
     Returns:
         tuple: (adoc_content, structured_findings)
@@ -54,56 +58,57 @@ def check_prometheus_file_descriptors(connector, settings):
     builder = CheckContentBuilder()
     builder.h3("File Descriptor Usage (Prometheus)")
 
-    if not settings.get('instaclustr_prometheus_enabled'):
-        findings = {
-            'status': 'skipped',
-            'reason': 'Prometheus monitoring not enabled',
-            'data': [],
-            'metadata': {
-                'source': 'prometheus',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
-        }
-        return builder.build(), findings
-
     try:
-        from plugins.common.prometheus_client import get_instaclustr_client
-
-        client = get_instaclustr_client(
-            cluster_id=settings['instaclustr_cluster_id'],
-            username=settings['instaclustr_prometheus_username'],
-            api_key=settings['instaclustr_prometheus_api_key'],
-            prometheus_base_url=settings.get('instaclustr_prometheus_base_url')
-        )
-
-        all_metrics = client.scrape_all_nodes()
-
-        if not all_metrics:
-            builder.error("❌ No metrics available from Prometheus")
+        # Get metric definition
+        fd_metric_def = get_metric_definition('file_descriptors')
+        if not fd_metric_def:
+            builder.error("❌ File descriptor metric definition not found")
             findings = {
                 'status': 'error',
-                'error_message': 'No metrics available from Prometheus',
+                'error_message': 'Metric definition not found',
+                'data': [],
+                'metadata': {'timestamp': datetime.utcnow().isoformat() + 'Z'}
+            }
+            return builder.build(), findings
+
+        # Collect FD usage metric adaptively
+        fd_result = collect_metric_adaptive(fd_metric_def, connector, settings)
+
+        if not fd_result:
+            builder.warning(
+                "⚠️ Could not collect file descriptor metrics\n\n"
+                "*Tried collection methods:*\n"
+                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
+                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
+                "3. Standard JMX - Not available or SSH unavailable\n\n"
+                "*To enable monitoring, configure one of:*\n"
+                "• Instaclustr Prometheus: Set `instaclustr_prometheus_enabled: true`\n"
+                "• Local Prometheus exporter: Ensure JMX exporter running on brokers\n"
+                "• Standard JMX: Enable JMX on port 9999 and configure SSH access"
+            )
+            findings = {
+                'status': 'skipped',
+                'reason': 'Unable to collect file descriptor metrics using any method',
                 'data': [],
                 'metadata': {
-                    'source': 'prometheus',
+                    'attempted_methods': ['instaclustr_prometheus', 'local_prometheus', 'jmx'],
                     'timestamp': datetime.utcnow().isoformat() + 'Z'
                 }
             }
             return builder.build(), findings
 
-        fd_open_metrics = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_filedescriptoropencount$')
-        fd_limit_metrics = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_filedescriptorlimit$')
+        # Extract data
+        method = fd_result.get('method')
+        node_metrics = fd_result.get('node_metrics', {})
+        metadata = fd_result.get('metadata', {})
 
-        if not fd_open_metrics or not fd_limit_metrics:
-            builder.error("❌ File descriptor metrics not found")
+        if not node_metrics:
+            builder.error("❌ No broker data available")
             findings = {
                 'status': 'error',
-                'error_message': 'File descriptor metrics not found in Prometheus',
+                'error_message': 'No broker data available',
                 'data': [],
-                'metadata': {
-                    'source': 'prometheus',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
+                'metadata': {'method': method, 'timestamp': datetime.utcnow().isoformat() + 'Z'}
             }
             return builder.build(), findings
 
@@ -111,70 +116,24 @@ def check_prometheus_file_descriptors(connector, settings):
         warning_pct = settings.get('kafka_fd_warning_pct', 70)
         critical_pct = settings.get('kafka_fd_critical_pct', 85)
 
-        # Process metrics by broker
-        broker_data = {}
-
-        for metric in fd_open_metrics:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-
-            if node_id not in broker_data:
-                broker_data[node_id] = {
-                    'node_id': node_id,
-                    'public_ip': target_labels.get('PublicIp', 'unknown'),
-                    'rack': target_labels.get('Rack', 'unknown'),
-                    'datacenter': target_labels.get('ClusterDataCenterName', 'unknown')
-                }
-
-            broker_data[node_id]['fd_open'] = int(metric['value'])
-
-        for metric in fd_limit_metrics:
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', 'unknown')
-
-            if node_id in broker_data:
-                broker_data[node_id]['fd_limit'] = int(metric['value'])
-
-        if not broker_data:
-            builder.error("❌ No broker data available")
-            findings = {
-                'status': 'error',
-                'error_message': 'No broker data available',
-                'data': [],
-                'metadata': {
-                    'source': 'prometheus',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
-            }
-            return builder.build(), findings
-
-        # Calculate percentages and identify issues
-        node_data = list(broker_data.values())
+        # Process broker data
+        # NOTE: file_descriptors metric already returns usage percentage from metric_collection_strategies
+        node_data = []
         critical_fd = []
         warning_fd = []
 
-        for broker in node_data:
-            fd_open = broker.get('fd_open', 0)
-            fd_limit = broker.get('fd_limit', 1)
-            fd_pct = (fd_open / fd_limit * 100) if fd_limit > 0 else 0
-            broker['fd_usage_pct'] = round(fd_pct, 1)
+        for node_host, fd_usage_pct in node_metrics.items():
+            broker_entry = {
+                'node_id': node_host,
+                'host': node_host,
+                'fd_usage_pct': round(fd_usage_pct, 1)
+            }
+            node_data.append(broker_entry)
 
-            if fd_pct >= critical_pct:
-                critical_fd.append({
-                    'node_id': broker['node_id'],
-                    'public_ip': broker['public_ip'],
-                    'fd_open': fd_open,
-                    'fd_limit': fd_limit,
-                    'fd_usage_pct': round(fd_pct, 1)
-                })
-            elif fd_pct >= warning_pct:
-                warning_fd.append({
-                    'node_id': broker['node_id'],
-                    'public_ip': broker['public_ip'],
-                    'fd_open': fd_open,
-                    'fd_limit': fd_limit,
-                    'fd_usage_pct': round(fd_pct, 1)
-                })
+            if fd_usage_pct >= critical_pct:
+                critical_fd.append(broker_entry)
+            elif fd_usage_pct >= warning_pct:
+                warning_fd.append(broker_entry)
 
         # Determine overall status
         if critical_fd:
@@ -190,43 +149,45 @@ def check_prometheus_file_descriptors(connector, settings):
             severity = 0
             message = f"✅ File descriptor usage healthy across {len(node_data)} brokers"
 
-        # Build structured findings
-        avg_fd_pct = sum(b['fd_usage_pct'] for b in node_data) / len(node_data)
+        # Calculate cluster aggregate
+        avg_fd_pct = fd_result.get('cluster_avg', 0)
 
+        # Build structured findings
         findings = {
             'status': status,
             'severity': severity,
             'message': message,
-            'per_broker_fd': {
-                'status': status,
-                'data': node_data,
-                'metadata': {
-                    'source': 'prometheus',
-                    'metrics': ['filedescriptoropencount', 'filedescriptorlimit'],
-                    'broker_count': len(node_data)
-                }
+            'data': {
+                'per_broker_fd': node_data,
+                'cluster_aggregate': {
+                    'avg_fd_usage_pct': round(avg_fd_pct, 1),
+                    'brokers_critical': len(critical_fd),
+                    'brokers_warning': len(warning_fd),
+                    'broker_count': len(node_data),
+                    'thresholds': {
+                        'warning_pct': warning_pct,
+                        'critical_pct': critical_pct
+                    }
+                },
+                'collection_method': method
             },
-            'cluster_aggregate': {
-                'avg_fd_usage_pct': round(avg_fd_pct, 1),
-                'brokers_critical': len(critical_fd),
-                'brokers_warning': len(warning_fd),
+            'metadata': {
+                'source': method,
+                'metrics': ['file_descriptor_usage_pct'],
                 'broker_count': len(node_data),
-                'thresholds': {
-                    'warning_pct': warning_pct,
-                    'critical_pct': critical_pct
-                }
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
             }
         }
 
         if critical_fd:
-            findings['critical_fd_usage'] = {
+            findings['data']['critical_fd_usage'] = {
                 'count': len(critical_fd),
                 'brokers': critical_fd,
                 'recommendation': 'URGENT: Broker near FD exhaustion - increase ulimit or reduce connections/partitions'
             }
 
         if warning_fd:
-            findings['warning_fd_usage'] = {
+            findings['data']['warning_fd_usage'] = {
                 'count': len(warning_fd),
                 'brokers': warning_fd,
                 'recommendation': 'Monitor FD usage - plan to increase ulimit'
@@ -252,14 +213,14 @@ def check_prometheus_file_descriptors(connector, settings):
         builder.text(f"- Average FD Usage: {round(avg_fd_pct, 1)}%")
         builder.text(f"- Brokers at Risk: {len(critical_fd)} critical, {len(warning_fd)} warning")
         builder.text(f"- Brokers Monitored: {len(node_data)}")
+        builder.text(f"- Collection Method: {method}")
         builder.blank()
 
         builder.text("*Per-Broker FD Usage:*")
         for broker in sorted(node_data, key=lambda x: x['fd_usage_pct'], reverse=True):
             status_icon = "🔴" if broker['fd_usage_pct'] >= critical_pct else "⚠️" if broker['fd_usage_pct'] >= warning_pct else "✅"
             builder.text(
-                f"{status_icon} Broker {broker['node_id'][:8]}: "
-                f"{broker['fd_open']:,}/{broker['fd_limit']:,} FDs ({broker['fd_usage_pct']}%)"
+                f"{status_icon} Broker {broker['node_id']}: {broker['fd_usage_pct']}% usage"
             )
         builder.blank()
 
@@ -311,15 +272,12 @@ def check_prometheus_file_descriptors(connector, settings):
         return builder.build(), findings
 
     except Exception as e:
-        logger.error(f"Prometheus file descriptor check failed: {e}", exc_info=True)
+        logger.error(f"File descriptor check failed: {e}", exc_info=True)
         builder.error(f"❌ Check failed: {str(e)}")
         findings = {
             'status': 'error',
             'error_message': str(e),
             'data': [],
-            'metadata': {
-                'source': 'prometheus',
-                'timestamp': datetime.utcnow().isoformat() + 'Z'
-            }
+            'metadata': {'timestamp': datetime.utcnow().isoformat() + 'Z'}
         }
         return builder.build(), findings

@@ -123,14 +123,24 @@ class SSHConnectionManager:
                 'port': self.settings.get('ssh_port', 22),
                 'timeout': self.settings.get('ssh_timeout', 10),
             }
-            
+
             # Add authentication
             if self.settings.get('ssh_key_file'):
                 connect_args['key_filename'] = self.settings['ssh_key_file']
             elif self.settings.get('ssh_password'):
                 connect_args['password'] = self.settings['ssh_password']
-            
+
             self.client.connect(**connect_args)
+
+            # Enable TCP keep-alive to prevent idle connection timeouts
+            # This sends periodic keep-alive packets to maintain the connection
+            transport = self.client.get_transport()
+            if transport:
+                # Set keep-alive interval (default 60 seconds)
+                keep_alive_interval = self.settings.get('ssh_keepalive_interval', 60)
+                transport.set_keepalive(keep_alive_interval)
+                logger.debug(f"SSH keep-alive enabled (interval: {keep_alive_interval}s)")
+
             logger.info(f"✅ SSH connection established to {self.settings['ssh_host']}")
             
         except paramiko.SSHException as e:

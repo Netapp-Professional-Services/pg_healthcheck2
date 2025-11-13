@@ -1,6 +1,10 @@
 {
   "high_consumer_lag": {
-    "metric_keywords": ["consumer_lag", "group_lags", "lag"],
+    "metric_keywords": [
+      "consumer_lag",
+      "group_lags",
+      "lag"
+    ],
     "rules": [
       {
         "expression": "data.get('lag', 0) > 10000",
@@ -21,6 +25,20 @@
           "Monitor consumer performance metrics.",
           "Review topic production rates and consumer throughput."
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "group_id",
+        "exists": true
+      },
+      {
+        "key": "lag",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
       }
     ]
   }

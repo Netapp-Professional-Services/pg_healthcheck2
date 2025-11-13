@@ -1,6 +1,9 @@
 {
   "topic_proliferation": {
-    "metric_keywords": ["kafka", "topic_analysis"],
+    "metric_keywords": [
+      "kafka",
+      "topic_analysis"
+    ],
     "rules": [
       {
         "expression": "data.get('total_count', 0) > data.get('max_threshold', 100)",
@@ -45,10 +48,27 @@
           "Implement validation in topic creation workflows."
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "max_threshold",
+        "exists": true
+      },
+      {
+        "key": "total_count",
+        "exists": true
+      },
+      {
+        "key": "violation_count",
+        "exists": true
+      }
     ]
   },
   "individual_topic_violations": {
-    "metric_keywords": ["kafka", "topic_details"],
+    "metric_keywords": [
+      "kafka",
+      "topic_details"
+    ],
     "rules": [
       {
         "expression": "data.get('starts_with_digit', False) == True",
@@ -91,6 +111,28 @@
           "Lowercase-only naming prevents confusion and ensures consistency across systems.",
           "Some tools and platforms are case-sensitive while others are not."
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "contains_hyphen",
+        "exists": true
+      },
+      {
+        "key": "contains_space",
+        "exists": true
+      },
+      {
+        "key": "contains_uppercase",
+        "exists": true
+      },
+      {
+        "key": "starts_with_digit",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
       }
     ]
   }

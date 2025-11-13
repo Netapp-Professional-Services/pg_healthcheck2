@@ -2,8 +2,13 @@
   "version_detection": {
     "metric_keywords": [
       "kafka_overview",
-      "version_info",
-      "version"
+      "version_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "version",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -22,8 +27,13 @@
   "controller_health": {
     "metric_keywords": [
       "kafka_overview",
-      "version_info",
-      "controller_id"
+      "version_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "controller_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -43,8 +53,13 @@
   "broker_count_critical": {
     "metric_keywords": [
       "kafka_overview",
-      "version_info",
-      "broker_count"
+      "version_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_count",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -78,8 +93,13 @@
   "broker_count_warning": {
     "metric_keywords": [
       "kafka_overview",
-      "version_info",
-      "broker_count"
+      "version_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_count",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -99,8 +119,13 @@
   "cluster_id_validation": {
     "metric_keywords": [
       "kafka_overview",
-      "version_info",
-      "cluster_id"
+      "version_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "cluster_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -119,8 +144,21 @@
   "broker_id_validation": {
     "metric_keywords": [
       "kafka_overview",
-      "broker_info",
-      "broker_id"
+      "broker_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "port",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -139,8 +177,21 @@
   "rack_awareness": {
     "metric_keywords": [
       "kafka_overview",
-      "broker_info",
-      "rack"
+      "broker_info"
+    ],
+    "data_conditions": [
+      {
+        "key": "rack",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      }
     ],
     "rules": [
       {

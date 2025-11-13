@@ -50,12 +50,58 @@ def run_check_purgatory_size(connector, settings):
     structured_data = {}
     
     builder.h3("Purgatory Size Monitoring (All Brokers)")
-    
+
     # Check SSH availability
     available, skip_msg, skip_data = require_ssh(connector, "Purgatory size check")
     if not available:
         builder.add(skip_msg)
         return builder.build(), skip_data
+
+    # Check JMX availability
+    if not connector.has_jmx():
+        current_strategy = connector.metric_collection_strategy
+        details = connector.metric_collection_details
+
+        builder.note(f"ℹ️ Purgatory metrics require direct JMX access")
+        builder.blank()
+
+        if current_strategy == 'local_prometheus':
+            builder.text(f"*Current metric collection:* Prometheus JMX Exporter (port {details.get('port', 7500)})")
+            builder.blank()
+            builder.text("*Note:* Purgatory metrics are not typically exported by Prometheus JMX Exporter.")
+            builder.text("If you need purgatory monitoring, enable direct JMX access:")
+        elif current_strategy == 'instaclustr_prometheus':
+            builder.text("*Current metric collection:* Instaclustr Prometheus API")
+            builder.blank()
+            builder.text("*Note:* Purgatory metrics may be available through Instaclustr API.")
+            builder.text("Contact Instaclustr support for purgatory metric availability.")
+            return builder.build(), {
+                'status': 'skipped',
+                'reason': 'instaclustr_prometheus_check_instaclustr_api',
+                'details': 'Using Instaclustr - purgatory metrics may be in their API'
+            }
+        else:
+            reason = details.get('reason', 'JMX not available')
+            builder.text(f"*Status:* {reason}")
+            builder.blank()
+            builder.text("*How to Enable JMX:*")
+
+        builder.blank()
+        builder.text("Add to Kafka startup script or systemd service:")
+        builder.text("```bash")
+        builder.text("export KAFKA_JMX_OPTS=\"-Dcom.sun.management.jmxremote \\")
+        builder.text("  -Dcom.sun.management.jmxremote.authenticate=false \\")
+        builder.text("  -Dcom.sun.management.jmxremote.ssl=false \\")
+        builder.text("  -Dcom.sun.management.jmxremote.port=9999\"")
+        builder.text("```")
+        builder.blank()
+        builder.text("Then restart Kafka brokers.")
+        return builder.build(), {
+            'status': 'skipped',
+            'reason': 'jmx_not_available',
+            'current_strategy': current_strategy,
+            'details': details
+        }
     
     try:
         # === STEP 1: GET THRESHOLDS ===
@@ -84,14 +130,19 @@ def run_check_purgatory_size(connector, settings):
             broker_id = result['node_id']
             
             if not result['success']:
+                error_msg = result.get('error', 'Unknown error')
+
+                # Check for common JMX issues
+                if 'exit 124' in error_msg or 'timeout' in error_msg.lower():
+                    error_msg = "JMX connection timeout - JMX may not be enabled on port 9999"
+                elif 'exit 127' in error_msg:
+                    error_msg = "kafka-run-class.sh not found - check kafka_run_class_path setting"
+
                 errors.append({
                     'host': host,
                     'broker_id': broker_id,
-                    'error': result.get('error', 'Unknown error')
+                    'error': error_msg
                 })
-                builder.warning(
-                    f"Could not collect purgatory metrics on {host} (Broker {broker_id}): {result.get('error')}"
-                )
                 continue
             
             output = result['output'].strip()
@@ -267,6 +318,25 @@ def run_check_purgatory_size(connector, settings):
                 f"Could not collect purgatory metrics from {len(errors)} broker(s):\n\n" +
                 "\n".join(f"* {e}" for e in error_list)
             )
+            builder.blank()
+
+            # Check if all errors are JMX-related
+            jmx_errors = [e for e in errors if 'JMX' in e['error'] or 'timeout' in e['error'].lower()]
+            if len(jmx_errors) == len(errors):
+                builder.text("*How to Enable JMX on Kafka Brokers:*")
+                builder.blank()
+                builder.text("Add the following to your Kafka startup script or systemd service:")
+                builder.text("```bash")
+                builder.text("export KAFKA_JMX_OPTS=\"-Dcom.sun.management.jmxremote \\")
+                builder.text("  -Dcom.sun.management.jmxremote.authenticate=false \\")
+                builder.text("  -Dcom.sun.management.jmxremote.ssl=false \\")
+                builder.text("  -Dcom.sun.management.jmxremote.port=9999\"")
+                builder.text("```")
+                builder.blank()
+                builder.text("Then restart Kafka brokers.")
+                builder.blank()
+                builder.text("*Alternative:* Use Prometheus JMX Exporter for purgatory metrics (port 7500)")
+                builder.blank()
         
         # === STEP 8: RECOMMENDATIONS ===
         if issues_found:

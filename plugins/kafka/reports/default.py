@@ -2,14 +2,22 @@ REPORT_SECTIONS = [
     {
         "title": "Kafka Health Check",
         "actions": [
+            # ========== CONNECTION & PERMISSIONS CHECK (Always First) ==========
+            # Validates user permissions and explains what checks are available
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_user_permissions', 'function': 'run'},
+
             # Prometheus-based checks (Instaclustr managed clusters)
             # These checks work without SSH access and provide comprehensive monitoring
             # They will be skipped if instaclustr_prometheus_enabled is not set
 
             # ========== CRITICAL: Data Loss & Availability (Priority 10) ==========
-            {'type': 'module', 'module': 'plugins.kafka.checks.prometheus_unclean_elections', 'function': 'check_prometheus_unclean_elections'},
-            {'type': 'module', 'module': 'plugins.kafka.checks.prometheus_offline_partitions', 'function': 'check_prometheus_offline_partitions'},
-            {'type': 'module', 'module': 'plugins.kafka.checks.prometheus_under_replicated', 'function': 'check_prometheus_under_replicated'},
+            # Unified adaptive checks (work with Instaclustr Prometheus, Local Prometheus, or JMX)
+# OK, ZK only
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_unclean_elections', 'function': 'run_unclean_elections_check'},
+# OK
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_offline_partitions', 'function': 'run_offline_partitions_check'},
+# OK
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_under_replicated_partitions', 'function': 'run_under_replicated_check'},
 
             # ========== HIGH: Infrastructure & Replication (Priority 9) ==========
             {'type': 'module', 'module': 'plugins.kafka.checks.prometheus_file_descriptors', 'function': 'check_prometheus_file_descriptors'},
@@ -39,6 +47,7 @@ REPORT_SECTIONS = [
         ]
     },
     {
+# This section OK
         "title": "OS-Level Metrics",
         "actions": [
             # SSH-based OS metrics across all brokers
@@ -48,6 +57,7 @@ REPORT_SECTIONS = [
         ]
     },
     {
+# This section OK
         "title": "Configuration Audits",
         "actions": [
             # SSH-based configuration and log analysis
@@ -63,20 +73,24 @@ REPORT_SECTIONS = [
         ]
     },
     {
+
         "title": "Kafka Purgatory",
         "actions": [
+# Could not collect purgatory metrics on 3.77.114.205 (Broker unknown): Command failed (exit 127): 
             {'type': 'module', 'module': 'plugins.kafka.checks.check_purgatory_size', 'function': 'run_check_purgatory_size'},
         ]
     },
     {
         "title": "Kafka Cluster Health",
         "actions": [
+# Failed to get partition distribution: KafkaConnectionError: Connection to 2 failed.
             {'type': 'module', 'module': 'plugins.kafka.checks.check_partition_balance', 'function': 'run_partition_balance'},
         ]
     },
     {
         'title': 'Topic Management',
         'actions': [
+# No topics?
             {'type': 'module', 'module': 'plugins.kafka.checks.check_topic_count_and_naming', 'function': 'run_check_topic_count_and_naming'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_topic_configuration', 'function': 'run_topic_configuration_check'},
         ]
@@ -84,12 +98,14 @@ REPORT_SECTIONS = [
     {
         "title": "Performance Monitoring",
         "actions": [
+# OK
             {'type': 'module', 'module': 'plugins.kafka.checks.check_iostat', 'function': 'run_check_iostat'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_jvm_stats', 'function': 'run_check_jvm_stats'},
         ]
     },
     {
         'title': 'Replication and ISR Health',
+# No Topics?
         'actions': [
             {'type': 'module', 'module': 'plugins.kafka.checks.check_isr_health', 'function': 'run_check_isr_health'},
         ]
@@ -97,13 +113,16 @@ REPORT_SECTIONS = [
     {
         'title': 'Kafka Storage Health',
         'actions': [
+# Could not retrieve log directory information: KafkaConnectionError: Connection to 3 failed.
             {'type': 'module', 'module': 'plugins.kafka.checks.check_storage_health', 'function': 'run_check_storage_health'},
+# OK
             {'type': 'module', 'module': 'plugins.kafka.checks.check_disk_usage', 'function': 'run_check_disk_usage'},
         ]
     },
     {
         'title': 'Broker Availability',
         'actions': [
+# OK
             {'type': 'module', 'module': 'plugins.kafka.checks.check_broker_availability', 'function': 'run_check_broker_availability'},
 
         ]
@@ -111,12 +130,14 @@ REPORT_SECTIONS = [
     {
         'title': 'Consumer Groups',
         'actions': [
+# Failed to describe consumer groups: KafkaConnectionError: Connection to 2 failed.
             {'type': 'module', 'module': 'plugins.kafka.checks.check_consumer_group_health', 'function': 'run_check_consumer_group_health'},
         ]
     },
     {
         'title': 'Consumer Health',
         'actions': [
+# No consumer groups or lag data available.
             {'type': 'module', 'module': 'plugins.kafka.checks.check_consumer_lag', 'function': 'run_consumer_lag'},
         ]
     },
