@@ -1,0 +1,171 @@
+# Trends Application Configuration
+# This file configures the backend storage and submission handling for health check data
+
+# Backend destination for trend data
+# Options: postgresql, api (deprecated - use submission_mode instead)
+destination: postgresql
+
+# Database configuration for PostgreSQL backend
+database:
+  host: localhost
+  port: 5432
+  database: health_trends
+  user: trends_user
+  password: your_secure_password_here
+
+# Encryption configuration for sensitive data
+encryption:
+  # Encryption mode: pgcrypto (PostgreSQL native) or kms (AWS KMS)
+  mode: pgcrypto
+
+  # If using KMS encryption, provide AWS KMS key ARN
+  # aws_kms_key_arn: arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012
+
+# ============================================================================
+# SUBMISSION MODE CONFIGURATION (NEW)
+# ============================================================================
+# Controls how the /api/submit-health-check endpoint processes submissions.
+# Choose based on your deployment scale and infrastructure.
+
+# Submission mode options:
+#   direct       - Synchronous database insertion (simple, no extra dependencies)
+#   pooled       - Connection pooling for better concurrency (requires configuration)
+#   async_queue  - Asynchronous processing with Celery (requires Redis/RabbitMQ)
+#   disabled     - Reject all submissions (read-only deployment)
+
+submission_mode: direct
+
+# Configuration for each submission mode
+submission_config:
+
+  # Mode A: Direct (default)
+  # Best for: Small deployments, development, <50 concurrent submissions
+  # Dependencies: None (just psycopg2)
+  direct:
+    enabled: true
+
+  # Mode B: Pooled connections
+  # Best for: Medium deployments, 50-200 concurrent submissions
+  # Dependencies: PgBouncer or pgpool-II recommended for optimal performance
+  # Notes: Requires tuning pool size based on PostgreSQL max_connections
+  pooled:
+    enabled: false
+    min_connections: 5
+    max_connections: 20
+    pool_timeout: 30  # seconds
+
+  # Mode C: Async queue with Celery
+  # Best for: Large deployments, >100 concurrent submissions, variable load
+  # Dependencies: celery, redis (or rabbitmq)
+  # Notes: Requires running Celery workers separately
+  async_queue:
+    enabled: false
+    broker_url: redis://localhost:6379/0       # Celery message broker
+    backend_url: redis://localhost:6379/1      # Celery result backend
+    max_retries: 3                              # Retry failed insertions
+    retry_backoff: 300                          # Seconds between retries (exponential)
+    worker_concurrency: 8                       # Number of worker threads
+
+  # Mode D: Disabled
+  # Best for: Read-only deployments, reporting-only instances
+  # The /api/submit-health-check endpoint will return 503
+  disabled:
+    enabled: false
+
+# ============================================================================
+# DEPLOYMENT EXAMPLES
+# ============================================================================
+
+# Small Deployment (1-10 health checks per minute):
+#   submission_mode: direct
+#   Run: python trends_app/main.py
+
+# Medium Deployment (10-100 health checks per minute):
+#   submission_mode: pooled
+#   Setup PgBouncer on port 6432
+#   Run: gunicorn -w 4 -b 0.0.0.0:5000 'trends_app:create_app()'
+
+# Large Deployment (100+ health checks per minute):
+#   submission_mode: async_queue
+#   Terminal 1: gunicorn -w 4 -b 0.0.0.0:5000 'trends_app:create_app()'
+#   Terminal 2: celery -A trends_app.submission_backends worker --concurrency=16
+
+# Read-Only Deployment (no external submissions):
+#   submission_mode: disabled
+#   Users can only view existing data through web UI
+
+# ============================================================================
+# SECURITY CONFIGURATION (OPTIONAL)
+# ============================================================================
+# All security features are optional and can be enabled independently.
+# Designed to be flexible for development while providing production hardening.
+
+security:
+  # HTTPS enforcement (OPTIONAL - recommended for production)
+  # Set to true to redirect all HTTP requests to HTTPS
+  # NOTE: Disable this for local development to avoid certificate issues
+  enforce_https: false  # true for production, false for dev
+
+  # Request size limits (ALWAYS ENABLED)
+  # Maximum request payload size in MB
+  # Protects against memory exhaustion attacks
+  max_request_size_mb: 16
+
+  # JSON complexity limits (ALWAYS ENABLED)
+  # Prevents JSON bomb attacks (deeply nested or massive JSON structures)
+  max_json_depth: 10          # Maximum nesting levels
+  max_json_keys: 10000        # Maximum total keys in entire JSON
+
+  # Rate limiting (OPTIONAL - requires Redis)
+  # Prevents API key abuse and DoS attacks
+  # NOTE: Set to false if Redis is not available
+  rate_limit_enabled: false   # true to enable (requires Redis)
+  rate_limit_per_minute: 100  # Max requests per minute per API key
+  rate_limit_per_hour: 1000   # Max requests per hour per API key
+
+  # Failed authentication logging (OPTIONAL - recommended)
+  # Logs failed API key authentication attempts for security monitoring
+  log_failed_auth: true
+
+  # Database type whitelist (OPTIONAL)
+  # Restrict which database types can be submitted
+  # null = accept all types (default)
+  # Example: ['postgres', 'mysql', 'cassandra']
+  allowed_db_types: null
+
+  # IP whitelist per API key (OPTIONAL - not yet implemented)
+  # Restrict API keys to specific IP addresses/ranges
+  # Useful for locking keys to specific servers
+  ip_whitelist_enabled: false
+
+# ============================================================================
+# SECURITY EXAMPLES
+# ============================================================================
+
+# Development Environment (minimal security):
+#   security:
+#     enforce_https: false
+#     max_request_size_mb: 16
+#     rate_limit_enabled: false
+#     log_failed_auth: true
+
+# Production Environment (full security):
+#   security:
+#     enforce_https: true
+#     max_request_size_mb: 16
+#     max_json_depth: 10
+#     rate_limit_enabled: true
+#     rate_limit_per_minute: 100
+#     log_failed_auth: true
+#     allowed_db_types: ['postgres', 'mysql', 'cassandra', 'kafka']
+
+# High-Security Environment (restricted):
+#   security:
+#     enforce_https: true
+#     max_request_size_mb: 8
+#     max_json_depth: 5
+#     rate_limit_enabled: true
+#     rate_limit_per_minute: 50
+#     log_failed_auth: true
+#     allowed_db_types: ['postgres']
+#     ip_whitelist_enabled: true
