@@ -8,7 +8,7 @@ __all__ = [
 
 def get_nodetool_compactionstats_query(connector):
     """
-    Returns JSON request for 'nodetool compactionstats' command.
+    Returns query of system_view.thread_pools for CompactionExecutor Pending tasks.
     
     Args:
         connector: Cassandra connector instance
@@ -16,7 +16,7 @@ def get_nodetool_compactionstats_query(connector):
     Returns:
         str: JSON string with operation and command
     """
-    return json.dumps({
-        "operation": "nodetool",
-        "command": "compactionstats"
+    return """
+	select pending_tasks  from system_views.thread_pools where name ='CompactionExecutor';
+    """ 
     })
