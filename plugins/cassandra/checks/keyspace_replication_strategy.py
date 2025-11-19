@@ -38,10 +38,7 @@ def run_keyspace_replication_strategy(connector, settings):
             return "\n".join(adoc_content), structured_data
         
         # Filter out system keyspaces in Python
-        system_keyspaces = {
-            'system', 'system_schema', 'system_traces',
-            'system_auth', 'system_distributed', 'system_views'
-        }
+        system_keyspaces = [ 'system', 'system_schema', 'system_traces', 'system_auth', 'system_distributed', 'system_views' ]
         user_keyspaces = [
             ks for ks in raw
             if ks.get('keyspace_name') not in system_keyspaces
