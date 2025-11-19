@@ -1,4 +1,5 @@
 from plugins.cassandra.utils.qrylib.qry_materialized_views import get_materialized_views_query
+from plugins.cassandra.utils.keyspace_filter import filter_user_keyspaces
 from plugins.common.check_helpers import format_check_header, format_recommendations, safe_execute_query
 
 def get_weight():
@@ -31,11 +32,8 @@ def run_materialized_views_check(connector, settings):
             structured_data["materialized_views"] = {"status": "error", "data": raw}
             return "\n".join(adoc_content), structured_data
         
-        # Filter out system keyspaces in Python
-        system_keyspaces = {'system', 'system_schema', 'system_traces', 
-                           'system_auth', 'system_distributed', 'system_views'}
-        user_views = [view for view in raw 
-                      if view.get('keyspace_name') not in system_keyspaces]
+        # Filter out system keyspaces using centralized filter
+        user_views = filter_user_keyspaces(raw, settings)
         
         if not user_views:
             adoc_content.append("[NOTE]\n====\nNo user materialized views found.\n====\n")

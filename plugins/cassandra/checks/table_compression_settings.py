@@ -1,4 +1,5 @@
 from plugins.cassandra.utils.qrylib.qry_table_compression_settings import get_table_compression_query
+from plugins.cassandra.utils.keyspace_filter import filter_tables_by_keyspace
 
 from plugins.common.check_helpers import format_check_header, format_recommendations, safe_execute_query
 
@@ -34,11 +35,8 @@ def run_table_compression_settings(connector, settings):
             structured_data["compression"] = {"status": "error", "data": raw}
             return "\n".join(adoc_content), structured_data
         
-        # Filter out system keyspaces in Python
-        system_keyspaces = {'system', 'system_schema', 'system_traces', 
-                           'system_auth', 'system_distributed', 'system_views'}
-        user_tables = [t for t in raw 
-                       if t.get('keyspace_name') not in system_keyspaces]
+        # Filter out system keyspaces using centralized filter
+        user_tables = filter_tables_by_keyspace(raw, settings)
         
         if not user_tables:
             adoc_content.append("[NOTE]\n====\nNo user tables found.\n====\n")

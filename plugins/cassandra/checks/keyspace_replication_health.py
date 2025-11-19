@@ -1,4 +1,5 @@
 from plugins.cassandra.utils.qrylib.qry_keyspace_replication_health import get_keyspace_replication_health_query
+from plugins.cassandra.utils.keyspace_filter import filter_user_keyspaces
 from plugins.common.check_helpers import format_check_header, format_recommendations, safe_execute_query
 
 def get_weight():
@@ -31,11 +32,8 @@ def run_keyspace_replication_health(connector, settings):
             structured_data["replication"] = {"status": "error", "data": raw}
             return "\n".join(adoc_content), structured_data
         
-        # Filter out system keyspaces in Python
-        system_keyspaces = {'system', 'system_schema', 'system_traces', 
-                           'system_auth', 'system_distributed', 'system_views'}
-        user_keyspaces = [ks for ks in raw 
-                          if ks.get('keyspace_name') not in system_keyspaces]
+        # Filter out system keyspaces using centralized filter
+        user_keyspaces = filter_user_keyspaces(raw, settings)
         
         if not user_keyspaces:
             adoc_content.append("[NOTE]\n====\nNo user keyspaces found.\n====\n")
