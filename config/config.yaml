@@ -85,7 +85,28 @@ request_timeout: 30
 
 # Optional: Default keyspace to connect to
 # Leave commented to not set a default keyspace (recommended)
-# keyspace: "your_keyspace_name"
+keyspace: "system_views"
+
+# ============================================================================
+# Control which keyspaces are included in health check analysis
+# By default, system keyspaces are excluded from all checks
+# ============================================================================
+
+# Exclude system keyspaces from analysis (default: true)
+# System keyspaces: system, system_schema, system_auth, system_distributed,
+#                   system_traces, system_views, system_virtual_schema
+exclude_system_keyspaces: true
+
+# Include system_auth in analysis (default: false)
+# Set to true if you need to analyze system_auth replication/configuration
+include_system_auth: false
+
+# Additional keyspaces to exclude (e.g., test, staging, temporary keyspaces)
+# custom_excluded_keyspaces:
+#   - "test_keyspace"
+#   - "staging_data"
+#   - "temp_analytics"
+
 
 # ============================================================================
 # PROMETHEUS MONITORING INTEGRATION (RECOMMENDED)

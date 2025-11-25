@@ -1,0 +1,81 @@
+# cassandra_instaclustr.yaml
+db_type: cassandra
+
+company_name: Instaclustr Cassandra
+report_title: Cassandra Health Check Report
+
+# Netapp Instaclustr Cassandra 5.05 Cluster
+# Cluster ID: 6010a91d-c018-417d-9a14-70e6005a34f0
+# Multi-node cluster in AWS VPC US East 1
+
+# Connection Settings
+hosts:
+  - "54.211.151.192"
+  - "100.24.74.94"
+  - "3.218.14.119"
+port: 9042
+
+# Authentication
+user: "iccassandra"
+password: "7a36438a21825366710e8b8ed366369b"
+
+# Datacenter Configuration (required for DC-aware load balancing)
+local_dc: "AWS_VPC_US_EAST_1"
+
+# Optional: Keyspace to connect to (leave commented to not set a default keyspace)
+# keyspace: "system"
+
+# SSH Configuration
+# SSH is NOT available for managed Instaclustr clusters
+# Health checks will be limited to CQL queries only (no nodetool commands)
+ssh_enabled: false
+
+# Instaclustr Prometheus Monitoring (PREFERRED METHOD)
+# Provides comprehensive metrics via Prometheus-compatible API
+# To get credentials:
+# 1. Log in to Instaclustr Console (https://console.instaclustr.com)
+# 2. Go to Account Settings
+# 3. Generate Prometheus API key
+# Documentation: https://www.instaclustr.com/support/documentation/monitoring/prometheus/
+
+instaclustr_cluster_id: "6010a91d-c018-417d-9a14-70e6005a34f0"
+instaclustr_prometheus_enabled: true
+instaclustr_prometheus_base_url: "https://b0da7454-3865-4166-8e0b-6a73487ab49d.prometheus.monitoring.instaclustr.com"
+instaclustr_prometheus_username: "perryclark"
+instaclustr_prometheus_api_key: "612fd8abfbfaf52ad36e567057a3a6b6"
+
+# Legacy: Custom Instaclustr API (Fallback)
+# Only used if Prometheus is not available
+# instaclustr_api_username: "your-username"
+# instaclustr_api_key: "your-api-key"
+# api_timeout: 30  # API request timeout in seconds (default: 30)
+
+# When Prometheus is configured, health checks will include:
+# - JVM heap usage metrics (jvm_memory_heap_used, jvm_memory_heap_max)
+# - GC metrics (jvm_gc_collection_seconds_count, jvm_gc_collection_seconds_sum)
+# - Compaction metrics (cassandra_compaction_pending_tasks, cassandra_compaction_bytes_compacted_total)
+# - Disk utilization (cassandra_table_disk_space_used_bytes, cassandra_total_disk_space_used_bytes)
+# - Performance metrics (cassandra_table_read_latency_seconds, cassandra_table_write_latency_seconds)
+# - Thread pool stats (cassandra_thread_pool_active_tasks, cassandra_thread_pool_pending_tasks)
+# - 100+ additional Cassandra metrics available via PromQL
+
+# Output format
+output_format: asciidoc
+
+# Report settings
+show_qry: true
+row_limit: 10
+
+# AI Configuration
+ai_analyze: true           # Master switch: Set to true to enable AI analysis
+ai_run_integrated: false    # Set to true for AI analysis during main report generation
+
+ai_provider: xAI
+ai_endpoint: https://api.x.ai/
+ai_api_key: xai-rPpN6oKPdZ3pO5ugRLz2qmH...
+ai_model: grok-4
+
+ai_user_header: "X-User-ID"
+ai_temperature: 0.1
+ai_max_output_tokens: 20000
+ai_max_prompt_tokens: 12000
