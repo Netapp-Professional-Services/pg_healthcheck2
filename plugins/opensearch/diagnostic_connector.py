@@ -201,15 +201,18 @@ class DiagnosticConnector:
         """Extract node information from diagnostic data."""
         self.cluster_nodes = []
 
-        # Try cat_nodes first
+        # Try cat_nodes first - handles various column header formats
         cat_nodes = self.loader.get_file('cat/cat_nodes.txt')
         if cat_nodes and isinstance(cat_nodes, list):
             for node in cat_nodes:
+                # Support both full and abbreviated column names
+                # Full: name, ip, node.role, master
+                # Abbreviated: n, i, role, m
                 node_info = {
-                    'name': node.get('name'),
-                    'ip': node.get('ip'),
-                    'role': node.get('node.role', 'Unknown'),
-                    'is_master': node.get('master') == '*'
+                    'name': node.get('name') or node.get('n'),
+                    'ip': node.get('ip') or node.get('i'),
+                    'role': node.get('node.role') or node.get('role', 'Unknown'),
+                    'is_master': (node.get('master') or node.get('m')) == '*'
                 }
                 self.cluster_nodes.append(node_info)
             return

@@ -260,8 +260,11 @@ class DiagnosticLoader:
         """
         Parse a cat API text file into structured JSON-like data.
 
-        Cat files are space-separated tables. We parse them into
-        lists of dictionaries for consistency with JSON data.
+        Cat files are space-separated tables with headers in the first line.
+        We parse them into lists of dictionaries for consistency with JSON data.
+
+        Support-diagnostics exports include headers in the files, so we always
+        read headers from the first line rather than using hardcoded mappings.
         """
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -271,22 +274,14 @@ class DiagnosticLoader:
                 self._files[f"cat/{file_path.name}"] = []
                 return
 
-            # Get headers - either from our mapping or from the first line
-            filename = file_path.name
-            if filename in self.CAT_FILE_HEADERS:
-                headers = self.CAT_FILE_HEADERS[filename]
-                data_lines = lines  # All lines are data
-            else:
-                # First line might be headers
-                first_line = lines[0].strip()
-                if first_line and not first_line[0].isdigit():
-                    headers = first_line.split()
-                    data_lines = lines[1:]
-                else:
-                    # No headers, create generic column names
-                    sample = lines[0].split()
-                    headers = [f'col{i}' for i in range(len(sample))]
-                    data_lines = lines
+            # First line is always headers in support-diagnostics exports
+            first_line = lines[0].strip()
+            if not first_line:
+                self._files[f"cat/{file_path.name}"] = []
+                return
+
+            headers = first_line.split()
+            data_lines = lines[1:]
 
             # Parse data lines
             records = []
