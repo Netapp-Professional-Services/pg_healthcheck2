@@ -1,0 +1,51 @@
+# OpenSearch Diagnostic Import Configuration
+#
+# Use this config when importing support-diagnostics exports:
+#   python import_diagnostic.py --diagnostic /path/to/diagnostic.zip --config config/opensearch_import.yaml
+#
+# This config is for IMPORT mode only - no live cluster connection is made.
+# The diagnostic data provides all cluster information.
+
+# Company/client name - used for organizing output and trends tracking
+company_name: "Example Client"
+
+# Database type - must be opensearch for diagnostic imports
+db_type: opensearch
+
+# ============================================================================
+# AI ANALYSIS (OPTIONAL)
+# ============================================================================
+# Set to true to get AI-powered recommendations based on findings
+ai_analyze: false
+
+# AI provider settings (if ai_analyze is true)
+# ai_provider: xai
+# ai_endpoint: https://api.x.ai/v1/chat/completions
+# ai_model: grok-beta
+# ai_api_key: ${XAI_API_KEY}
+
+# ============================================================================
+# TREND STORAGE (OPTIONAL)
+# ============================================================================
+# Enable to ship results to trends database for historical tracking
+trend_storage_enabled: false
+
+# Trend database connection (if trend_storage_enabled is true)
+# trend_database:
+#   host: localhost
+#   port: 5432
+#   database: health_trends
+#   user: trends_user
+#   password: ${TRENDS_PASSWORD}
+
+# ============================================================================
+# REPORT OPTIONS
+# ============================================================================
+# Generate AsciiDoc report
+generate_report: true
+
+# Show queries in report output
+show_qry: false
+
+# Limit rows in table outputs
+row_limit: 50
