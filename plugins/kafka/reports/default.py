@@ -13,6 +13,7 @@ REPORT_SECTIONS = [
             # ========== CRITICAL: Data Loss & Availability (Priority 10) ==========
             # Unified adaptive checks (work with Instaclustr Prometheus, Local Prometheus, or JMX)
 # OK, ZK only
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_rack_awareness', 'function': 'run_rack_awareness_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_unclean_elections', 'function': 'run_unclean_elections_check'},
 # OK
             {'type': 'module', 'module': 'plugins.kafka.checks.check_offline_partitions', 'function': 'run_offline_partitions_check'},

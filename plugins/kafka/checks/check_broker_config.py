@@ -73,6 +73,7 @@ def run_broker_config_check(connector, settings):
 
             try:
                 # Execute query via connector (uses qrylib)
+                # How can we make this configurable to call get_kafka_env_query instead of get_server_properties_query
                 query = get_server_properties_query(connector)
                 formatted, raw = connector.execute_query(query, return_raw=True)
 

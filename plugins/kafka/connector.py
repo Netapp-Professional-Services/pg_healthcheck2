@@ -1383,7 +1383,8 @@ class KafkaConnector(SSHSupportMixin):
                     brokers.append({
                         'id': broker.nodeId if hasattr(broker, 'nodeId') else broker.id,
                         'host': broker.host,
-                        'port': broker.port
+                        'port': broker.port,
+                        'rack': broker.rack
                     })
                 
                 # Get controller - it's an object, not a method
