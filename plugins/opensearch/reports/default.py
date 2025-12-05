@@ -19,6 +19,21 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_cve_vulnerabilities',
                 'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_ssl_certificates',
+                'function': 'run'
+            }
+        ]
+    },
+    {
+        'title': 'License & Compliance',
+        'actions': [
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_license_status',
+                'function': 'run'
             }
         ]
     },
@@ -44,6 +59,11 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_index_health',
                 'function': 'run_check_index_health'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_ilm_policies',
+                'function': 'run'
             }
         ]
     },
