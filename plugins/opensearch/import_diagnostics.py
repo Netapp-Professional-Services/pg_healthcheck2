@@ -178,7 +178,7 @@ def main():
 
     # Ship to trends if requested
     if args.ship_trends:
-        _ship_to_trends(args, settings, connector, findings, content)
+        _ship_to_trends(args, settings, connector, findings, content, plugin)
 
     connector.disconnect()
 
@@ -276,12 +276,13 @@ def _evaluate_rules(findings):
                 print(f"   {icons.get(level, '•')} {level.upper()}: {levels[level]}")
 
 
-def _ship_to_trends(args, settings, connector, findings, adoc_content):
+def _ship_to_trends(args, settings, connector, findings, adoc_content, plugin):
     """Ship results to trends database."""
     try:
         import yaml
         from output_handlers import trend_shipper
         from utils.json_utils import safe_json_dumps
+        from utils.dynamic_prompt_generator import generate_dynamic_prompt
 
         # Load trends config
         trends_config_path = Path(args.trends_config)
@@ -324,6 +325,21 @@ def _ship_to_trends(args, settings, connector, findings, adoc_content):
             'nodes': len(connector.cluster_nodes) if connector.cluster_nodes else 1,
         }
 
+        # Evaluate rules using generate_dynamic_prompt to get properly structured analysis_results
+        # This is needed to store triggered rules in health_check_triggered_rules table
+        analysis_rules = plugin.get_rules_config()
+        analysis_results = None
+        if analysis_rules:
+            try:
+                analysis_results = generate_dynamic_prompt(
+                    findings, settings, analysis_rules, db_metadata, plugin, verbose=False
+                )
+                triggered_count = analysis_results.get('total_issues', 0)
+                if triggered_count > 0:
+                    print(f"   Evaluated {triggered_count} triggered rules for storage")
+            except Exception as e:
+                print(f"⚠️  Rule evaluation failed (rules will not be stored): {e}")
+
         # Serialize findings to JSON string (after adding metadata)
         findings_json = safe_json_dumps(findings)
 
@@ -345,7 +361,7 @@ def _ship_to_trends(args, settings, connector, findings, adoc_content):
                 findings_json=findings_json,
                 structured_findings=findings,
                 adoc_content=adoc_content,
-                analysis_results=None  # Could pass evaluated rules here
+                analysis_results=analysis_results
             )
         elif destination == 'api':
             api_config = trends_config.get('api', {})
@@ -354,7 +370,7 @@ def _ship_to_trends(args, settings, connector, findings, adoc_content):
                 target_info=target_info,
                 findings=findings,
                 adoc_content=adoc_content,
-                analysis_results=None
+                analysis_results=analysis_results
             )
         else:
             print(f"⚠️  Unknown destination: {destination}")
