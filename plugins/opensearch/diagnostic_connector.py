@@ -25,11 +25,12 @@ from datetime import datetime
 
 from plugins.opensearch.diagnostic_loader import DiagnosticLoader
 from plugins.common.output_formatters import AsciiDocFormatter
+from plugins.common.cve_mixin import CVECheckMixin
 
 logger = logging.getLogger(__name__)
 
 
-class DiagnosticConnector:
+class DiagnosticConnector(CVECheckMixin):
     """
     Connector that reads from support-diagnostics exports.
 
@@ -192,8 +193,10 @@ class DiagnosticConnector:
             self.cluster_name = self._metadata.get('cluster_name', 'Unknown')
 
             # Build version info
+            version_number = self._metadata.get('version', 'Unknown')
             self._version_info = {
-                'number': self._metadata.get('version', 'Unknown'),
+                'number': version_number,
+                'version_string': version_number,  # CVE mixin expects this key
                 'build_type': self._metadata.get('build_type'),
                 'build_flavor': self._metadata.get('build_flavor'),
                 'major_version': self._metadata.get('version_major', 0),
@@ -201,6 +204,10 @@ class DiagnosticConnector:
 
             # Extract node info
             self._extract_cluster_nodes()
+
+            # Initialize CVE support (requires network access to NVD API)
+            # This allows CVE checks even for offline diagnostic imports
+            self.initialize_cve_support()
 
             # Display connection status
             self._display_connection_status()
