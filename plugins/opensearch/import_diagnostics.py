@@ -30,6 +30,7 @@ The support-diagnostics tool can be obtained from:
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -148,11 +149,12 @@ def main():
         connector.disconnect()
         sys.exit(1)
 
-    # Determine output directory
+    # Determine output directory (sanitize company name like main.py does)
+    sanitized_company_name = re.sub(r'\W+', '_', args.company.lower()).strip('_')
     if args.output_dir:
         output_dir = Path(args.output_dir)
     else:
-        output_dir = project_root / 'adoc_out' / args.company
+        output_dir = project_root / 'adoc_out' / sanitized_company_name
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
