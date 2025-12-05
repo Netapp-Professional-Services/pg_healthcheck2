@@ -6,13 +6,19 @@ This check analyzes shard allocation to identify:
 - Disk-based allocation issues
 - Node capacity and distribution
 - Allocation filtering rules
+- Shard recovery status and throttling
 
 Data source:
-- Live clusters: GET /_cluster/allocation/explain, GET /_cat/allocation
-- Imported diagnostics: allocation_explain.json, allocation.json, cat/cat_allocation.txt
+- Live clusters: GET /_cluster/allocation/explain, GET /_cat/allocation, GET /_cat/recovery
+- Imported diagnostics: allocation_explain.json, allocation.json, cat/cat_allocation.txt,
+                        cat/cat_recovery.txt, recovery.json
 
 Shard allocation issues are a common cause of cluster problems.
 """
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 from plugins.common.check_helpers import CheckContentBuilder
 
@@ -189,6 +195,10 @@ def run(connector, settings):
         builder.text("- Low watermark (default 85%): Stop allocating new shards")
         builder.text("- High watermark (default 90%): Start relocating shards away")
         builder.text("- Flood stage (default 95%): Enforce read-only index blocks")
+        builder.blank()
+
+        # Analyze shard recovery status
+        recovery_analysis = _analyze_recovery(connector, builder)
 
         # Build structured data
         high_disk_count = len([n for n in node_allocations if n["disk_percent"] > 80])
@@ -206,7 +216,12 @@ def run(connector, settings):
                 "has_unassigned_shards": has_unassigned,
                 "unassigned_reason": unassigned_reason,
                 "has_disk_pressure": high_disk_count > 0,
-                "has_critical_disk": critical_disk_count > 0
+                "has_critical_disk": critical_disk_count > 0,
+                # Recovery analysis signals
+                "active_recoveries": recovery_analysis.get("active_count", 0),
+                "slow_recoveries": recovery_analysis.get("slow_count", 0),
+                "has_active_recovery": recovery_analysis.get("active_count", 0) > 0,
+                "has_slow_recovery": recovery_analysis.get("slow_count", 0) > 0,
             }
         }
 
@@ -218,3 +233,139 @@ def run(connector, settings):
             "status": "error",
             "error": str(e)
         }
+
+
+def _analyze_recovery(connector, builder):
+    """
+    Analyze shard recovery status to identify slow or stuck recoveries.
+
+    Returns:
+        dict: Recovery analysis summary
+    """
+    result = {
+        "active_count": 0,
+        "slow_count": 0,
+        "recoveries": []
+    }
+
+    try:
+        # Try cat_recovery first
+        cat_recovery = connector.execute_query({"operation": "cat_recovery"})
+
+        if isinstance(cat_recovery, list) and cat_recovery:
+            active_recoveries = []
+            slow_recoveries = []
+
+            for rec in cat_recovery:
+                # Skip completed recoveries
+                stage = rec.get("stage", "")
+                if stage.lower() == "done":
+                    continue
+
+                index = rec.get("index", rec.get("i", "unknown"))
+                shard = rec.get("shard", rec.get("s", "0"))
+                source = rec.get("source_node", rec.get("snode", ""))
+                target = rec.get("target_node", rec.get("tnode", ""))
+                bytes_total = rec.get("bytes_total", rec.get("bt", "0"))
+                bytes_recovered = rec.get("bytes_recovered", rec.get("br", "0"))
+                time_str = rec.get("time", rec.get("t", "0"))
+
+                recovery_info = {
+                    "index": index,
+                    "shard": shard,
+                    "stage": stage,
+                    "source": source,
+                    "target": target,
+                    "bytes_total": bytes_total,
+                    "bytes_recovered": bytes_recovered,
+                    "time": time_str
+                }
+
+                active_recoveries.append(recovery_info)
+
+                # Check if recovery is slow (> 30 minutes)
+                time_ms = _parse_time_to_ms(time_str)
+                if time_ms > 30 * 60 * 1000:  # 30 minutes
+                    slow_recoveries.append(recovery_info)
+
+            result["active_count"] = len(active_recoveries)
+            result["slow_count"] = len(slow_recoveries)
+            result["recoveries"] = active_recoveries
+
+            # Report active recoveries
+            if active_recoveries:
+                builder.h4("Active Shard Recoveries")
+
+                if slow_recoveries:
+                    builder.warning(
+                        f"⚠️ **{len(slow_recoveries)} slow recoveries detected (>30 min)**\n\n"
+                        "Slow recoveries may indicate I/O bottlenecks, network issues, or recovery throttling."
+                    )
+                else:
+                    builder.note(f"**{len(active_recoveries)} shard recovery operation(s) in progress**")
+
+                builder.blank()
+
+                recovery_table = []
+                for rec in active_recoveries[:10]:
+                    recovery_table.append({
+                        "Index": rec["index"][:30],
+                        "Shard": rec["shard"],
+                        "Stage": rec["stage"],
+                        "Progress": f"{rec['bytes_recovered']}/{rec['bytes_total']}",
+                        "Time": rec["time"],
+                        "Target Node": rec["target"][:15] if rec["target"] else "N/A"
+                    })
+                builder.table(recovery_table)
+
+                if len(active_recoveries) > 10:
+                    builder.text(f"_...and {len(active_recoveries) - 10} more recoveries in progress_")
+                builder.blank()
+
+                if slow_recoveries:
+                    builder.text("*Recommendations for slow recovery:*")
+                    builder.text("1. Check node I/O and network throughput")
+                    builder.text("2. Review recovery throttling settings:")
+                    builder.text("   - `indices.recovery.max_bytes_per_sec` (default 40mb)")
+                    builder.text("   - `cluster.routing.allocation.node_concurrent_recoveries`")
+                    builder.text("3. Ensure source and target nodes are healthy")
+                    builder.text("4. Consider temporarily increasing recovery bandwidth")
+                    builder.blank()
+
+        # Also try recovery.json for more detail
+        recovery_json = connector.execute_query({"operation": "recovery"})
+        if recovery_json and isinstance(recovery_json, dict) and "error" not in recovery_json:
+            # recovery.json is keyed by index name
+            for index_name, index_recoveries in recovery_json.items():
+                if isinstance(index_recoveries, dict) and "shards" in index_recoveries:
+                    for shard_recovery in index_recoveries["shards"]:
+                        stage = shard_recovery.get("stage", "")
+                        if stage.lower() != "done":
+                            result["active_count"] += 1
+
+    except Exception as e:
+        logger.warning(f"Could not analyze recovery status: {e}")
+
+    return result
+
+
+def _parse_time_to_ms(time_str):
+    """Parse time string like '5.2m' or '1.5h' to milliseconds."""
+    if not time_str:
+        return 0
+
+    time_str = str(time_str).lower().strip()
+
+    try:
+        if time_str.endswith("h"):
+            return float(time_str[:-1]) * 60 * 60 * 1000
+        elif time_str.endswith("m"):
+            return float(time_str[:-1]) * 60 * 1000
+        elif time_str.endswith("s"):
+            return float(time_str[:-1]) * 1000
+        elif time_str.endswith("ms"):
+            return float(time_str[:-2])
+        else:
+            return float(time_str)
+    except (ValueError, TypeError):
+        return 0

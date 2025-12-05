@@ -80,5 +80,47 @@
         ]
       }
     ]
+  },
+  "ilm_execution_errors": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "has_ilm_errors", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_ilm_errors') == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Indices have failed ILM transitions and are stuck in error state. These indices will not progress through lifecycle phases until manually resolved.",
+        "recommendations": [
+          "Check ILM error details: GET /_ilm/explain/<index>",
+          "Common causes: disk space, permission issues, missing templates",
+          "Retry failed ILM: POST /<index>/_ilm/retry",
+          "Review ILM policy configuration for incompatible settings",
+          "Monitor for recurring failures after resolution"
+        ]
+      }
+    ]
+  },
+  "ilm_stuck_indices": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "has_stuck_indices", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_stuck_indices') == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Indices have been stuck in ILM phases for extended periods. This may indicate misconfigured rollover conditions or other issues preventing lifecycle progression.",
+        "recommendations": [
+          "Review rollover conditions - may be too aggressive for data volume",
+          "Verify write alias is correctly configured for rollover",
+          "Check if indices have any documents for rollover triggers",
+          "Ensure sufficient disk space for new index creation",
+          "Consider time-based rollover if size-based isn't triggering"
+        ]
+      }
+    ]
   }
 }

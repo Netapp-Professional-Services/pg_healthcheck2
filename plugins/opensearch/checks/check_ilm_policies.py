@@ -7,10 +7,12 @@ to identify:
 - Policies without delete phases (unbounded growth)
 - Misconfigured rollover settings
 - Policies that may cause storage issues
+- ILM execution errors (indices stuck in phases or failing to transition)
 
 Data source:
-- Live clusters: GET /_ilm/policy API (Elasticsearch) or GET /_plugins/_ism/policies (OpenSearch)
-- Imported diagnostics: commercial/ilm_policies.json
+- Live clusters: GET /_ilm/policy, GET /_ilm/explain (Elasticsearch)
+- Imported diagnostics: commercial/ilm_policies.json, commercial/ilm_explain.json,
+                        commercial/ilm_explain_only_errors.json
 
 Note: OpenSearch uses ISM (Index State Management) instead of ILM. The concepts
 are similar but the API and terminology differ. This check handles both.
@@ -162,6 +164,9 @@ def run(connector, settings):
 }''')
             builder.text("----")
 
+        # Analyze ILM execution errors (indices stuck or failing)
+        ilm_errors = _analyze_ilm_execution_errors(connector, builder)
+
         # Build structured data for rules engine
         # Note: Return flat structure - report_builder wraps with module name
         structured_data = {
@@ -174,6 +179,12 @@ def run(connector, settings):
                 "policies_with_issues_count": len(policies_with_issues),
                 "has_no_policies": len(analyzed_policies) == 0,
                 "has_no_user_policies": len(user_policies) == 0,
+                # ILM execution error signals
+                "ilm_error_count": ilm_errors.get("error_count", 0),
+                "ilm_stuck_count": ilm_errors.get("stuck_count", 0),
+                "has_ilm_errors": ilm_errors.get("error_count", 0) > 0,
+                "has_stuck_indices": ilm_errors.get("stuck_count", 0) > 0,
+                "ilm_execution_issues": ilm_errors.get("error_count", 0) + ilm_errors.get("stuck_count", 0) > 0,
             }
         }
 
@@ -274,3 +285,173 @@ def _add_policy_table(builder, policies, title):
         })
 
     builder.table(table_data)
+
+
+def _analyze_ilm_execution_errors(connector, builder):
+    """
+    Analyze ILM execution status to find indices with errors or stuck in phases.
+
+    Uses ilm_explain and ilm_explain_only_errors diagnostic files to identify:
+    - Indices with ILM errors (failed to transition)
+    - Indices stuck in a phase for too long
+    - Indices waiting on conditions that may never be met
+
+    Returns:
+        dict: Summary of ILM execution issues
+    """
+    result = {
+        "error_count": 0,
+        "stuck_count": 0,
+        "error_indices": [],
+        "stuck_indices": []
+    }
+
+    try:
+        # First try ilm_explain_only_errors (contains only problematic indices)
+        ilm_errors = connector.execute_query({"operation": "ilm_explain_only_errors"})
+
+        # Fall back to full ilm_explain if errors-only not available
+        if isinstance(ilm_errors, dict) and "error" in ilm_errors:
+            ilm_errors = connector.execute_query({"operation": "ilm_explain"})
+
+        if isinstance(ilm_errors, dict) and "error" in ilm_errors:
+            # ILM explain not available
+            return result
+
+        indices = ilm_errors.get("indices", {})
+        if not indices:
+            return result
+
+        error_indices = []
+        stuck_indices = []
+
+        for index_name, index_data in indices.items():
+            # Skip system indices
+            if index_name.startswith("."):
+                continue
+
+            # Check for explicit errors
+            if index_data.get("step") == "ERROR" or index_data.get("failed_step"):
+                error_info = {
+                    "index": index_name,
+                    "policy": index_data.get("policy", "unknown"),
+                    "phase": index_data.get("phase", "unknown"),
+                    "action": index_data.get("action", "unknown"),
+                    "failed_step": index_data.get("failed_step", "unknown"),
+                    "step_info": index_data.get("step_info", {})
+                }
+
+                # Extract error reason if available
+                step_info = index_data.get("step_info", {})
+                if isinstance(step_info, dict):
+                    error_info["reason"] = step_info.get("reason",
+                        step_info.get("message", "No details available"))
+
+                error_indices.append(error_info)
+
+            # Check for indices stuck in a phase
+            # An index is "stuck" if it's been in the same phase for too long
+            # or is waiting on rollover conditions that aren't being met
+            phase_time = index_data.get("phase_time_millis", 0)
+            phase = index_data.get("phase", "")
+            action = index_data.get("action", "")
+            step = index_data.get("step", "")
+
+            # Convert to hours
+            phase_hours = phase_time / (1000 * 60 * 60) if phase_time else 0
+
+            # Flag if stuck in hot phase waiting for rollover for > 7 days
+            if phase == "hot" and action == "rollover" and step == "check-rollover-ready":
+                if phase_hours > 168:  # 7 days in hours
+                    stuck_indices.append({
+                        "index": index_name,
+                        "policy": index_data.get("policy", "unknown"),
+                        "phase": phase,
+                        "waiting_for": "rollover conditions",
+                        "stuck_hours": round(phase_hours, 1),
+                        "stuck_days": round(phase_hours / 24, 1)
+                    })
+
+            # Flag any phase stuck for > 30 days (might be intentional but worth flagging)
+            elif phase_hours > 720:  # 30 days
+                stuck_indices.append({
+                    "index": index_name,
+                    "policy": index_data.get("policy", "unknown"),
+                    "phase": phase,
+                    "waiting_for": f"{action}/{step}",
+                    "stuck_hours": round(phase_hours, 1),
+                    "stuck_days": round(phase_hours / 24, 1)
+                })
+
+        result["error_count"] = len(error_indices)
+        result["stuck_count"] = len(stuck_indices)
+        result["error_indices"] = error_indices
+        result["stuck_indices"] = stuck_indices
+
+        # Add to report if there are issues
+        if error_indices or stuck_indices:
+            builder.h4("ILM Execution Issues")
+
+            if error_indices:
+                builder.critical(
+                    f"🔴 **{len(error_indices)} indices have ILM errors**\n\n"
+                    "These indices failed to transition and require manual intervention."
+                )
+                builder.blank()
+
+                error_table = []
+                for err in error_indices[:10]:  # Limit to 10
+                    error_table.append({
+                        "Index": err["index"][:40],
+                        "Policy": err["policy"],
+                        "Phase": err["phase"],
+                        "Failed Step": err.get("failed_step", "unknown"),
+                        "Reason": str(err.get("reason", ""))[:50]
+                    })
+                builder.table(error_table)
+
+                if len(error_indices) > 10:
+                    builder.text(f"_...and {len(error_indices) - 10} more indices with errors_")
+                builder.blank()
+
+                builder.text("*To resolve ILM errors:*")
+                builder.text("1. Check the error reason in `GET /_ilm/explain/<index>`")
+                builder.text("2. Fix the underlying issue (disk space, permissions, etc.)")
+                builder.text("3. Retry with `POST /<index>/_ilm/retry`")
+                builder.blank()
+
+            if stuck_indices:
+                builder.warning(
+                    f"⚠️ **{len(stuck_indices)} indices appear stuck in ILM phases**\n\n"
+                    "These indices have been in the same phase for an extended period."
+                )
+                builder.blank()
+
+                stuck_table = []
+                for stuck in stuck_indices[:10]:
+                    stuck_table.append({
+                        "Index": stuck["index"][:40],
+                        "Policy": stuck["policy"],
+                        "Phase": stuck["phase"],
+                        "Waiting For": stuck["waiting_for"],
+                        "Days Stuck": stuck["stuck_days"]
+                    })
+                builder.table(stuck_table)
+
+                if len(stuck_indices) > 10:
+                    builder.text(f"_...and {len(stuck_indices) - 10} more stuck indices_")
+                builder.blank()
+
+                builder.text("*Common causes of stuck indices:*")
+                builder.text("- Rollover conditions too aggressive (index never reaches size/age)")
+                builder.text("- No write alias pointing to the index")
+                builder.text("- Insufficient disk space for new index creation")
+                builder.text("- Missing ILM-managed index template")
+                builder.blank()
+
+    except Exception as e:
+        # Don't fail the whole check if ILM explain fails
+        import logging
+        logging.getLogger(__name__).warning(f"Could not analyze ILM execution status: {e}")
+
+    return result

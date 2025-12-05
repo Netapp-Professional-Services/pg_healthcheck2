@@ -56,5 +56,26 @@
                 ]
             }
         ]
+    },
+    "slow_shard_recovery": {
+        "metric_keywords": ["shard_allocation"],
+        "data_conditions": [
+            {"key": "has_slow_recovery", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_slow_recovery') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Shard recovery operations are taking longer than 30 minutes. This may indicate I/O bottlenecks, network issues, or recovery throttling.",
+                "recommendations": [
+                    "Check node I/O and network throughput",
+                    "Review recovery throttling: indices.recovery.max_bytes_per_sec",
+                    "Ensure source and target nodes are healthy",
+                    "Consider temporarily increasing recovery bandwidth",
+                    "Monitor for disk or network saturation"
+                ]
+            }
+        ]
     }
 }

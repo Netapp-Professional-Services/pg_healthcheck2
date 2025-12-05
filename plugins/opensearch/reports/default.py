@@ -97,6 +97,16 @@ REPORT_SECTIONS = [
             },
             {
                 'type': 'module',
+                'module': 'plugins.opensearch.checks.check_mapping_health',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_shard_sizing',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
                 'module': 'plugins.opensearch.checks.check_templates',
                 'function': 'run'
             },

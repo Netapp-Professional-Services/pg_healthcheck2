@@ -145,6 +145,7 @@ class DiagnosticConnector(CVECheckMixin):
         'ml_trained_models_stats': 'commercial/ml_trained_models_stats.json',
         'security_privileges': 'commercial/security_priv.json',
         'ilm_explain_errors': 'commercial/ilm_explain_only_errors.json',
+        'ilm_explain_only_errors': 'commercial/ilm_explain_only_errors.json',
     }
 
     def __init__(self, settings: Dict[str, Any], diagnostic_path: str):
