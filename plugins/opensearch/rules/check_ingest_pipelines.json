@@ -1,0 +1,61 @@
+{
+    "heavy_processor_usage": {
+        "metric_keywords": ["ingest_pipelines"],
+        "data_conditions": [
+            {"key": "has_heavy_processors", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_heavy_processors') == True",
+                "level": "low",
+                "score": 3,
+                "reasoning": "Pipelines use performance-intensive processors (grok, script, enrich). Monitor for indexing bottlenecks.",
+                "recommendations": [
+                    "Monitor pipeline metrics via node stats API during peak load",
+                    "Optimize grok patterns to be as specific as possible",
+                    "Pre-compile and cache scripts where possible",
+                    "Consider bulk indexing to amortize pipeline overhead"
+                ]
+            }
+        ]
+    },
+    "many_pipelines_with_heavy_processors": {
+        "metric_keywords": ["ingest_pipelines"],
+        "data_conditions": [
+            {"key": "heavy_processor_pipeline_count", "operator": ">", "value": 3}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('heavy_processor_pipeline_count', 0) > 3",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Multiple pipelines use CPU-intensive processors. This could impact indexing performance at scale.",
+                "recommendations": [
+                    "Profile pipeline performance using the simulate API",
+                    "Consider consolidating pipelines to reduce processing overhead",
+                    "Evaluate if pre-processing can be done at the source",
+                    "Monitor cluster CPU usage during indexing operations"
+                ]
+            }
+        ]
+    },
+    "many_user_pipelines": {
+        "metric_keywords": ["ingest_pipelines"],
+        "data_conditions": [
+            {"key": "user_pipeline_count", "operator": ">", "value": 20}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('user_pipeline_count', 0) > 20",
+                "level": "low",
+                "score": 2,
+                "reasoning": "Large number of ingest pipelines configured. Consider if all are actively used and necessary.",
+                "recommendations": [
+                    "Audit pipeline usage to identify unused pipelines",
+                    "Consider consolidating similar pipelines",
+                    "Document the purpose of each pipeline"
+                ]
+            }
+        ]
+    }
+}

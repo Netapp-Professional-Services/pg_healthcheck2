@@ -24,6 +24,11 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_ssl_certificates',
                 'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_security_audit',
+                'function': 'run'
             }
         ]
     },
@@ -64,6 +69,11 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_ilm_policies',
                 'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_templates',
+                'function': 'run'
             }
         ]
     },
@@ -89,6 +99,26 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_cluster_performance',
                 'function': 'run_check_cluster_performance'
+            }
+        ]
+    },
+    {
+        'title': 'Backup & Recovery',
+        'actions': [
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_snapshot_status',
+                'function': 'run'
+            }
+        ]
+    },
+    {
+        'title': 'Data Ingestion',
+        'actions': [
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_ingest_pipelines',
+                'function': 'run'
             }
         ]
     },

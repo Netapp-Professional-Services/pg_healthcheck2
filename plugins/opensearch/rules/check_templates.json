@@ -1,0 +1,60 @@
+{
+    "templates_without_ilm": {
+        "metric_keywords": ["templates"],
+        "data_conditions": [
+            {"key": "has_templates_without_ilm", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_templates_without_ilm') == True",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "User-defined templates exist without ILM policies. Indices created from these templates will grow indefinitely.",
+                "recommendations": [
+                    "Add ILM policies to templates for automatic lifecycle management",
+                    "Configure rollover for time-series data patterns",
+                    "Set retention policies to manage storage costs"
+                ]
+            }
+        ]
+    },
+    "many_templates_without_ilm": {
+        "metric_keywords": ["templates"],
+        "data_conditions": [
+            {"key": "templates_without_ilm_count", "operator": ">", "value": 5}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('templates_without_ilm_count', 0) > 5",
+                "level": "high",
+                "score": 6,
+                "reasoning": "Multiple user templates lack ILM policies. This could lead to uncontrolled storage growth across many index patterns.",
+                "recommendations": [
+                    "Prioritize adding ILM policies to frequently used templates",
+                    "Create reusable component templates with common lifecycle settings",
+                    "Implement a governance process for template creation"
+                ]
+            }
+        ]
+    },
+    "no_user_templates": {
+        "metric_keywords": ["templates"],
+        "data_conditions": [
+            {"key": "has_templates", "operator": "==", "value": true},
+            {"key": "has_user_templates", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_templates') == True and data.get('has_user_templates') == False",
+                "level": "low",
+                "score": 2,
+                "reasoning": "Only system templates exist. Consider creating templates for your application indices to ensure consistent configuration.",
+                "recommendations": [
+                    "Create index templates for application-specific index patterns",
+                    "Use templates to enforce consistent mappings and settings",
+                    "Include ILM policies in templates for lifecycle management"
+                ]
+            }
+        ]
+    }
+}
