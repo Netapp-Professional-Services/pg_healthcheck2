@@ -171,13 +171,51 @@ python -m plugins.opensearch.import_diagnostics ./export.zip \
 
 ### Data Stored
 
-The following is stored in `health_check_runs`:
+When shipping to trends, data is stored in two tables:
+
+#### `health_check_runs` table
 - Company association
 - Cluster name and version
 - Node count
 - Full structured findings (encrypted)
 - AsciiDoc report content
-- Execution metadata
+- Execution metadata (user, host, timestamp)
+- Health score (calculated from rule evaluations)
+
+#### `health_check_triggered_rules` table
+- Individual rule violations linked to the run
+- Severity level (critical, high, medium, low, info)
+- Severity score (numeric, for ranking)
+- Rule reasoning and recommendations
+- Triggered data context
+
+This separation allows for:
+1. **Aggregate queries** - Find clusters with specific rule violations
+2. **Trend analysis** - Track rule violations over time
+3. **Sales targeting** - Query for specific opportunities across all customers
+
+### Example: Triggered Rules Output
+
+```
+Shipping to trends database...
+   Evaluated 6 triggered rules for storage
+Log: Successfully connected to PostgreSQL for trend shipping.
+Log: Successfully inserted health check run with ID: 1017
+Log: Storing triggered rules for trend analysis...
+Log: Stored 6 triggered rules for run 1017
+Log: Issue summary - Critical: 1, High: 1, Medium: 4
+```
+
+### Technical Implementation
+
+The `--ship-trends` flag triggers the following process:
+
+1. **Rule Evaluation** - `generate_dynamic_prompt()` evaluates all rules against findings
+2. **Issue Collection** - Critical, high, and medium issues are collected with full context
+3. **Database Storage** - `_store_triggered_rules()` inserts each triggered rule into `health_check_triggered_rules`
+4. **Findings Storage** - Full findings JSON is encrypted and stored in `health_check_runs`
+
+This ensures that triggered rules are queryable independently of the full findings blob, enabling efficient sales opportunity queries.
 
 ## Querying Sales Opportunities
 
