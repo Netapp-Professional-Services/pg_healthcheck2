@@ -1,0 +1,73 @@
+::: {es01}{n1DoNVUZR3Wgj8qwCzQ-fQ}{iITR_r1HQP2Mn4R4rlvRzg}{172.19.0.2}{172.19.0.2:9300}{cdhilmrstw}{ml.machine_memory=18833219584, xpack.installed=true, transform.node=true, ml.max_open_jobs=20}
+   Hot threads at 2025-11-20T14:55:35.560Z, interval=500ms, busiestThreads=10000, ignoreIdleThreads=true:
+   
+    0.0% (246.5micros out of 500ms) cpu usage by thread 'ticker-schedule-trigger-engine'
+     10/10 snapshots sharing following 2 elements
+       java.base@15.0.1/java.lang.Thread.sleep(Native Method)
+       org.elasticsearch.xpack.watcher.trigger.schedule.engine.TickerScheduleTriggerEngine$Ticker.run(TickerScheduleTriggerEngine.java:193)
+   
+    0.0% (0s out of 500ms) cpu usage by thread 'process reaper'
+     10/10 snapshots sharing following 5 elements
+       java.base@15.0.1/java.lang.ProcessHandleImpl.waitForProcessExit0(Native Method)
+       java.base@15.0.1/java.lang.ProcessHandleImpl$1.run(ProcessHandleImpl.java:142)
+       java.base@15.0.1/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+       java.base@15.0.1/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+       java.base@15.0.1/java.lang.Thread.run(Thread.java:832)
+   
+    0.0% (0s out of 500ms) cpu usage by thread 'Common-Cleaner'
+     10/10 snapshots sharing following 5 elements
+       java.base@15.0.1/java.lang.Object.wait(Native Method)
+       java.base@15.0.1/java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:155)
+       java.base@15.0.1/jdk.internal.ref.CleanerImpl.run(CleanerImpl.java:148)
+       java.base@15.0.1/java.lang.Thread.run(Thread.java:832)
+       java.base@15.0.1/jdk.internal.misc.InnocuousThread.run(InnocuousThread.java:134)
+   
+    0.0% (0s out of 500ms) cpu usage by thread 'Notification Thread'
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+   
+    0.0% (0s out of 500ms) cpu usage by thread 'ml-cpp-log-tail-thread'
+     10/10 snapshots sharing following 6 elements
+       java.base@15.0.1/java.io.FileInputStream.readBytes(Native Method)
+       java.base@15.0.1/java.io.FileInputStream.read(FileInputStream.java:249)
+       org.elasticsearch.xpack.ml.process.logging.CppLogMessageHandler.tailStream(CppLogMessageHandler.java:105)
+       org.elasticsearch.xpack.ml.process.NativeController.lambda$tailLogsInThread$0(NativeController.java:74)
+       org.elasticsearch.xpack.ml.process.NativeController$$Lambda$2808/0x00000008012d21d8.run(Unknown Source)
+       java.base@15.0.1/java.lang.Thread.run(Thread.java:832)
+   
+    0.0% (0s out of 500ms) cpu usage by thread 'Connection evictor'
+     10/10 snapshots sharing following 3 elements
+       java.base@15.0.1/java.lang.Thread.sleep(Native Method)
+       org.apache.http.impl.client.IdleConnectionEvictor$1.run(IdleConnectionEvictor.java:66)
+       java.base@15.0.1/java.lang.Thread.run(Thread.java:832)
+   
+    0.0% (0s out of 500ms) cpu usage by thread 'elasticsearch[keepAlive/7.10.2]'
+     10/10 snapshots sharing following 7 elements
+       java.base@15.0.1/jdk.internal.misc.Unsafe.park(Native Method)
+       java.base@15.0.1/java.util.concurrent.locks.LockSupport.park(LockSupport.java:211)
+       java.base@15.0.1/java.util.concurrent.locks.AbstractQueuedSynchronizer.acquire(AbstractQueuedSynchronizer.java:714)
+       java.base@15.0.1/java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireSharedInterruptibly(AbstractQueuedSynchronizer.java:1046)
+       java.base@15.0.1/java.util.concurrent.CountDownLatch.await(CountDownLatch.java:232)
+       app//org.elasticsearch.bootstrap.Bootstrap$1.run(Bootstrap.java:89)
+       java.base@15.0.1/java.lang.Thread.run(Thread.java:832)
+   
+    0.0% (0s out of 500ms) cpu usage by thread 'DestroyJavaVM'
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+     unique snapshot
+

@@ -1,0 +1,10 @@
+{
+  "mode" : "full",
+  "product" : "elasticsearch",
+  "flags" : "BaseInputs{outputDir='/Users/smuthukaruppan/Tech/elasticsearch/diagnostics-9.3.1'},ElasticRestClientInputs: {host='localhost', port=9200, proxyHost='', proxyPort=8080, user='elastic', isPassword=true, pkiKeystore='', isPkiPass=false, pkiKeystorePass='', proxyUser='', isProxyPass=false, isSsl=true, skipVerification=true, scheme='https'},DiagnosticInputs: {, diagType='api', mode='full', remoteUser='null', keyfile='', isKeyFilePass=false', trustRemote=false', knownHostsFile='', sudo=false', remotePort=22, runner='cli'}",
+  "diagnostic" : "9.3.1",
+  "type" : "elasticsearch_diagnostic",
+  "runner" : "cli",
+  "version" : "7.10.2",
+  "timestamp" : "2025-11-20T14:55:36.488Z"
+}

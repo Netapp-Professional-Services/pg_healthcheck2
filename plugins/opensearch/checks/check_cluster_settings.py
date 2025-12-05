@@ -17,9 +17,13 @@ def get_weight():
 
 
 def run_check_cluster_settings(connector, settings):
-    """Audit cluster settings for production readiness."""
+    """
+    Audit cluster settings for production readiness.
+
+    Returns:
+        tuple: (adoc_content, structured_findings)
+    """
     builder = CheckContentBuilder(connector.formatter)
-    structured_data = {}
 
     builder.h3("Cluster Settings Audit")
     builder.para("Review of critical cluster configuration settings and production readiness.")
@@ -28,10 +32,12 @@ def run_check_cluster_settings(connector, settings):
         # Get cluster settings
         cluster_settings = connector.execute_query({"operation": "cluster_stats"})
 
-        if "error" in cluster_settings:
+        if isinstance(cluster_settings, dict) and "error" in cluster_settings:
             builder.error(f"Could not retrieve cluster settings: {cluster_settings['error']}")
-            structured_data["settings"] = {"status": "error", "details": cluster_settings['error']}
-            return builder.build(), structured_data
+            return builder.build(), {
+                "status": "error",
+                "error": cluster_settings['error']
+            }
 
         # Get cluster state for additional info
         cluster_health = connector.execute_query({"operation": "cluster_health"})
@@ -182,24 +188,35 @@ def run_check_cluster_settings(connector, settings):
                 builder.success("✅ Cluster settings are well-configured for production use.")
                 builder.recs({"general": recs["general"]})
 
-        structured_data["settings"] = {
+        # Return structured data with proper format for rules engine
+        return builder.build(), {
             "status": "success",
-            "node_count": node_count,
-            "data_node_count": data_node_count,
-            "master_node_count": master_node_count,
-            "index_count": index_count,
-            "total_shards": total_shards,
-            "shards_per_node": round(shards_per_node, 1),
-            "critical_issues": len(issues["critical"]),
-            "warnings": len(issues["warnings"])
+            "data": {
+                "node_count": node_count,
+                "data_node_count": data_node_count,
+                "master_node_count": master_node_count,
+                "index_count": index_count,
+                "total_shards": total_shards,
+                "unassigned_shards": unassigned_shards,
+                "shards_per_node": round(shards_per_node, 1),
+                "critical_issues": len(issues["critical"]),
+                "warnings": len(issues["warnings"]),
+                "has_critical_issues": len(issues["critical"]) > 0,
+                "has_warnings": len(issues["warnings"]) > 0,
+                "insufficient_master_nodes": master_node_count < 3,
+                "single_data_node": data_node_count < 2,
+                "high_shard_count": shards_per_node > 1000,
+                "elevated_shard_count": shards_per_node > 600,
+            }
         }
 
     except Exception as e:
         logger.error(f"Settings audit failed: {e}", exc_info=True)
         builder.error(f"Check failed: {e}")
-        structured_data["settings"] = {"status": "error", "details": str(e)}
-
-    return builder.build(), structured_data
+        return builder.build(), {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 def _format_bytes(bytes_value):

@@ -103,6 +103,7 @@ class DiagnosticConnector:
         'repositories': 'repositories.json',
         'dangling_indices': 'dangling_indices.json',
         'remote_cluster_info': 'remote_cluster_info.json',
+        'remote_info': 'remote_cluster_info.json',
         'fielddata_stats': 'fielddata_stats.json',
         'ssl_certs': 'ssl_certs.json',
 
@@ -130,6 +131,19 @@ class DiagnosticConnector:
         'enrich_stats': 'commercial/enrich_stats.json',
         'data_stream': 'commercial/data_stream.json',
         'rollup_jobs': 'commercial/rollup_jobs.json',
+
+        # Additional mappings for comprehensive coverage
+        'cat_thread_pool': 'cat/cat_thread_pool.txt',
+        'allocation_explain_disk': 'allocation_explain_disk.json',
+        'watcher_stack': 'commercial/watcher_stack.json',
+        'ccr_follower_info': 'commercial/ccr_follower_info.json',
+        'ml_datafeeds_stats': 'commercial/ml_datafeeds_stats.json',
+        'ml_dataframe': 'commercial/ml_dataframe.json',
+        'ml_dataframe_stats': 'commercial/ml_dataframe_stats.json',
+        'ml_trained_models': 'commercial/ml_trained_models.json',
+        'ml_trained_models_stats': 'commercial/ml_trained_models_stats.json',
+        'security_privileges': 'commercial/security_priv.json',
+        'ilm_explain_errors': 'commercial/ilm_explain_only_errors.json',
     }
 
     def __init__(self, settings: Dict[str, Any], diagnostic_path: str):

@@ -1,0 +1,24 @@
+name                            index_patterns               order      version composed_of
+.ml-meta                        [.ml-meta]                   0          7100299 
+.transform-notifications-000002 [.transform-notifications-*] 0          7100299 
+.monitoring-beats               [.monitoring-beats-7-*]      0          7000199 
+.logstash-management            [.logstash]                  0                  
+.ml-inference-000003            [.ml-inference-000003]       0          7100299 
+.ml-state                       [.ml-state*]                 0          7100299 
+.monitoring-kibana              [.monitoring-kibana-7-*]     0          7000199 
+.monitoring-es                  [.monitoring-es-7-*]         0          7000199 
+.ml-config                      [.ml-config]                 0          7100299 
+.monitoring-alerts-7            [.monitoring-alerts-7]       0          7000199 
+.ml-anomalies-                  [.ml-anomalies-*]            0          7100299 
+.monitoring-logstash            [.monitoring-logstash-7-*]   0          7000199 
+.ml-notifications-000001        [.ml-notifications-000001]   0          7100299 
+.ml-stats                       [.ml-stats-*]                0          7100299 
+.transform-internal-005         [.transform-internal-005]    0          7100299 
+ilm-history                     [ilm-history-3*]             2147483647 3       []
+.triggered_watches              [.triggered_watches*]        2147483647 12      []
+.slm-history                    [.slm-history-3*]            2147483647 3       []
+synthetics                      [synthetics-*-*]             100        0       [synthetics-mappings, synthetics-settings]
+metrics                         [metrics-*-*]                100        0       [metrics-mappings, metrics-settings]
+.watch-history-12               [.watcher-history-12*]       2147483647 12      []
+.watches                        [.watches*]                  2147483647 12      []
+logs                            [logs-*-*]                   100        0       [logs-mappings, logs-settings]

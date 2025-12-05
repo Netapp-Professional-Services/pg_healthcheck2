@@ -29,6 +29,11 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_security_audit',
                 'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_security_mappings',
+                'function': 'run'
             }
         ]
     },
@@ -38,6 +43,11 @@ REPORT_SECTIONS = [
             {
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_license_status',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_xpack_features',
                 'function': 'run'
             }
         ]
@@ -54,6 +64,21 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_cluster_settings',
                 'function': 'run_check_cluster_settings'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_shard_allocation',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_thread_pools',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_zone_awareness',
+                'function': 'run'
             }
         ]
     },
@@ -73,6 +98,11 @@ REPORT_SECTIONS = [
             {
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_templates',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_data_streams',
                 'function': 'run'
             }
         ]
@@ -109,6 +139,11 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_snapshot_status',
                 'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_dangling_indices',
+                'function': 'run'
             }
         ]
     },
@@ -118,6 +153,61 @@ REPORT_SECTIONS = [
             {
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_ingest_pipelines',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_enrich_policies',
+                'function': 'run'
+            }
+        ]
+    },
+    {
+        'title': 'Alerting & Automation',
+        'actions': [
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_watcher_status',
+                'function': 'run'
+            }
+        ]
+    },
+    {
+        'title': 'Cross-Cluster & Multi-Region',
+        'actions': [
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_ccr_status',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_remote_clusters',
+                'function': 'run'
+            }
+        ]
+    },
+    {
+        'title': 'Machine Learning',
+        'actions': [
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_ml_status',
+                'function': 'run'
+            }
+        ]
+    },
+    {
+        'title': 'Data Transforms & Rollups',
+        'actions': [
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_transforms',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_rollup_jobs',
                 'function': 'run'
             }
         ]

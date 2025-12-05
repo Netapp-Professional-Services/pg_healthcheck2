@@ -1,0 +1,116 @@
+{
+    "ml_unused_opportunity": {
+        "metric_keywords": ["xpack_features"],
+        "data_conditions": [
+            {"key": "ml_unused", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('ml_unused') == True",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Machine Learning is licensed but not utilized. Consider anomaly detection for operational insights.",
+                "recommendations": [
+                    "Set up anomaly detection jobs for log analysis",
+                    "Configure ML for security analytics (SIEM use cases)",
+                    "Explore data frame analytics for predictive modeling"
+                ]
+            }
+        ]
+    },
+    "security_audit_disabled": {
+        "metric_keywords": ["xpack_features"],
+        "data_conditions": [
+            {"key": "audit_enabled", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('security_enabled') == True and data.get('audit_enabled') == False",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Security audit logging is available but not enabled. Required for compliance and forensics.",
+                "recommendations": [
+                    "Enable audit logging for compliance requirements",
+                    "Configure audit outputs (index, logfile, or both)",
+                    "Define audit events to capture (authentication, authorization, etc.)"
+                ]
+            }
+        ]
+    },
+    "external_auth_not_configured": {
+        "metric_keywords": ["xpack_features"],
+        "data_conditions": [
+            {"key": "has_external_auth", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('security_enabled') == True and data.get('has_external_auth') == False",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "No external authentication (LDAP, SAML, OIDC) is configured. Enterprise SSO recommended.",
+                "recommendations": [
+                    "Integrate with enterprise identity provider (SAML/OIDC)",
+                    "Configure LDAP/Active Directory for centralized user management",
+                    "Implement role mappings for automated access control"
+                ]
+            }
+        ]
+    },
+    "upsell_opportunities_detected": {
+        "metric_keywords": ["xpack_features"],
+        "data_conditions": [
+            {"key": "has_upsell_opportunities", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_upsell_opportunities') == True",
+                "level": "info",
+                "score": 3,
+                "reasoning": "License upgrade opportunities identified. Features are enabled but not available with current license.",
+                "recommendations": [
+                    "Review license tier to unlock desired features",
+                    "Evaluate Platinum/Enterprise license benefits",
+                    "Contact sales for license consultation"
+                ]
+            }
+        ]
+    },
+    "unused_features_detected": {
+        "metric_keywords": ["xpack_features"],
+        "data_conditions": [
+            {"key": "has_unused_features", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_unused_features') == True and data.get('unused_licensed_count', 0) > 3",
+                "level": "info",
+                "score": 2,
+                "reasoning": "Multiple licensed features are not being utilized. Review for cost optimization or enablement.",
+                "recommendations": [
+                    "Audit unused features for potential value",
+                    "Consider training to maximize license investment",
+                    "Review if lower license tier meets requirements"
+                ]
+            }
+        ]
+    },
+    "ccr_not_configured": {
+        "metric_keywords": ["xpack_features"],
+        "data_conditions": [
+            {"key": "ccr_available", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('ccr_available') == True and data.get('ccr_follower_count', 0) == 0",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Cross-Cluster Replication is available but not configured. Consider for disaster recovery.",
+                "recommendations": [
+                    "Configure CCR for critical indices",
+                    "Set up remote cluster for disaster recovery",
+                    "Implement active-passive or active-active replication strategy"
+                ]
+            }
+        ]
+    }
+}
