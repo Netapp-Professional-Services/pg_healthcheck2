@@ -12,7 +12,7 @@ Requires: instaclustr_prometheus_enabled: true
 import logging
 from typing import Dict
 from datetime import datetime
-from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.check_helpers import CheckContentBuilder, require_prometheus
 
 logger = logging.getLogger(__name__)
 
@@ -37,20 +37,10 @@ def check_prometheus_latency(connector, settings):
     builder.h3("Read/Write Latency P95 (Prometheus)")
 
     # Check if Prometheus is enabled
-    if not settings.get('instaclustr_prometheus_enabled'):
-        # Check skipped - Prometheus monitoring not enabled
-        findings = {
-            'prometheus_latency': {
-                'status': 'skipped',
-                'reason': 'Prometheus monitoring not enabled',
-                'data': [],
-                'metadata': {
-                    'source': 'prometheus',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
-            }
-        }
-        return builder.build(), findings
+    prom_ok, skip_msg, skip_data = require_prometheus(settings, "latency metrics")
+    if not prom_ok:
+        builder.add(skip_msg)
+        return builder.build(), {'prometheus_latency': skip_data}
 
     try:
         # Import here to avoid dependency if not using Prometheus

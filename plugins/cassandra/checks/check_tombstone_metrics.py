@@ -1,5 +1,6 @@
 from plugins.common.check_helpers import require_ssh, CheckContentBuilder, safe_execute_query
 from plugins.cassandra.utils.qrylib.qry_disk_space_per_keyspace import get_nodetool_tablestats_query
+from plugins.cassandra.utils.keyspace_filter import KeyspaceFilter
 import logging
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,9 @@ def run_check_tombstone_metrics(connector, settings):
         return builder.build(), structured_data
 
     # Filter user tables and find problematic ones
+    # Use centralized keyspace filter for consistent filtering
+    ks_filter = KeyspaceFilter(settings)
+
     all_tables = {}
     problematic_tables = set()
 
@@ -67,8 +71,8 @@ def run_check_tombstone_metrics(connector, settings):
         keyspace = table_info.get('keyspace_name', 'unknown')
         table_name = table_info.get('table_name', 'unknown')
 
-        # Skip system keyspaces
-        if keyspace.startswith('system'):
+        # Skip excluded keyspaces (system + user-configured exclusions)
+        if ks_filter.is_excluded(keyspace):
             continue
 
         # Extract tombstone metrics

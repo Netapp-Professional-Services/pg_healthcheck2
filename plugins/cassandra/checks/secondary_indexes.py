@@ -22,6 +22,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.cassandra.utils.keyspace_filter import KeyspaceFilter
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +59,6 @@ def check_secondary_indexes(connector, settings):
     timestamp = datetime.utcnow().isoformat() + 'Z'
 
     try:
-        # System keyspaces to exclude
-        system_keyspaces = {
-            'system', 'system_schema', 'system_auth',
-            'system_distributed', 'system_traces', 'system_views',
-            'system_virtual_schema'
-        }
-
         # Query all indexes (filtering in Python since Cassandra doesn't support WHERE NOT IN)
         query = """
         SELECT
@@ -77,8 +71,10 @@ def check_secondary_indexes(connector, settings):
         """
 
         result = connector.session.execute(query)
-        # Filter out system keyspaces in Python
-        indexes = [row for row in result if row['keyspace_name'] not in system_keyspaces]
+
+        # Filter out system keyspaces using centralized filter
+        ks_filter = KeyspaceFilter(settings)
+        indexes = [row for row in result if not ks_filter.is_excluded(row['keyspace_name'])]
 
         if not indexes:
             builder.success("✅ No secondary indexes found (good - use native CQL queries when possible)")

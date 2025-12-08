@@ -178,8 +178,8 @@ def check_network_topology(connector, settings):
                         builder.text(f"   - Action: {warning['recommendation']}")
                 builder.blank()
 
-            # Add recommendations
-            builder.text("*Recommended Actions:*")
+            # Add recommendations - build list dynamically to get correct numbering
+            recommendations = []
 
             # Check for specific issues and provide targeted advice
             has_single_rack = any(w['severity'] == 'warning' and 'rack' in w['issue'].lower() for w in topology_warnings)
@@ -187,27 +187,54 @@ def check_network_topology(connector, settings):
             has_version_mismatch = any('version' in w['issue'].lower() for w in topology_warnings)
 
             if has_single_rack:
-                builder.text("1. *Deploy Across Multiple Racks*: Minimum 3 racks recommended for RF=3")
-                builder.text("   - Add nodes to different racks to eliminate single rack SPOF")
-                builder.text("   - Ensure rack names are properly configured in cassandra.yaml (GossipingPropertyFileSnitch)")
-                builder.text("   - After adding nodes, run `nodetool rebuild` to redistribute data")
+                recommendations.append({
+                    'title': 'Deploy Across Multiple Racks',
+                    'summary': 'Minimum 3 racks recommended for RF=3',
+                    'details': [
+                        'Add nodes to different racks to eliminate single rack SPOF',
+                        'Ensure rack names are properly configured in cassandra.yaml (GossipingPropertyFileSnitch)',
+                        'After adding nodes, run `nodetool rebuild` to redistribute data'
+                    ]
+                })
 
             if has_small_cluster:
-                builder.text("2. *Scale to Minimum 3 Nodes Per DC*: Required for RF=3 with proper quorum")
-                builder.text("   - RF=3 with 2 nodes: quorum reads/writes cannot tolerate any node failure")
-                builder.text("   - 3 nodes allows QUORUM (2 nodes) to succeed with 1 node down")
-                builder.text("   - Add nodes incrementally and run `nodetool cleanup` on existing nodes")
+                recommendations.append({
+                    'title': 'Scale to Minimum 3 Nodes Per DC',
+                    'summary': 'Required for RF=3 with proper quorum',
+                    'details': [
+                        'RF=3 with 2 nodes: quorum reads/writes cannot tolerate any node failure',
+                        '3 nodes allows QUORUM (2 nodes) to succeed with 1 node down',
+                        'Add nodes incrementally and run `nodetool cleanup` on existing nodes'
+                    ]
+                })
 
             if has_version_mismatch:
-                builder.text("3. *Standardize Cassandra Versions*: All nodes should run the same version")
-                builder.text("   - Plan rolling upgrade to bring all nodes to latest stable version")
-                builder.text("   - Version mismatches can cause protocol incompatibilities and data corruption")
+                recommendations.append({
+                    'title': 'Standardize Cassandra Versions',
+                    'summary': 'All nodes should run the same version',
+                    'details': [
+                        'Plan rolling upgrade to bring all nodes to latest stable version',
+                        'Version mismatches can cause protocol incompatibilities and data corruption'
+                    ]
+                })
 
             if total_datacenters == 1:
-                builder.text("4. *Consider Multi-DC for DR*: Single DC = no geographic redundancy")
-                builder.text("   - Multi-DC provides disaster recovery capability")
-                builder.text("   - Use NetworkTopologyStrategy: `{'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 3}`")
-            builder.blank()
+                recommendations.append({
+                    'title': 'Consider Multi-DC for DR',
+                    'summary': 'Single DC = no geographic redundancy',
+                    'details': [
+                        'Multi-DC provides disaster recovery capability',
+                        "Use NetworkTopologyStrategy: `{'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 3}`"
+                    ]
+                })
+
+            if recommendations:
+                builder.text("*Recommended Actions:*")
+                for idx, rec in enumerate(recommendations, 1):
+                    builder.text(f"{idx}. *{rec['title']}*: {rec['summary']}")
+                    for detail in rec['details']:
+                        builder.text(f"   - {detail}")
+                builder.blank()
 
             builder.text("*Best Practices:*")
             builder.text("- *Minimum Configuration*: 3 nodes per DC, distributed across 3+ racks, RF=3")
