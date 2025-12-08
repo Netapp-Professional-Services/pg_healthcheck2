@@ -6,6 +6,10 @@ Generates health check reports from Elastic/OpenSearch support-diagnostics expor
 This allows offline analysis of cluster health without live access.
 
 Usage:
+    # Using a config file (recommended):
+    python -m plugins.opensearch.import_diagnostics --config config/opensearch_import.yaml
+
+    # Using CLI arguments:
     python -m plugins.opensearch.import_diagnostics /path/to/diagnostic-export [options]
 
     # From zip file
@@ -13,6 +17,12 @@ Usage:
 
     # From extracted directory
     python -m plugins.opensearch.import_diagnostics ./api-diagnostics-20251120-145536/
+
+    # Auto-detect most recent export in a directory (upload folder):
+    python -m plugins.opensearch.import_diagnostics /path/to/uploads/
+
+    # Config file with CLI overrides (CLI takes precedence):
+    python -m plugins.opensearch.import_diagnostics --config config/opensearch_import.yaml --company "Override Corp"
 
     # With custom output directory
     python -m plugins.opensearch.import_diagnostics ./export.zip --output-dir ./reports
@@ -22,6 +32,16 @@ Usage:
 
     # Ship to trends database
     python -m plugins.opensearch.import_diagnostics ./export.zip --ship-trends
+
+Smart Path Detection:
+    When given a directory path, the tool will automatically find the most recent
+    diagnostic export by looking for files/directories matching:
+    - api-diagnostics-*.zip
+    - api-diagnostics-*/
+    - commercial-diagnostics-*.zip
+    - diagnostics-*.zip
+
+    This is useful when diagnostics are uploaded to a shared folder.
 
 The support-diagnostics tool can be obtained from:
     https://github.com/elastic/support-diagnostics
@@ -34,6 +54,8 @@ import re
 import sys
 from pathlib import Path
 from datetime import datetime
+
+import yaml
 
 # Ensure project root is in path
 project_root = Path(__file__).parent.parent.parent
@@ -55,7 +77,13 @@ def parse_args():
 
     parser.add_argument(
         'diagnostic_path',
+        nargs='?',  # Make positional arg optional
         help='Path to diagnostic export (zip file or extracted directory)'
+    )
+
+    parser.add_argument(
+        '--config',
+        help='Path to YAML config file (similar to main.py config format)'
     )
 
     parser.add_argument(
@@ -65,8 +93,7 @@ def parse_args():
 
     parser.add_argument(
         '--company', '-c',
-        default='opensearch_import',
-        help='Company name for report identification (default: opensearch_import)'
+        help='Company name for report identification (overrides config file)'
     )
 
     parser.add_argument(
@@ -77,13 +104,13 @@ def parse_args():
     parser.add_argument(
         '--ship-trends',
         action='store_true',
+        default=None,
         help='Ship results to trends database (requires trends config)'
     )
 
     parser.add_argument(
         '--trends-config',
-        default='config/trends.yaml',
-        help='Path to trends configuration file'
+        help='Path to trends configuration file (default: config/trends.yaml)'
     )
 
     parser.add_argument(
@@ -101,22 +128,249 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    """Main entry point."""
-    args = parse_args()
-
-    # Validate diagnostic path
-    diagnostic_path = Path(args.diagnostic_path)
-    if not diagnostic_path.exists():
-        print(f"❌ Error: Path not found: {diagnostic_path}")
+def load_config(config_path):
+    """Load configuration from YAML file."""
+    try:
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        print(f"❌ Error: Config file not found: {config_path}")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        print(f"❌ Error: Invalid YAML in config file: {e}")
         sys.exit(1)
 
-    # Setup settings
+
+def merge_args_with_config(args, config):
+    """
+    Merge CLI arguments with config file settings.
+    CLI arguments take precedence over config file.
+
+    Returns a namespace-like object with all settings.
+    """
+    # Start with config file values, then override with CLI args
+
+    # diagnostic_path: CLI > config
+    if args.diagnostic_path:
+        diagnostic_path = args.diagnostic_path
+    else:
+        diagnostic_path = config.get('diagnostic_path')
+
+    # company: CLI > config
+    if args.company:
+        company = args.company
+    else:
+        company = config.get('company_name', 'opensearch_import')
+
+    # output_dir: CLI > config
+    if args.output_dir:
+        output_dir = args.output_dir
+    else:
+        output_dir = config.get('output_dir')
+
+    # report_config: CLI > config
+    if args.report_config:
+        report_config = args.report_config
+    else:
+        report_config = config.get('report_config')
+
+    # ship_trends: CLI > config (note: config uses trend_storage_enabled)
+    if args.ship_trends is not None:
+        ship_trends = args.ship_trends
+    else:
+        ship_trends = config.get('trend_storage_enabled', False)
+
+    # trends_config: CLI > config
+    if args.trends_config:
+        trends_config = args.trends_config
+    else:
+        trends_config = config.get('trends_config', 'config/trends.yaml')
+
+    # json_only: CLI only (no config equivalent)
+    json_only = args.json_only
+
+    # quiet: CLI only
+    quiet = args.quiet
+
+    # Preserve full config for settings dict
+    full_config = config
+
+    # Create a simple namespace-like object
+    class MergedArgs:
+        pass
+
+    merged = MergedArgs()
+    merged.diagnostic_path = diagnostic_path
+    merged.company = company
+    merged.output_dir = output_dir
+    merged.report_config = report_config
+    merged.ship_trends = ship_trends
+    merged.trends_config = trends_config
+    merged.json_only = json_only
+    merged.quiet = quiet
+    merged.full_config = full_config
+
+    return merged
+
+
+def find_latest_diagnostic(search_path, quiet=False):
+    """
+    Find the most recent diagnostic export in a directory.
+
+    Looks for:
+    - api-diagnostics-*.zip files
+    - api-diagnostics-*/ directories
+    - commercial-diagnostics-*.zip files
+    - commercial-diagnostics-*/ directories
+
+    Returns the most recently modified match, or None if no matches found.
+    """
+    search_path = Path(search_path)
+
+    if not search_path.is_dir():
+        return None
+
+    # Patterns to match diagnostic exports
+    patterns = [
+        'api-diagnostics-*.zip',
+        'api-diagnostics-*',
+        'commercial-diagnostics-*.zip',
+        'commercial-diagnostics-*',
+        'diagnostics-*.zip',
+        'diagnostics-*',
+    ]
+
+    candidates = []
+
+    for pattern in patterns:
+        for match in search_path.glob(pattern):
+            # Skip if it's a file that doesn't end in .zip (unless it's a directory)
+            if match.is_file() and not match.suffix == '.zip':
+                continue
+            # Get modification time
+            try:
+                mtime = match.stat().st_mtime
+                candidates.append((match, mtime))
+            except OSError:
+                continue
+
+    if not candidates:
+        return None
+
+    # Sort by modification time, most recent first
+    candidates.sort(key=lambda x: x[1], reverse=True)
+
+    latest = candidates[0][0]
+
+    if not quiet and len(candidates) > 1:
+        print(f"📁 Found {len(candidates)} diagnostic exports in {search_path}")
+        print(f"   Using most recent: {latest.name}")
+
+    return latest
+
+
+def resolve_diagnostic_path(path_str, quiet=False):
+    """
+    Resolve the diagnostic path, handling:
+    1. Direct path to zip file
+    2. Direct path to extracted directory
+    3. Directory containing diagnostic exports (finds most recent)
+
+    Returns resolved Path or None if not found.
+    """
+    if not path_str:
+        return None
+
+    path = Path(path_str)
+
+    if not path.exists():
+        return None
+
+    # Case 1: Direct path to a zip file
+    if path.is_file() and path.suffix == '.zip':
+        return path
+
+    # Case 2: Direct path to an extracted diagnostic directory
+    # Check if it looks like a diagnostic export (has cluster_health.json or similar)
+    if path.is_dir():
+        diagnostic_markers = [
+            'cluster_health.json',
+            'cluster_state.json',
+            'nodes.json',
+            'manifest.json',
+        ]
+        for marker in diagnostic_markers:
+            if (path / marker).exists():
+                return path
+
+        # Case 3: Directory containing diagnostic exports - find most recent
+        latest = find_latest_diagnostic(path, quiet)
+        if latest:
+            return latest
+
+        # Maybe it's still a valid diagnostic dir without our markers
+        # Let the connector try to load it
+        return path
+
+    return path
+
+
+def main():
+    """Main entry point."""
+    raw_args = parse_args()
+
+    # Load config file if specified
+    if raw_args.config:
+        config = load_config(raw_args.config)
+        args = merge_args_with_config(raw_args, config)
+    else:
+        # No config file - use CLI args with defaults
+        config = {}
+        args = merge_args_with_config(raw_args, config)
+        # Set default company if not provided via CLI
+        if not args.company:
+            args.company = 'opensearch_import'
+        args.full_config = {}
+
+    # Validate that we have a diagnostic path
+    if not args.diagnostic_path:
+        print("❌ Error: No diagnostic path provided.")
+        print("   Either specify a path as argument or use --config with diagnostic_path in YAML")
+        print("\nExamples:")
+        print("   python -m plugins.opensearch.import_diagnostics /path/to/diagnostic.zip")
+        print("   python -m plugins.opensearch.import_diagnostics --config config/opensearch_import.yaml")
+        print("   python -m plugins.opensearch.import_diagnostics /path/to/uploads/  # finds most recent")
+        sys.exit(1)
+
+    # Resolve diagnostic path - handles directories with multiple exports
+    diagnostic_path = resolve_diagnostic_path(args.diagnostic_path, args.quiet)
+
+    if not diagnostic_path:
+        print(f"❌ Error: Path not found: {args.diagnostic_path}")
+        sys.exit(1)
+
+    if not diagnostic_path.exists():
+        print(f"❌ Error: Resolved path not found: {diagnostic_path}")
+        sys.exit(1)
+
+    # Setup settings - merge config file settings with required fields
     settings = {
         'company_name': args.company,
-        'show_qry': False,
-        'row_limit': 100,
+        'show_qry': args.full_config.get('show_qry', False),
+        'row_limit': args.full_config.get('row_limit', 100),
     }
+
+    # Add AI settings from config if present
+    if args.full_config.get('ai_analyze'):
+        settings['ai_analyze'] = True
+        settings['ai_provider'] = args.full_config.get('ai_provider')
+        settings['ai_endpoint'] = args.full_config.get('ai_endpoint')
+        settings['ai_model'] = args.full_config.get('ai_model')
+        settings['ai_api_key'] = args.full_config.get('ai_api_key')
+
+    # Add NVD API key if present
+    if args.full_config.get('nvd_api_key'):
+        settings['nvd_api_key'] = args.full_config.get('nvd_api_key')
 
     # Create connector and load diagnostic data
     if not args.quiet:

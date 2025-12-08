@@ -1,16 +1,40 @@
 # OpenSearch Diagnostic Import Configuration
 #
 # Use this config when importing support-diagnostics exports:
-#   python import_diagnostic.py --diagnostic /path/to/diagnostic.zip --config config/opensearch_import.yaml
+#   python -m plugins.opensearch.import_diagnostics --config config/opensearch_import.yaml
+#
+# CLI arguments can override config values:
+#   python -m plugins.opensearch.import_diagnostics --config config/opensearch_import.yaml --company "Override Corp"
 #
 # This config is for IMPORT mode only - no live cluster connection is made.
 # The diagnostic data provides all cluster information.
+
+# ============================================================================
+# REQUIRED: PATH TO DIAGNOSTIC EXPORT
+# ============================================================================
+# Path to the support-diagnostics export. Supports:
+#   - Direct path to zip file: /path/to/api-diagnostics-20251120-145536.zip
+#   - Direct path to extracted directory: /path/to/api-diagnostics-20251120-145536/
+#   - Directory containing exports (auto-finds most recent): /path/to/uploads/
+#
+# When pointing to a directory with multiple exports, the tool automatically
+# selects the most recently modified file matching patterns like:
+#   api-diagnostics-*.zip, commercial-diagnostics-*.zip, diagnostics-*.zip
+#
+# Can be overridden with CLI positional argument
+diagnostic_path: "/path/to/api-diagnostics-YYYYMMDD-HHMMSS.zip"
 
 # Company/client name - used for organizing output and trends tracking
 company_name: "Example Client"
 
 # Database type - must be opensearch for diagnostic imports
 db_type: opensearch
+
+# Optional: Custom output directory (default: adoc_out/<company_name>)
+# output_dir: "/path/to/output"
+
+# Optional: Custom report configuration file
+# report_config: "plugins/opensearch/reports/custom.py"
 
 # ============================================================================
 # AI ANALYSIS (OPTIONAL)
@@ -49,3 +73,4 @@ show_qry: false
 
 # Limit rows in table outputs
 row_limit: 50
+nvd_api_key: "dffb636b-c2e0-4ba0-8afc-f937758b8945"
