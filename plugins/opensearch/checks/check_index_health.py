@@ -23,17 +23,11 @@ def run_check_index_health(connector, settings):
     """
     Monitor index health, shard allocation, and storage efficiency.
 
-    Args:
-        connector: OpenSearch connector instance
-        settings: Configuration settings
-
     Returns:
-        tuple: (adoc_content, structured_data)
+        tuple: (adoc_content, structured_findings)
     """
     builder = CheckContentBuilder(connector.formatter)
-    structured_data = {}
 
-    # Add check header
     builder.h3("Index Health & Shard Distribution")
     builder.para(
         "Analysis of index health status, shard allocation across nodes, and storage efficiency metrics."
@@ -43,10 +37,12 @@ def run_check_index_health(connector, settings):
         # 1. Get index information
         indices = connector.execute_query({"operation": "cat_indices"})
 
-        if "error" in indices:
+        if isinstance(indices, dict) and "error" in indices:
             builder.error(f"Could not retrieve index information: {indices['error']}")
-            structured_data["index_health"] = {"status": "error", "details": indices['error']}
-            return builder.build(), structured_data
+            return builder.build(), {
+                "status": "error",
+                "error": indices['error']
+            }
 
         # 2. Get shard allocation details
         shards = connector.execute_query({"operation": "cat_shards"})
@@ -201,24 +197,32 @@ def run_check_index_health(connector, settings):
         elif total_indices > 0:
             builder.success("✅ All indices are healthy with proper shard allocation.")
 
-        # 10. Structured data
-        structured_data["index_health"] = {
+        # 10. Return structured data with proper format for rules engine
+        return builder.build(), {
             "status": "success",
-            "total_indices": total_indices,
-            "green_indices": len(green_indices),
-            "yellow_indices": len(yellow_indices),
-            "red_indices": len(red_indices),
-            "unassigned_shards": unassigned_count,
-            "large_indices": len(large_indices),
-            "critical_issues": len(red_indices) + (1 if unassigned_count > 0 else 0)
+            "data": {
+                "total_indices": total_indices,
+                "green_indices": len(green_indices),
+                "yellow_indices": len(yellow_indices),
+                "red_indices": len(red_indices),
+                "unassigned_shards": unassigned_count,
+                "large_indices": len(large_indices),
+                "critical_issues": len(red_indices) + (1 if unassigned_count > 0 else 0),
+                "has_red_indices": len(red_indices) > 0,
+                "has_yellow_indices": len(yellow_indices) > 0,
+                "has_unassigned_shards": unassigned_count > 0,
+                "has_large_indices": len(large_indices) > 0,
+                "all_healthy": len(red_indices) == 0 and len(yellow_indices) == 0,
+            }
         }
 
     except Exception as e:
         logger.error(f"Index health check failed: {e}", exc_info=True)
         builder.error(f"Check failed: {e}")
-        structured_data["index_health"] = {"status": "error", "details": str(e)}
-
-    return builder.build(), structured_data
+        return builder.build(), {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 def _is_large_index(size_str, docs_count):

@@ -1,0 +1,80 @@
+{
+    "deprecated_users_in_use": {
+        "metric_keywords": ["security_audit"],
+        "data_conditions": [
+            {"key": "has_deprecated_users", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_deprecated_users') == True",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Deprecated user accounts are still in use. These should be migrated to their recommended replacements.",
+                "recommendations": [
+                    "Migrate applications to use recommended user replacements",
+                    "Update connection strings and credentials",
+                    "Disable deprecated users after migration is complete"
+                ]
+            }
+        ]
+    },
+    "excess_superusers": {
+        "metric_keywords": ["security_audit"],
+        "data_conditions": [
+            {"key": "has_excess_superusers", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_excess_superusers') == True",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "More than 2 accounts have superuser/admin privileges. This increases security risk and reduces accountability.",
+                "recommendations": [
+                    "Review superuser accounts and determine if all are necessary",
+                    "Apply principle of least privilege - grant only required permissions",
+                    "Create role-specific accounts instead of sharing superuser access",
+                    "Enable audit logging for superuser actions"
+                ]
+            }
+        ]
+    },
+    "many_superusers": {
+        "metric_keywords": ["security_audit"],
+        "data_conditions": [
+            {"key": "superuser_count", "operator": ">", "value": 5}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('superuser_count', 0) > 5",
+                "level": "high",
+                "score": 7,
+                "reasoning": "More than 5 accounts have superuser/admin privileges. This is a significant security concern.",
+                "recommendations": [
+                    "Urgently review and reduce superuser account count",
+                    "Implement role-based access control (RBAC)",
+                    "Create specific roles for common administrative tasks",
+                    "Conduct a security audit of all privileged access"
+                ]
+            }
+        ]
+    },
+    "overprivileged_roles": {
+        "metric_keywords": ["security_audit"],
+        "data_conditions": [
+            {"key": "overprivileged_role_count", "operator": ">", "value": 3}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('overprivileged_role_count', 0) > 3",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Multiple custom roles have cluster-wide administrative privileges. Consider more granular permissions.",
+                "recommendations": [
+                    "Review custom roles with 'all' or 'manage' cluster privileges",
+                    "Create more specific roles with limited scope",
+                    "Document the business need for each high-privilege role"
+                ]
+            }
+        ]
+    }
+}

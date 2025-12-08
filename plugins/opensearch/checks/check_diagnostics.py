@@ -17,9 +17,14 @@ def get_weight():
 
 
 def run_check_diagnostics(connector, settings):
-    """Run advanced diagnostic queries for troubleshooting."""
+    """
+    Run advanced diagnostic queries for troubleshooting.
+
+    Returns:
+        tuple: (adoc_content, structured_findings)
+    """
     builder = CheckContentBuilder(connector.formatter)
-    structured_data = {}
+    diagnostic_data = {}
 
     builder.h3("Advanced Diagnostics")
     builder.para(
@@ -52,13 +57,10 @@ def run_check_diagnostics(connector, settings):
                 else:
                     builder.note("Hot threads data not available")
 
-                structured_data["hot_threads"] = {
-                    "status": "success",
-                    "has_hot_threads": "cpu usage" in hot_threads_text.lower()
-                }
+                diagnostic_data["has_hot_threads"] = "cpu usage" in hot_threads_text.lower()
             else:
                 builder.note("Hot threads API not available")
-                structured_data["hot_threads"] = {"status": "unavailable"}
+                diagnostic_data["has_hot_threads"] = False
         except Exception as e:
             logger.warning(f"Could not retrieve hot threads: {e}")
             builder.note("Hot threads information unavailable")
@@ -92,11 +94,8 @@ def run_check_diagnostics(connector, settings):
                 else:
                     builder.note("✅ No pending cluster tasks")
 
-                structured_data["pending_tasks"] = {
-                    "status": "success",
-                    "count": len(tasks),
-                    "task_types": list(set([t.get("source", "unknown") for t in tasks]))
-                }
+                diagnostic_data["pending_task_count"] = len(tasks)
+                diagnostic_data["has_pending_tasks"] = len(tasks) > 0
             else:
                 builder.note("Pending tasks information unavailable")
         except Exception as e:
@@ -144,11 +143,9 @@ def run_check_diagnostics(connector, settings):
                     else:
                         builder.note(f"✅ Segment counts healthy (total: {total_segments} across all indices)")
 
-                    structured_data["segments"] = {
-                        "status": "success",
-                        "total_segments": total_segments,
-                        "high_segment_indices": len(high_segment_indices)
-                    }
+                    diagnostic_data["total_segments"] = total_segments
+                    diagnostic_data["high_segment_indices"] = len(high_segment_indices)
+                    diagnostic_data["has_high_segment_indices"] = len(high_segment_indices) > 0
                 else:
                     builder.note("No segment data available")
             else:
@@ -191,10 +188,8 @@ def run_check_diagnostics(connector, settings):
                 else:
                     builder.note("✅ No active shard recoveries")
 
-                structured_data["recovery"] = {
-                    "status": "success",
-                    "active_recoveries": len(active_recoveries)
-                }
+                diagnostic_data["active_recoveries"] = len(active_recoveries)
+                diagnostic_data["has_active_recoveries"] = len(active_recoveries) > 0
             else:
                 builder.note("Recovery status unavailable")
         except Exception as e:
@@ -234,10 +229,8 @@ def run_check_diagnostics(connector, settings):
                 else:
                     builder.note("✅ No long-running tasks detected")
 
-                structured_data["long_running_tasks"] = {
-                    "status": "success",
-                    "count": len(long_running_tasks)
-                }
+                diagnostic_data["long_running_task_count"] = len(long_running_tasks)
+                diagnostic_data["has_long_running_tasks"] = len(long_running_tasks) > 0
             else:
                 builder.note("Task information unavailable")
         except Exception as e:
@@ -276,15 +269,10 @@ def run_check_diagnostics(connector, settings):
                         })
 
                     builder.table(plugin_summary)
-
-                    structured_data["plugins"] = {
-                        "status": "success",
-                        "count": len(unique_plugins),
-                        "plugins": list(unique_plugins)
-                    }
+                    diagnostic_data["plugin_count"] = len(unique_plugins)
                 else:
                     builder.note("No plugins detected (or running OpenSearch core only)")
-                    structured_data["plugins"] = {"status": "success", "count": 0}
+                    diagnostic_data["plugin_count"] = 0
             else:
                 builder.note("Plugin information unavailable")
         except Exception as e:
@@ -334,10 +322,8 @@ def run_check_diagnostics(connector, settings):
                 else:
                     builder.note("✅ Field data usage is minimal")
 
-                structured_data["field_data"] = {
-                    "status": "success",
-                    "total_bytes": total_field_data_bytes
-                }
+                diagnostic_data["field_data_bytes"] = total_field_data_bytes
+                diagnostic_data["high_field_data_usage"] = total_field_data_bytes > 5_000_000_000
             else:
                 builder.note("Field data statistics unavailable")
         except Exception as e:
@@ -359,9 +345,16 @@ def run_check_diagnostics(connector, settings):
 
         builder.recs({"general": recs["general"]})
 
+        # Return structured data with proper format for rules engine
+        return builder.build(), {
+            "status": "success",
+            "data": diagnostic_data
+        }
+
     except Exception as e:
         logger.error(f"Diagnostics check failed: {e}", exc_info=True)
         builder.error(f"Check failed: {e}")
-        structured_data["diagnostics"] = {"status": "error", "details": str(e)}
-
-    return builder.build(), structured_data
+        return builder.build(), {
+            "status": "error",
+            "error": str(e)
+        }

@@ -1,0 +1,61 @@
+{
+    "ccr_replication_lag": {
+        "metric_keywords": ["ccr_status"],
+        "data_conditions": [
+            {"key": "has_lag", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_lag') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Cross-cluster replication has lagging shards. Follower indices are behind leader.",
+                "recommendations": [
+                    "Check network connectivity between clusters",
+                    "Review leader index write throughput",
+                    "Consider increasing max_read_request_operation_count",
+                    "Check follower cluster resources"
+                ]
+            }
+        ]
+    },
+    "ccr_failures": {
+        "metric_keywords": ["ccr_status"],
+        "data_conditions": [
+            {"key": "has_failures", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_failures') == True",
+                "level": "critical",
+                "score": 9,
+                "reasoning": "Cross-cluster replication has failed shards. Replication is not working properly.",
+                "recommendations": [
+                    "Check CCR errors: GET /<follower_index>/_ccr/stats",
+                    "Verify remote cluster connectivity",
+                    "Review follower index mappings match leader",
+                    "Consider pausing and resuming replication"
+                ]
+            }
+        ]
+    },
+    "autofollow_failures": {
+        "metric_keywords": ["ccr_status"],
+        "data_conditions": [
+            {"key": "autofollow_failures", "operator": ">", "value": 0}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('autofollow_failures', 0) > 0",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Auto-follow patterns have recent failures. New indices may not be replicated.",
+                "recommendations": [
+                    "Check auto-follow errors: GET /_ccr/auto_follow/<pattern_name>",
+                    "Verify pattern matches expected indices",
+                    "Review remote cluster availability"
+                ]
+            }
+        ]
+    }
+}

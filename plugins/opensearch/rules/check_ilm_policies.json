@@ -1,0 +1,126 @@
+{
+  "no_ilm_policies_defined": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "has_no_policies", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_no_policies') == True",
+        "level": "high",
+        "score": 8,
+        "reasoning": "No Index Lifecycle Management (ILM) policies are defined. Without lifecycle policies, indices will grow indefinitely consuming storage until manually deleted.",
+        "recommendations": [
+          "Create ILM policies for log, metrics, and time-series data",
+          "Implement rollover policies to manage index size",
+          "Add delete phases to enforce data retention",
+          "Consider hot/warm/cold tiers for cost optimization",
+          "Example: hot (7d) → warm (30d) → cold (60d) → delete (90d)"
+        ]
+      }
+    ]
+  },
+  "no_user_ilm_policies": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "has_no_user_policies", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_no_user_policies') == True and data.get('total_policies', 0) > 0",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Only system ILM policies exist. User data indices are not managed by lifecycle policies and may grow indefinitely.",
+        "recommendations": [
+          "Create custom ILM policies for your application indices",
+          "Apply policies to index templates for automatic management",
+          "Define retention periods based on compliance requirements",
+          "Consider storage tier optimization for large datasets"
+        ]
+      }
+    ]
+  },
+  "ilm_policies_without_delete": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "policies_without_delete_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('policies_without_delete_count', 0) > 0",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Some ILM policies do not have a delete phase. Indices managed by these policies will accumulate indefinitely.",
+        "recommendations": [
+          "Review policies and add delete phases where appropriate",
+          "Define data retention periods based on business requirements",
+          "Consider compliance/regulatory retention requirements",
+          "Monitor storage usage trends for affected indices",
+          "Evaluate cost impact of indefinite retention"
+        ]
+      }
+    ]
+  },
+  "ilm_policies_with_issues": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "policies_with_issues_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('policies_with_issues_count', 0) > 0",
+        "level": "low",
+        "score": 3,
+        "reasoning": "Some ILM policies have configuration concerns that may impact their effectiveness.",
+        "recommendations": [
+          "Review rollover conditions (size, age, document count)",
+          "Ensure rollover triggers before indices become too large",
+          "Validate phase transitions are appropriate for your use case",
+          "Test policy behavior in a non-production environment"
+        ]
+      }
+    ]
+  },
+  "ilm_execution_errors": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "has_ilm_errors", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_ilm_errors') == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Indices have failed ILM transitions and are stuck in error state. These indices will not progress through lifecycle phases until manually resolved.",
+        "recommendations": [
+          "Check ILM error details: GET /_ilm/explain/<index>",
+          "Common causes: disk space, permission issues, missing templates",
+          "Retry failed ILM: POST /<index>/_ilm/retry",
+          "Review ILM policy configuration for incompatible settings",
+          "Monitor for recurring failures after resolution"
+        ]
+      }
+    ]
+  },
+  "ilm_stuck_indices": {
+    "metric_keywords": ["ilm_policies"],
+    "data_conditions": [
+      { "key": "has_stuck_indices", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_stuck_indices') == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Indices have been stuck in ILM phases for extended periods. This may indicate misconfigured rollover conditions or other issues preventing lifecycle progression.",
+        "recommendations": [
+          "Review rollover conditions - may be too aggressive for data volume",
+          "Verify write alias is correctly configured for rollover",
+          "Check if indices have any documents for rollover triggers",
+          "Ensure sufficient disk space for new index creation",
+          "Consider time-based rollover if size-based isn't triggering"
+        ]
+      }
+    ]
+  }
+}

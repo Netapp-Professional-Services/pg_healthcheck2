@@ -17,9 +17,13 @@ def get_weight():
 
 
 def run_check_cluster_performance(connector, settings):
-    """Monitor cluster performance metrics."""
+    """
+    Monitor cluster performance metrics.
+
+    Returns:
+        tuple: (adoc_content, structured_findings)
+    """
     builder = CheckContentBuilder(connector.formatter)
-    structured_data = {}
 
     builder.h3("Cluster Performance Metrics")
     builder.para("Analysis of search/indexing performance, thread pool utilization, and cache hit ratios.")
@@ -31,10 +35,12 @@ def run_check_cluster_performance(connector, settings):
             "metrics": ["indices", "thread_pool", "jvm"]
         })
 
-        if "error" in node_stats:
+        if isinstance(node_stats, dict) and "error" in node_stats:
             builder.error(f"Could not retrieve performance metrics: {node_stats['error']}")
-            structured_data["performance"] = {"status": "error", "details": node_stats['error']}
-            return builder.build(), structured_data
+            return builder.build(), {
+                "status": "error",
+                "error": node_stats['error']
+            }
 
         # Aggregate cluster-wide metrics
         total_search_count = 0
@@ -193,20 +199,29 @@ def run_check_cluster_performance(connector, settings):
         else:
             builder.success("✅ Cluster performance is healthy with no significant issues detected.")
 
-        structured_data["performance"] = {
+        # Return structured data with proper format for rules engine
+        return builder.build(), {
             "status": "success",
-            "search_queries": total_search_count,
-            "avg_search_latency_ms": round(avg_search_latency, 2),
-            "indexing_operations": total_index_count,
-            "avg_indexing_latency_ms": round(avg_index_latency, 2),
-            "query_cache_hit_ratio": round(query_cache_hit_ratio, 1),
-            "request_cache_hit_ratio": round(request_cache_hit_ratio, 1),
-            "thread_pool_issues": len(thread_pool_issues)
+            "data": {
+                "search_queries": total_search_count,
+                "avg_search_latency_ms": round(avg_search_latency, 2),
+                "indexing_operations": total_index_count,
+                "avg_indexing_latency_ms": round(avg_index_latency, 2),
+                "query_cache_hit_ratio": round(query_cache_hit_ratio, 1),
+                "request_cache_hit_ratio": round(request_cache_hit_ratio, 1),
+                "thread_pool_issues": len(thread_pool_issues),
+                "has_thread_pool_issues": len(thread_pool_issues) > 0,
+                "has_critical_thread_pool_issues": any(i['severity'] == 'critical' for i in thread_pool_issues),
+                "high_search_latency": avg_search_latency > 1000,
+                "high_indexing_latency": avg_index_latency > 100,
+                "low_query_cache_hit_ratio": query_cache_hit_ratio < 50 and total_query_cache > 1000,
+            }
         }
 
     except Exception as e:
         logger.error(f"Performance check failed: {e}", exc_info=True)
         builder.error(f"Check failed: {e}")
-        structured_data["performance"] = {"status": "error", "details": str(e)}
-
-    return builder.build(), structured_data
+        return builder.build(), {
+            "status": "error",
+            "error": str(e)
+        }

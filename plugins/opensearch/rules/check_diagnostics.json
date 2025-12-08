@@ -1,0 +1,98 @@
+{
+    "high_pending_tasks": {
+        "metric_keywords": ["diagnostics"],
+        "data_conditions": [
+            {"key": "pending_task_count", "operator": ">", "value": 10}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('pending_task_count', 0) > 10",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "High number of pending cluster tasks. Master node may be overloaded.",
+                "recommendations": [
+                    "Check master node resource usage",
+                    "Review cluster state size",
+                    "Consider dedicated master nodes for large clusters"
+                ]
+            }
+        ]
+    },
+    "high_segment_counts": {
+        "metric_keywords": ["diagnostics"],
+        "data_conditions": [
+            {"key": "has_high_segment_indices", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_high_segment_indices') == True",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Indices with high segment counts detected. This can impact search performance.",
+                "recommendations": [
+                    "Force merge read-only indices to reduce segment count",
+                    "Review max_num_segments setting for force merge",
+                    "Consider implementing index lifecycle policies"
+                ]
+            }
+        ]
+    },
+    "long_running_tasks": {
+        "metric_keywords": ["diagnostics"],
+        "data_conditions": [
+            {"key": "has_long_running_tasks", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_long_running_tasks') == True",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Long-running tasks detected. These may impact cluster performance.",
+                "recommendations": [
+                    "Identify the long-running task using tasks API",
+                    "Cancel if appropriate: POST _tasks/{task_id}/_cancel",
+                    "Review query patterns and optimize if needed"
+                ]
+            }
+        ]
+    },
+    "high_field_data_usage": {
+        "metric_keywords": ["diagnostics"],
+        "data_conditions": [
+            {"key": "high_field_data_usage", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('high_field_data_usage') == True",
+                "level": "high",
+                "score": 6,
+                "reasoning": "High field data memory usage (>5GB). This contributes to heap pressure.",
+                "recommendations": [
+                    "Use doc_values instead of fielddata where possible",
+                    "Review aggregation and sorting patterns",
+                    "Limit the fields loaded into memory",
+                    "Consider increasing heap or adding nodes"
+                ]
+            }
+        ]
+    },
+    "active_recoveries": {
+        "metric_keywords": ["diagnostics"],
+        "data_conditions": [
+            {"key": "has_active_recoveries", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_active_recoveries') == True",
+                "level": "info",
+                "score": 2,
+                "reasoning": "Active shard recovery operations in progress. This is normal during rebalancing.",
+                "recommendations": [
+                    "Monitor recovery progress",
+                    "Consider adjusting recovery settings if too slow",
+                    "Avoid heavy writes during recovery if possible"
+                ]
+            }
+        ]
+    }
+}

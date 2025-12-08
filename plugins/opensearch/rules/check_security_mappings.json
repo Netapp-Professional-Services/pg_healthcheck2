@@ -1,0 +1,102 @@
+{
+    "security_not_enabled": {
+        "metric_keywords": ["security_mappings"],
+        "data_conditions": [
+            {"key": "security_enabled", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('security_enabled') == False",
+                "level": "critical",
+                "score": 10,
+                "reasoning": "Security features are not enabled. Cluster is vulnerable to unauthorized access.",
+                "recommendations": [
+                    "Enable security features immediately",
+                    "Configure authentication and authorization",
+                    "Enable TLS encryption for network traffic",
+                    "Implement audit logging for compliance"
+                ]
+            }
+        ]
+    },
+    "no_external_auth": {
+        "metric_keywords": ["security_mappings"],
+        "data_conditions": [
+            {"key": "external_auth_configured", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('security_enabled') == True and data.get('external_auth_configured') == False",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "No external authentication configured. Enterprise identity integration recommended.",
+                "recommendations": [
+                    "Integrate with enterprise identity provider (LDAP/AD)",
+                    "Implement SSO via SAML or OIDC",
+                    "Configure role mappings for automated access control",
+                    "Consider PKI authentication for service accounts"
+                ]
+            }
+        ]
+    },
+    "sso_not_configured": {
+        "metric_keywords": ["security_mappings"],
+        "data_conditions": [
+            {"key": "sso_configured", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('security_enabled') == True and data.get('sso_configured') == False",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Single Sign-On (SSO) not configured. SSO improves security and user experience.",
+                "recommendations": [
+                    "Configure SAML integration with identity provider (Okta, Azure AD, etc.)",
+                    "Implement OIDC for modern applications",
+                    "Set up role mappings for group-based access",
+                    "Test SSO authentication flow"
+                ]
+            }
+        ]
+    },
+    "compliance_gap": {
+        "metric_keywords": ["security_mappings"],
+        "data_conditions": [
+            {"key": "compliance_gap", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('compliance_gap') == True",
+                "level": "high",
+                "score": 6,
+                "reasoning": "Security configuration gaps may impact compliance requirements (SOC2, HIPAA, PCI-DSS).",
+                "recommendations": [
+                    "Conduct security audit for compliance gaps",
+                    "Implement centralized identity management",
+                    "Enable audit logging for all security events",
+                    "Document security controls for compliance reporting"
+                ]
+            }
+        ]
+    },
+    "no_role_mappings": {
+        "metric_keywords": ["security_mappings"],
+        "data_conditions": [
+            {"key": "has_role_mappings", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('external_auth_configured') == True and data.get('has_role_mappings') == False",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "External authentication configured but no role mappings defined. User access may be inconsistent.",
+                "recommendations": [
+                    "Create role mappings for external user groups",
+                    "Map LDAP/AD groups to Elasticsearch roles",
+                    "Test role assignments for different user types",
+                    "Document role mapping rules"
+                ]
+            }
+        ]
+    }
+}

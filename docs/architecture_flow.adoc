@@ -165,8 +165,7 @@ alt settings.ai_analyze == true
 
     note right of AI
       Sends prompt to:
-      - xAI Grok
-      - OpenAI
+      - OpenAI Compatible
       - Other configured provider
     end note
 
@@ -429,9 +428,7 @@ adoc_content += f"\n\n== AI Analysis\n\n{ai_response}"
 
 *AI Providers Supported:*
 
-- xAI Grok
-- OpenAI (GPT-4, GPT-3.5)
-- Anthropic Claude
+- OpenAI Compatible (GPT, xAI/Grok, Proxied/Private/Corporate Providers)
 - Custom endpoints
 
 === 8. Trend Shipping
@@ -597,12 +594,8 @@ python main.py --config config/postgres.yaml
 db_type: postgres
 ai_analyze: true
 trend_storage_enabled: true
-ai_provider: xai
-ai_model: grok-beta
-trend_database:
-  host: localhost
-  port: 5432
-  database: health_trends
+ai_provider: NetappLLM
+ai_model: gpt-4o
 ----
 
 [source,bash]

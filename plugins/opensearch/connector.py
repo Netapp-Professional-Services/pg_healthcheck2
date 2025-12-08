@@ -9,11 +9,12 @@ from typing import Dict, List, Optional, Any
 from plugins.common.ssh_mixin import SSHSupportMixin
 from plugins.common.aws_handler import AWSSupportMixin, AWSConnectionManager
 from plugins.common.output_formatters import AsciiDocFormatter
+from plugins.common.cve_mixin import CVECheckMixin
 
 logger = logging.getLogger(__name__)
 
 
-class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin):
+class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin, CVECheckMixin):
     """
     Connector for OpenSearch clusters with multi-node SSH support.
 
@@ -71,8 +72,14 @@ class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin):
         self._opensearch_client = None  # AWS OpenSearch Service client
         self._cloudwatch_client = None
 
+        # Technology name for CVE lookups
+        self.technology_name = 'opensearch'
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
+
+        # Initialize CVE support (from mixin)
+        self.initialize_cve_support()
 
         logger.info("OpenSearch connector initialized")
 
@@ -186,7 +193,27 @@ class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin):
 
             # 2. Get cluster info and version
             cluster_info = self.client.info()
-            self._version_info = cluster_info.get('version', {})
+            version_dict = cluster_info.get('version', {})
+            version_number = version_dict.get('number', 'Unknown')
+
+            # Extract major version
+            major_version = 0
+            if version_number and version_number != 'Unknown':
+                try:
+                    import re
+                    match = re.match(r'(\d+)', version_number)
+                    if match:
+                        major_version = int(match.group(1))
+                except (ValueError, AttributeError):
+                    logger.debug(f"Could not extract major version from: {version_number}")
+                    major_version = 0
+
+            # Store version info with major_version added
+            self._version_info = {
+                **version_dict,
+                'version_string': version_number,
+                'major_version': major_version
+            }
             self.cluster_name = cluster_info.get('cluster_name', 'Unknown')
 
             # 3. Discover cluster topology
@@ -506,6 +533,257 @@ class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin):
                 # Execute on all hosts
                 results = self.execute_ssh_on_all_hosts(command, "Shell command")
                 return results
+
+            elif operation == 'cat_thread_pool':
+                # Get thread pool stats
+                return self.client.cat.thread_pool(format='json', h='node_name,name,active,queue,rejected,completed')
+
+            elif operation == 'allocation':
+                # Get shard allocation details
+                try:
+                    return self.client.cat.allocation(format='json', v=True)
+                except Exception as e:
+                    return {"error": f"Allocation data unavailable: {e}"}
+
+            elif operation == 'allocation_explain':
+                # Get allocation explain (why shards are unassigned)
+                try:
+                    return self.client.cluster.allocation_explain()
+                except Exception as e:
+                    # No unassigned shards - this is normal
+                    return {"error": f"No unassigned shards or unavailable: {e}"}
+
+            elif operation == 'cluster_settings':
+                # Get cluster settings
+                return self.client.cluster.get_settings(include_defaults=True)
+
+            elif operation == 'nodes' or operation == 'nodes_info':
+                # Get detailed node information
+                return self.client.nodes.info()
+
+            elif operation == 'mappings':
+                # Get index mappings
+                index = query_dict.get('index', '_all')
+                return self.client.indices.get_mapping(index=index)
+
+            elif operation == 'settings':
+                # Get index settings
+                index = query_dict.get('index', '_all')
+                return self.client.indices.get_settings(index=index)
+
+            elif operation == 'aliases':
+                # Get index aliases
+                return self.client.indices.get_alias()
+
+            elif operation == 'templates':
+                # Get legacy templates
+                return self.client.indices.get_template()
+
+            elif operation == 'index_templates':
+                # Get index templates (v2)
+                try:
+                    return self.client.indices.get_index_template()
+                except Exception as e:
+                    return {"error": f"Index templates unavailable: {e}"}
+
+            elif operation == 'component_templates':
+                # Get component templates
+                try:
+                    return self.client.cluster.get_component_template()
+                except Exception as e:
+                    return {"error": f"Component templates unavailable: {e}"}
+
+            elif operation == 'pipelines':
+                # Get ingest pipelines
+                try:
+                    return self.client.ingest.get_pipeline()
+                except Exception as e:
+                    return {"error": f"Ingest pipelines unavailable: {e}"}
+
+            elif operation == 'repositories':
+                # Get snapshot repositories
+                try:
+                    return self.client.snapshot.get_repository()
+                except Exception as e:
+                    return {"error": f"Repositories unavailable: {e}"}
+
+            elif operation == 'licenses':
+                # Get license information (Elasticsearch)
+                try:
+                    response = self.client.transport.perform_request('GET', '/_license')
+                    return response
+                except Exception as e:
+                    return {"error": f"License info unavailable: {e}"}
+
+            elif operation == 'ssl_certs':
+                # Get SSL certificate information (Elasticsearch/OpenSearch security plugin)
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ssl/certificates')
+                    return response
+                except Exception as e:
+                    return {"error": f"SSL certificates unavailable: {e}"}
+
+            # Commercial/X-Pack features
+            elif operation == 'ilm_policies':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ilm/policy')
+                    return response
+                except Exception as e:
+                    return {"error": f"ILM policies unavailable: {e}"}
+
+            elif operation == 'ilm_status':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ilm/status')
+                    return response
+                except Exception as e:
+                    return {"error": f"ILM status unavailable: {e}"}
+
+            elif operation == 'slm_policies':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_slm/policy')
+                    return response
+                except Exception as e:
+                    return {"error": f"SLM policies unavailable: {e}"}
+
+            elif operation == 'slm_stats':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_slm/stats')
+                    return response
+                except Exception as e:
+                    return {"error": f"SLM stats unavailable: {e}"}
+
+            elif operation == 'watcher_stats':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_watcher/stats')
+                    return response
+                except Exception as e:
+                    return {"error": f"Watcher stats unavailable: {e}"}
+
+            elif operation == 'ccr_stats':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ccr/stats')
+                    return response
+                except Exception as e:
+                    return {"error": f"CCR stats unavailable: {e}"}
+
+            elif operation == 'ccr_autofollow':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ccr/auto_follow')
+                    return response
+                except Exception as e:
+                    return {"error": f"CCR auto-follow unavailable: {e}"}
+
+            elif operation == 'ml_info':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ml/info')
+                    return response
+                except Exception as e:
+                    return {"error": f"ML info unavailable: {e}"}
+
+            elif operation == 'ml_anomaly_detectors':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ml/anomaly_detectors')
+                    return response
+                except Exception as e:
+                    return {"error": f"ML anomaly detectors unavailable: {e}"}
+
+            elif operation == 'ml_datafeeds':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_ml/datafeeds')
+                    return response
+                except Exception as e:
+                    return {"error": f"ML datafeeds unavailable: {e}"}
+
+            elif operation == 'transform':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_transform')
+                    return response
+                except Exception as e:
+                    return {"error": f"Transforms unavailable: {e}"}
+
+            elif operation == 'transform_stats':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_transform/_stats')
+                    return response
+                except Exception as e:
+                    return {"error": f"Transform stats unavailable: {e}"}
+
+            elif operation == 'data_stream':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_data_stream')
+                    return response
+                except Exception as e:
+                    return {"error": f"Data streams unavailable: {e}"}
+
+            elif operation == 'rollup_jobs':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_rollup/job')
+                    return response
+                except Exception as e:
+                    return {"error": f"Rollup jobs unavailable: {e}"}
+
+            elif operation == 'enrich_policies':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_enrich/policy')
+                    return response
+                except Exception as e:
+                    return {"error": f"Enrich policies unavailable: {e}"}
+
+            elif operation == 'enrich_stats':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_enrich/_stats')
+                    return response
+                except Exception as e:
+                    return {"error": f"Enrich stats unavailable: {e}"}
+
+            elif operation == 'security_users':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_security/user')
+                    return response
+                except Exception as e:
+                    return {"error": f"Security users unavailable: {e}"}
+
+            elif operation == 'security_roles':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_security/role')
+                    return response
+                except Exception as e:
+                    return {"error": f"Security roles unavailable: {e}"}
+
+            elif operation == 'security_role_mappings':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_security/role_mapping')
+                    return response
+                except Exception as e:
+                    return {"error": f"Security role mappings unavailable: {e}"}
+
+            elif operation == 'xpack':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_xpack/usage')
+                    return response
+                except Exception as e:
+                    return {"error": f"X-Pack usage unavailable: {e}"}
+
+            elif operation == 'dangling_indices':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_dangling')
+                    return response
+                except Exception as e:
+                    return {"error": f"Dangling indices unavailable: {e}"}
+
+            elif operation == 'remote_info':
+                try:
+                    response = self.client.transport.perform_request('GET', '/_remote/info')
+                    return response
+                except Exception as e:
+                    return {"error": f"Remote cluster info unavailable: {e}"}
+
+            elif operation == 'cat_nodeattrs':
+                try:
+                    response = self.client.cat.nodeattrs(format='json')
+                    return {"nodeattrs": response}
+                except Exception as e:
+                    return {"error": f"Node attributes unavailable: {e}"}
 
             else:
                 return {"error": f"Unsupported operation: {operation}"}
