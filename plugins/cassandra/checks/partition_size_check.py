@@ -1,5 +1,6 @@
 from plugins.cassandra.utils.qrylib.qry_partition_size import get_partition_size_query
-from plugins.common.check_helpers import format_check_header, format_recommendations, safe_execute_query
+from plugins.cassandra.utils.keyspace_filter import filter_tables_by_keyspace
+from plugins.common.check_helpers import format_check_header, format_recommendations, safe_execute_query, format_data_as_table
 
 def get_weight():
     """Returns the importance score for this module (1-10)."""
@@ -33,11 +34,8 @@ def run_partition_size_check(connector, settings):
                 structured_data["partition_sizes"] = {"status": "error", "data": raw}
                 return "\n".join(adoc_content), structured_data
             
-            # Filter out system keyspaces in Python
-            system_keyspaces = {'system', 'system_schema', 'system_traces', 
-                               'system_auth', 'system_distributed', 'system_views'}
-            user_tables = [t for t in raw 
-                           if t.get('keyspace_name') not in system_keyspaces]
+            # Filter out system keyspaces using centralized filter
+            user_tables = filter_tables_by_keyspace(raw, settings)
             
             if not user_tables:
                 adoc_content.append("[NOTE]\n====\nNo user tables found.\n====\n")
@@ -45,9 +43,15 @@ def run_partition_size_check(connector, settings):
                 return "\n".join(adoc_content), structured_data
             
             threshold_bytes = 100 * 1024 * 1024  # 100MB
-            large_partitions = [t for t in user_tables 
+            large_partitions = [t for t in user_tables
                                 if t.get('max_partition_size', 0) > threshold_bytes]
-            
+
+            # Format filtered data for display (only user tables)
+            filtered_table = format_data_as_table(
+                user_tables,
+                columns=['keyspace_name', 'table_name', 'max_partition_size']
+            )
+
             if large_partitions:
                 adoc_content.append(
                     f"[WARNING]\n====\n"
@@ -55,8 +59,8 @@ def run_partition_size_check(connector, settings):
                     "Large partitions can cause performance degradation, increased memory usage, and compaction issues.\n"
                     "====\n"
                 )
-                adoc_content.append(formatted)
-                
+                adoc_content.append(filtered_table)
+
                 recommendations = [
                     "Investigate tables with large partitions: review data model for wide partitions",
                     "Consider denormalizing or refactoring queries to avoid large partitions",
@@ -64,7 +68,7 @@ def run_partition_size_check(connector, settings):
                     "For affected tables, consider using SSTable tools to analyze partition distribution"
                 ]
                 adoc_content.extend(format_recommendations(recommendations))
-                
+
                 status_result = "warning"
             else:
                 adoc_content.append(
@@ -72,7 +76,7 @@ def run_partition_size_check(connector, settings):
                     f"All {len(user_tables)} user table(s) have max_partition_size <= 100MB.\n"
                     "====\n"
                 )
-                adoc_content.append(formatted)
+                adoc_content.append(filtered_table)
                 status_result = "success"
             
             structured_data["partition_sizes"] = {

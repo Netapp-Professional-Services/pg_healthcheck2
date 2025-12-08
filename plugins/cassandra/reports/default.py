@@ -43,6 +43,12 @@ REPORT_SECTIONS = [
 
             {'type': 'module', 'module': 'plugins.cassandra.checks.udf_aggregates_check', 'function': 'run_udf_aggregates_check'},
             {'type': 'module', 'module': 'plugins.cassandra.checks.keyspace_replication_health', 'function': 'run_keyspace_replication_health'},
+        ]
+    },
+    {
+        'title': 'Security',
+        'actions': [
+            {'type': 'module', 'module': 'plugins.cassandra.checks.check_cve_vulnerabilities', 'function': 'run'},
             {'type': 'module', 'module': 'plugins.cassandra.checks.superuser_roles', 'function': 'run_superuser_roles_check'},
         ]
     },

@@ -20,6 +20,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.cassandra.utils.keyspace_filter import KeyspaceFilter
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +57,6 @@ def check_read_repair_settings(connector, settings):
     timestamp = datetime.utcnow().isoformat() + 'Z'
 
     try:
-        # System keyspaces to exclude
-        system_keyspaces = {
-            'system', 'system_schema', 'system_auth',
-            'system_distributed', 'system_traces', 'system_views',
-            'system_virtual_schema'
-        }
-
         # Query all tables (filtering in Python since Cassandra doesn't support WHERE NOT IN)
         query = """
         SELECT
@@ -74,8 +68,10 @@ def check_read_repair_settings(connector, settings):
         """
 
         result = connector.session.execute(query)
-        # Filter out system keyspaces in Python
-        tables = [row for row in result if row['keyspace_name'] not in system_keyspaces]
+
+        # Filter out system keyspaces using centralized filter
+        ks_filter = KeyspaceFilter(settings)
+        tables = [row for row in result if not ks_filter.is_excluded(row['keyspace_name'])]
 
         if not tables:
             builder.warning("⚠️ No user tables found")
@@ -99,29 +95,27 @@ def check_read_repair_settings(connector, settings):
         if non_standard_count == 0:
             builder.success(f"✅ All {total_tables} table(s) have recommended read repair settings")
         else:
-            builder.warning(f"⚠️ {non_standard_count} of {total_tables} table(s) have non-recommended read repair settings")
+            # This is informational, not a warning - read repair settings are deprecated
+            # and Cassandra handles this automatically in 3.0+
+            builder.note(
+                f"ℹ️ {non_standard_count} of {total_tables} table(s) have legacy read repair settings. "
+                "In Cassandra 3.0+, these settings are deprecated - Cassandra handles read repair automatically. "
+                "No action required."
+            )
 
-            # Add explanation
-            builder.blank()
-            builder.text("*Why This Matters:*")
-            builder.text("In Cassandra 3.0+, read repair settings were deprecated in favor of automatic read repair. ")
-            builder.text("The recommended setting is `read_repair = 'NONE'` as Cassandra now handles read repair automatically ")
-            builder.text("during reads when inconsistencies are detected.")
-            builder.blank()
-
-            # Add details
-            builder.text("*Current Configuration:*")
-            for setting_type, data in findings.items():
-                if setting_type.startswith('read_repair_') and data.get('count', 0) > 0:
-                    setting_name = setting_type.replace('read_repair_', '').replace('_', ' ').title()
-                    builder.text(f"- {setting_name}: {data['count']} table(s)")
-            builder.blank()
-
-            # Add recommendations
-            builder.text("*Recommended Actions:*")
-            builder.text("1. No immediate action required - Cassandra handles read repair automatically")
-            builder.text("2. For new tables, use: `WITH read_repair = 'NONE'`")
-            builder.text("3. Existing tables will continue to work, but explicit settings are ignored in modern Cassandra versions")
+        # List tables with their settings
+        builder.blank()
+        builder.h4("Table Settings")
+        builder.text("|===")
+        builder.text("| Keyspace.Table | read_repair | dclocal_read_repair")
+        builder.text("")
+        for table in tables:
+            ks = table.get('keyspace_name')
+            tbl = table.get('table_name')
+            rr = table.get('read_repair_chance', 0.0)
+            dclocal = table.get('dclocal_read_repair_chance', 0.0)
+            builder.text(f"| {ks}.{tbl} | {rr} | {dclocal}")
+        builder.text("|===")
 
         return builder.build(), {'read_repair_settings': findings}
 

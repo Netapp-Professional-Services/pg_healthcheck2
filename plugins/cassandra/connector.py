@@ -14,11 +14,12 @@ from plugins.common import (
     SSHSupportMixin
 )
 from plugins.common.parsers import NodetoolParser
+from plugins.common.cve_mixin import CVECheckMixin
 
 logger = logging.getLogger(__name__)
 
 
-class CassandraConnector(SSHSupportMixin):
+class CassandraConnector(SSHSupportMixin, CVECheckMixin):
     """
     Handles all direct communication with Cassandra, including CQL, nodetool, and shell commands.
     
@@ -77,8 +78,14 @@ class CassandraConnector(SSHSupportMixin):
         self.environment = None
         self.environment_details = {}
 
+        # Technology name for CVE lookups
+        self.technology_name = 'cassandra'
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
+
+        # Initialize CVE support (from mixin)
+        self.initialize_cve_support()
 
         logger.info("Cassandra connector initialized")
 

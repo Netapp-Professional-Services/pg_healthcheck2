@@ -1,4 +1,5 @@
 from plugins.cassandra.utils.qrylib.qry_udf_aggregates import get_functions_query, get_aggregates_query
+from plugins.cassandra.utils.keyspace_filter import KeyspaceFilter
 from plugins.common.check_helpers import format_check_header, safe_execute_query, format_recommendations
 
 def get_weight():
@@ -22,11 +23,8 @@ def run_udf_aggregates_check(connector, settings):
     )
     structured_data = {}
     
-    system_keyspaces = {
-        'system', 'system_schema', 'system_traces',
-        'system_auth', 'system_distributed', 'system_views',
-        'system_virtual_schema'
-    }
+    # Create keyspace filter for filtering UDFs/aggregates
+    ks_filter = KeyspaceFilter(settings)
     
     # Query functions
     query_funcs = get_functions_query(connector)
@@ -42,7 +40,7 @@ def run_udf_aggregates_check(connector, settings):
         user_funcs = [
             {"type": "function", **f}
             for f in raw_funcs
-            if f.get('keyspace_name') not in system_keyspaces
+            if not ks_filter.is_excluded(f.get('keyspace_name'))
         ]
         structured_data["functions"] = {
             "status": "success",
@@ -64,7 +62,7 @@ def run_udf_aggregates_check(connector, settings):
         user_aggs = [
             {"type": "aggregate", **a}
             for a in raw_aggs
-            if a.get('keyspace_name') not in system_keyspaces
+            if not ks_filter.is_excluded(a.get('keyspace_name'))
         ]
         structured_data["aggregates"] = {
             "status": "success",

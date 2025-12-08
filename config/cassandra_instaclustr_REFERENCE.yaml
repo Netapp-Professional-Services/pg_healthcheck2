@@ -265,22 +265,14 @@ ai_analyze: true
 ai_run_integrated: true
 
 # AI Provider Configuration
-# Supported providers: xAI, anthropic, openai
-ai_provider: xAI
-ai_endpoint: https://api.x.ai/
-ai_api_key: your_xai_api_key_here
-ai_model: grok-4
+# Supported providers: OpenAI Compatible (gpt, xai, corporate proxies, etc)
+ai_provider: NetappLLM
+ai_endpoint: https://llm-proxy-api.ai.openeng.netapp.com/
+ai_api_key: sk_07f02c556....  # Get API Key from https://llm-proxy-web.ai.openeng.netapp.com/
+ai_model: gpt-5 # AI Model
+ai_user: clap  # Your netapp username
 
-# Alternative providers:
-# Anthropic Claude:
-#   ai_provider: anthropic
-#   ai_endpoint: https://api.anthropic.com/
-#   ai_model: claude-3-5-sonnet-20241022
-#
-# OpenAI:
-#   ai_provider: openai
-#   ai_endpoint: https://api.openai.com/v1/
-#   ai_model: gpt-4-turbo
+ssl_cert_path: /opt/homebrew/etc/openssl@3/certs/../cert.pem. # On MacOS
 
 # AI request headers (optional)
 ai_user_header: "X-User-ID"
@@ -295,54 +287,6 @@ ai_max_output_tokens: 20000
 
 # Maximum tokens to send in prompt (for cost control)
 ai_max_prompt_tokens: 12000
-
-# ============================================================================
-# TREND ANALYSIS & HISTORICAL TRACKING (OPTIONAL)
-# ============================================================================
-# Ship health check findings to PostgreSQL database for trend analysis
-# and historical tracking. Enables:
-#   - Time-series analysis of metrics
-#   - Trend detection (degradation, improvements)
-#   - Historical comparison
-#   - Predictive insights
-# ============================================================================
-
-# Enable trend shipping (requires PostgreSQL database)
-# trend_shipper_enabled: true
-
-# PostgreSQL connection for trend database
-# trend_db_host: "localhost"
-# trend_db_port: 5432
-# trend_db_name: "health_trends"
-# trend_db_user: "postgres"
-# trend_db_password: "your_postgres_password"
-
-# Trend retention period (days)
-# trend_retention_days: 90
-
-# ============================================================================
-# RULE-BASED ANALYSIS (AUTOMATIC)
-# ============================================================================
-# Health checks automatically evaluate findings against JSON rule files
-# located in plugins/cassandra/rules/
-#
-# Available rule files:
-#   - prometheus_jvm_heap.json
-#   - prometheus_cpu.json
-#   - prometheus_disk_usage.json
-#   - prometheus_compaction.json
-#   - prometheus_latency.json
-#   - table_statistics.json
-#   - secondary_indexes.json
-#   - read_repair_settings.json
-#   - keyspace_replication_health.json
-#
-# Rules define:
-#   - Severity levels (critical, high, medium, low)
-#   - Score impacts (for overall health score)
-#   - Reasoning templates
-#   - Actionable recommendations
-# ============================================================================
 
 # ============================================================================
 # CHECK-SPECIFIC CONFIGURATION (OPTIONAL)
