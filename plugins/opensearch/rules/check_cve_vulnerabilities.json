@@ -1,0 +1,143 @@
+{
+  "critical_cves_detected": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "core", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('core', {}).get('severity_counts', {}).get('critical', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Critical CVEs detected in OpenSearch installation. These vulnerabilities pose severe security risks and should be addressed immediately.",
+        "recommendations": [
+          "Review each critical CVE to determine exploitability in your environment",
+          "Implement temporary mitigations if immediate patching is not possible",
+          "Plan emergency upgrade to latest OpenSearch patch version",
+          "Subscribe to OpenSearch security mailing list for updates"
+        ]
+      }
+    ]
+  },
+  "high_severity_cves_detected": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "core", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('core', {}).get('severity_counts', {}).get('high', 0) > 0 and data.get('core', {}).get('severity_counts', {}).get('critical', 0) == 0",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "High severity CVEs detected in OpenSearch installation. These vulnerabilities require prompt attention to maintain security posture.",
+        "recommendations": [
+          "Review high severity CVEs and assess impact on your environment",
+          "Plan upgrade to latest OpenSearch patch version within 30 days",
+          "Monitor for exploit activity related to identified CVEs",
+          "Review NVD detailed information for each CVE"
+        ]
+      }
+    ]
+  },
+  "medium_severity_cves_detected": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "core", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('core', {}).get('severity_counts', {}).get('medium', 0) > 0 and data.get('core', {}).get('severity_counts', {}).get('high', 0) == 0 and data.get('core', {}).get('severity_counts', {}).get('critical', 0) == 0",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Medium severity CVEs detected in OpenSearch installation. While not immediately critical, these should be addressed in upcoming maintenance windows.",
+        "recommendations": [
+          "Review medium severity CVEs and plan remediation",
+          "Include CVE fixes in next scheduled maintenance window",
+          "Monitor OpenSearch security announcements for updates",
+          "Test upgrade path in non-production environment"
+        ]
+      }
+    ]
+  },
+  "aws_cves_require_vendor_support": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "environment", "value": "AWS"}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('core', {}).get('total_cves', 0) > 0",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "CVEs detected in AWS OpenSearch Service installation. AWS requires vendor-specific patching and support.",
+        "recommendations": [
+          "Contact AWS Support immediately for patching guidance",
+          "Review AWS Security Advisories: https://www.datastax.com/legal/security-advisories",
+          "Do not apply Apache OpenSearch patches directly to AWS",
+          "Plan upgrade with AWS support team"
+        ]
+      }
+    ]
+  },
+  "instaclustr_managed_cves": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "environment", "value": "INSTACLUSTR"}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('core', {}).get('total_cves', 0) > 0",
+        "level": "high",
+        "score": 7,
+        "reasoning": "CVEs detected in Instaclustr managed cluster. Instaclustr typically handles security patches automatically, but verification is recommended.",
+        "recommendations": [
+          "Contact Instaclustr Support to verify patch status",
+          "Review Instaclustr's managed upgrade schedule",
+          "Confirm CVEs are addressed in your current version",
+          "Request upgrade if CVEs are not yet patched"
+        ]
+      }
+    ]
+  },
+  "cve_check_unavailable": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "status", "value": "unavailable"}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('status') == 'unavailable'",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "CVE vulnerability checking is not available. This may indicate network connectivity issues or missing NVD API configuration.",
+        "recommendations": [
+          "Verify internet access to NVD API (https://services.nvd.nist.gov)",
+          "Add nvd_api_key to configuration for higher rate limits",
+          "Check firewall rules allow outbound HTTPS to NVD",
+          "Manually review OpenSearch security announcements"
+        ]
+      }
+    ]
+  },
+  "cve_check_error": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "status", "value": "error"}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('status') == 'error'",
+        "level": "medium",
+        "score": 3,
+        "reasoning": "CVE vulnerability check failed. Unable to retrieve security vulnerability information from NVD.",
+        "recommendations": [
+          "Check error details in structured findings",
+          "Verify NVD API service status",
+          "Check if rate limits are exceeded (add API key if needed)",
+          "Retry health check after resolving connectivity issues",
+          "Manually review security announcements as fallback"
+        ]
+      }
+    ]
+  }
+}

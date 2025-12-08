@@ -1,0 +1,102 @@
+{
+    "single_zone_deployment": {
+        "metric_keywords": ["zone_awareness"],
+        "data_conditions": [
+            {"key": "single_zone_deployment", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('single_zone_deployment') == True",
+                "level": "critical",
+                "score": 9,
+                "reasoning": "All nodes are in a single availability zone. Complete cluster failure if zone becomes unavailable.",
+                "recommendations": [
+                    "Deploy nodes across multiple availability zones",
+                    "Enable zone awareness for shard distribution",
+                    "Implement forced zone awareness for resilience",
+                    "Design for N+1 zone redundancy"
+                ]
+            }
+        ]
+    },
+    "zone_awareness_not_enabled": {
+        "metric_keywords": ["zone_awareness"],
+        "data_conditions": [
+            {"key": "zone_awareness_gap", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('zone_awareness_gap') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Multiple zones available but zone awareness not enabled. Primary and replica shards may be in same zone.",
+                "recommendations": [
+                    "Enable zone awareness: PUT /_cluster/settings {\"persistent\": {\"cluster.routing.allocation.awareness.attributes\": \"zone\"}}",
+                    "Configure node attributes: node.attr.zone=zone_name",
+                    "Enable forced awareness for maximum resilience",
+                    "Verify shard distribution across zones"
+                ]
+            }
+        ]
+    },
+    "insufficient_nodes": {
+        "metric_keywords": ["zone_awareness"],
+        "data_conditions": [
+            {"key": "insufficient_nodes", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('insufficient_nodes') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Fewer than 3 nodes in cluster. Cannot maintain quorum for master election during failures.",
+                "recommendations": [
+                    "Add nodes to reach minimum of 3 for quorum",
+                    "Consider dedicated master nodes for larger clusters",
+                    "Distribute nodes across availability zones",
+                    "Plan capacity for N+1 node failures"
+                ]
+            }
+        ]
+    },
+    "ha_issues_detected": {
+        "metric_keywords": ["zone_awareness"],
+        "data_conditions": [
+            {"key": "ha_consulting_opportunity", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('ha_consulting_opportunity') == True",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "High availability configuration issues detected. Architecture review recommended.",
+                "recommendations": [
+                    "Conduct HA architecture assessment",
+                    "Review disaster recovery procedures",
+                    "Test failover scenarios",
+                    "Document recovery procedures"
+                ]
+            }
+        ]
+    },
+    "low_ha_score": {
+        "metric_keywords": ["zone_awareness"],
+        "data_conditions": [
+            {"key": "ha_score", "operator": "<", "value": 60}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('ha_score', 100) < 60",
+                "level": "high",
+                "score": 6,
+                "reasoning": "HA score below acceptable threshold. Multiple architecture improvements needed.",
+                "recommendations": [
+                    "Address critical HA gaps immediately",
+                    "Engage architecture consulting for comprehensive review",
+                    "Prioritize zone distribution improvements",
+                    "Implement monitoring and alerting for HA metrics"
+                ]
+            }
+        ]
+    }
+}
