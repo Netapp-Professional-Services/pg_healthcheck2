@@ -1,0 +1,81 @@
+{
+    "unassigned_shards": {
+        "metric_keywords": ["shard_allocation"],
+        "data_conditions": [
+            {"key": "has_unassigned_shards", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_unassigned_shards') == True",
+                "level": "critical",
+                "score": 10,
+                "reasoning": "Cluster has unassigned shards. This means data is not fully replicated or some primary shards are missing.",
+                "recommendations": [
+                    "Check allocation explain API for detailed reasons",
+                    "Verify node availability and disk space",
+                    "Review cluster reroute options if manual intervention is needed"
+                ]
+            }
+        ]
+    },
+    "critical_disk_usage": {
+        "metric_keywords": ["shard_allocation"],
+        "data_conditions": [
+            {"key": "has_critical_disk", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_critical_disk') == True",
+                "level": "critical",
+                "score": 9,
+                "reasoning": "One or more nodes have disk usage above 90% (high watermark). Elasticsearch will stop allocating shards to these nodes.",
+                "recommendations": [
+                    "Add more disk capacity immediately",
+                    "Delete old indices or use ILM to manage retention",
+                    "Consider adding more nodes to distribute data"
+                ]
+            }
+        ]
+    },
+    "high_disk_usage": {
+        "metric_keywords": ["shard_allocation"],
+        "data_conditions": [
+            {"key": "has_disk_pressure", "operator": "==", "value": true},
+            {"key": "has_critical_disk", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_disk_pressure') == True and data.get('has_critical_disk') == False",
+                "level": "high",
+                "score": 7,
+                "reasoning": "One or more nodes have disk usage above 80% (low watermark). New shard allocation may be limited.",
+                "recommendations": [
+                    "Plan for additional disk capacity",
+                    "Review index lifecycle policies",
+                    "Monitor disk growth trends"
+                ]
+            }
+        ]
+    },
+    "slow_shard_recovery": {
+        "metric_keywords": ["shard_allocation"],
+        "data_conditions": [
+            {"key": "has_slow_recovery", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_slow_recovery') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Shard recovery operations are taking longer than 30 minutes. This may indicate I/O bottlenecks, network issues, or recovery throttling.",
+                "recommendations": [
+                    "Check node I/O and network throughput",
+                    "Review recovery throttling: indices.recovery.max_bytes_per_sec",
+                    "Ensure source and target nodes are healthy",
+                    "Consider temporarily increasing recovery bandwidth",
+                    "Monitor for disk or network saturation"
+                ]
+            }
+        ]
+    }
+}

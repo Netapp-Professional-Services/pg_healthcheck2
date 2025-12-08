@@ -1,0 +1,2 @@
+shards disk.indices disk.used disk.avail disk.total disk.percent host       ip         node
+     0           0b      65gb     51.9gb      117gb           55 172.19.0.2 172.19.0.2 es01

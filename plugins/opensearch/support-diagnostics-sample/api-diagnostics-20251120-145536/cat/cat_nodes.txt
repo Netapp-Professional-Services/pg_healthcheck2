@@ -1,0 +1,2 @@
+n    nodeId i          v      role       m      d   dup hp cpu load_1m load_5m load_15m iic sfc sqc scc
+es01 n1Do   172.19.0.2 7.10.2 cdhilmrstw * 51.9gb 55.62 22   1    3.45    3.74     3.89   0   0   0   0

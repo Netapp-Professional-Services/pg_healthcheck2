@@ -1,0 +1,81 @@
+{
+    "no_remote_clusters": {
+        "metric_keywords": ["remote_clusters"],
+        "data_conditions": [
+            {"key": "has_remote_clusters", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_remote_clusters') == False",
+                "level": "info",
+                "score": 3,
+                "reasoning": "No remote clusters configured. Multi-cluster architecture provides disaster recovery and geographic distribution benefits.",
+                "recommendations": [
+                    "Evaluate multi-cluster architecture for disaster recovery",
+                    "Consider Cross-Cluster Search (CCS) for federated queries",
+                    "Implement Cross-Cluster Replication (CCR) for critical data"
+                ]
+            }
+        ]
+    },
+    "disconnected_clusters": {
+        "metric_keywords": ["remote_clusters"],
+        "data_conditions": [
+            {"key": "has_disconnected_clusters", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_disconnected_clusters') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Remote cluster connections are down. Cross-cluster features may be unavailable.",
+                "recommendations": [
+                    "Check network connectivity to remote clusters",
+                    "Verify remote cluster credentials and certificates",
+                    "Review remote cluster health and availability",
+                    "Implement monitoring for cross-cluster connectivity"
+                ]
+            }
+        ]
+    },
+    "ccr_not_utilized": {
+        "metric_keywords": ["remote_clusters"],
+        "data_conditions": [
+            {"key": "ccr_upsell_opportunity", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('ccr_upsell_opportunity') == True",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Remote clusters configured but Cross-Cluster Replication (CCR) not active. CCR provides disaster recovery capability.",
+                "recommendations": [
+                    "Configure CCR for critical indices",
+                    "Verify CCR license availability (Platinum/Enterprise required)",
+                    "Design replication topology for DR requirements",
+                    "Test failover procedures"
+                ]
+            }
+        ]
+    },
+    "dr_architecture_gap": {
+        "metric_keywords": ["remote_clusters"],
+        "data_conditions": [
+            {"key": "dr_architecture_gap", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('dr_architecture_gap') == True",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "No disaster recovery architecture detected. Single-cluster deployment is at risk of complete data loss.",
+                "recommendations": [
+                    "Design multi-cluster DR architecture",
+                    "Implement automated snapshot backups",
+                    "Consider geographic distribution for compliance",
+                    "Engage architecture consulting for DR planning"
+                ]
+            }
+        ]
+    }
+}

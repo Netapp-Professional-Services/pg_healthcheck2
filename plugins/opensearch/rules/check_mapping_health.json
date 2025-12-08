@@ -1,0 +1,85 @@
+{
+  "field_explosion_critical": {
+    "metric_keywords": ["mapping_health"],
+    "data_conditions": [
+      { "key": "has_field_explosion", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_field_explosion') == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Indices have field counts at or near the mapping field limit. New documents may fail to index if they contain new fields.",
+        "recommendations": [
+          "Identify source of field growth (dynamic mapping, nested objects)",
+          "Implement strict mapping to prevent automatic field creation",
+          "Consider using flattened field type for key-value data",
+          "Increase field limit only as last resort: index.mapping.total_fields.limit",
+          "Reindex data with optimized mapping structure"
+        ]
+      }
+    ]
+  },
+  "high_field_counts": {
+    "metric_keywords": ["mapping_health"],
+    "data_conditions": [
+      { "key": "has_high_field_counts", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_high_field_counts') == True",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Multiple indices have high field counts (500-1000). This increases memory usage, slows query compilation, and may lead to field explosion.",
+        "recommendations": [
+          "Audit indices with high field counts for optimization opportunities",
+          "Consolidate related fields using object types",
+          "Disable dynamic mapping on production indices",
+          "Consider index templates with explicit mappings",
+          "Monitor field count trends over time"
+        ]
+      }
+    ]
+  },
+  "dynamic_mapping_risk": {
+    "metric_keywords": ["mapping_health"],
+    "data_conditions": [
+      { "key": "has_dynamic_mapping_risk", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_dynamic_mapping_risk') == True",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Many indices have dynamic mapping enabled. This can lead to uncontrolled field growth, type conflicts, and mapping inconsistencies.",
+        "recommendations": [
+          "Create explicit mappings for production indices",
+          "Use dynamic: strict to reject unknown fields",
+          "Use dynamic: false to ignore unknown fields",
+          "Define index templates with proper mappings",
+          "Review dynamic mapping rules if dynamic mapping is required"
+        ]
+      }
+    ]
+  },
+  "mapping_consulting_opportunity": {
+    "metric_keywords": ["mapping_health"],
+    "data_conditions": [
+      { "key": "mapping_consulting_opportunity", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('mapping_consulting_opportunity') == True",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Index mapping issues detected that may benefit from schema design review and optimization consulting.",
+        "recommendations": [
+          "Engage mapping and schema design consulting",
+          "Review data modeling best practices",
+          "Optimize mappings for query patterns",
+          "Implement mapping governance process"
+        ]
+      }
+    ]
+  }
+}

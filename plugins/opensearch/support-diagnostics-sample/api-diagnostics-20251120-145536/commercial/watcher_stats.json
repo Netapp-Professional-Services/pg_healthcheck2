@@ -1,0 +1,1 @@
+{"_nodes":{"total":1,"successful":1,"failed":0},"cluster_name":"docker-cluster","manually_stopped":false,"stats":[{"node_id":"n1DoNVUZR3Wgj8qwCzQ-fQ","watcher_state":"started","watch_count":0,"execution_thread_pool":{"queue_size":0,"max_size":0},"current_watches":[],"queued_watches":[]}]}

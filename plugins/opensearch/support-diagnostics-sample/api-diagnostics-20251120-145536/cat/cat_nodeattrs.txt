@@ -1,0 +1,5 @@
+node id   pid host       ip         port attr              value
+es01 n1Do 7   172.19.0.2 172.19.0.2 9300 ml.machine_memory 18833219584
+es01 n1Do 7   172.19.0.2 172.19.0.2 9300 xpack.installed   true
+es01 n1Do 7   172.19.0.2 172.19.0.2 9300 transform.node    true
+es01 n1Do 7   172.19.0.2 172.19.0.2 9300 ml.max_open_jobs  20

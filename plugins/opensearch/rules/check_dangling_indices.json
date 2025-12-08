@@ -1,0 +1,61 @@
+{
+    "dangling_indices_detected": {
+        "metric_keywords": ["dangling_indices"],
+        "data_conditions": [
+            {"key": "has_dangling_indices", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_dangling_indices') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Dangling indices detected. Data exists on disk but is not part of cluster state. May indicate data loss or recovery opportunity.",
+                "recommendations": [
+                    "Review dangling indices for critical data",
+                    "Import indices using POST /_dangling/<uuid>?accept_data_loss=true",
+                    "Investigate root cause of cluster state inconsistency",
+                    "Implement regular snapshot backups to prevent future data loss"
+                ]
+            }
+        ]
+    },
+    "multiple_dangling_indices": {
+        "metric_keywords": ["dangling_indices"],
+        "data_conditions": [
+            {"key": "dangling_count", "operator": ">", "value": 2}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('dangling_count', 0) > 2",
+                "level": "critical",
+                "score": 9,
+                "reasoning": "Multiple dangling indices indicate significant cluster state issues. Immediate investigation required.",
+                "recommendations": [
+                    "Prioritize recovery of critical data indices",
+                    "Audit cluster for additional inconsistencies",
+                    "Engage data recovery consulting services",
+                    "Review cluster stability and disaster recovery procedures"
+                ]
+            }
+        ]
+    },
+    "data_recovery_opportunity": {
+        "metric_keywords": ["dangling_indices"],
+        "data_conditions": [
+            {"key": "needs_data_recovery", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('needs_data_recovery') == True",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Data recovery opportunity identified. Professional data recovery services may be beneficial.",
+                "recommendations": [
+                    "Assess business value of recoverable data",
+                    "Consider professional data recovery consulting",
+                    "Implement disaster recovery plan to prevent recurrence"
+                ]
+            }
+        ]
+    }
+}

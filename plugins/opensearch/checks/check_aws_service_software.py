@@ -17,9 +17,13 @@ def get_weight():
 
 
 def run_check_aws_service_software(connector, settings):
-    """Check AWS OpenSearch Service configuration and updates."""
+    """
+    Check AWS OpenSearch Service configuration and updates.
+
+    Returns:
+        tuple: (adoc_content, structured_findings)
+    """
     builder = CheckContentBuilder(connector.formatter)
-    structured_data = {}
 
     # Only run for AWS environments
     if connector.environment != 'aws':
@@ -28,8 +32,10 @@ def run_check_aws_service_software(connector, settings):
             "This check is only applicable for AWS OpenSearch Service domains.\n\n"
             "Current environment is self-hosted OpenSearch."
         )
-        structured_data["aws_service"] = {"status": "skipped", "reason": "Not AWS environment"}
-        return builder.build(), structured_data
+        return builder.build(), {
+            "status": "skipped",
+            "data": {"reason": "Not AWS environment"}
+        }
 
     # Check AWS availability
     aws_ok, skip_msg, skip_data = require_aws(connector, "AWS service software check")
@@ -43,15 +49,19 @@ def run_check_aws_service_software(connector, settings):
         domain_name = connector.environment_details.get('domain_name')
         if not domain_name:
             builder.warning("AWS domain name not configured - cannot fetch service details")
-            structured_data["aws_service"] = {"status": "error", "details": "Domain name not configured"}
-            return builder.build(), structured_data
+            return builder.build(), {
+                "status": "error",
+                "error": "Domain name not configured"
+            }
 
         # Get domain configuration from AWS API
         opensearch_client = connector._opensearch_client
         if not opensearch_client:
             builder.warning("AWS OpenSearch client not initialized - some checks unavailable")
-            structured_data["aws_service"] = {"status": "partial", "details": "API client unavailable"}
-            return builder.build(), structured_data
+            return builder.build(), {
+                "status": "partial",
+                "data": {"reason": "API client unavailable"}
+            }
 
         # Describe domain
         try:
@@ -60,8 +70,10 @@ def run_check_aws_service_software(connector, settings):
         except Exception as e:
             logger.error(f"Could not describe domain: {e}")
             builder.error(f"Could not retrieve domain information: {e}")
-            structured_data["aws_service"] = {"status": "error", "details": str(e)}
-            return builder.build(), structured_data
+            return builder.build(), {
+                "status": "error",
+                "error": str(e)
+            }
 
         # Extract key configuration
         opensearch_version = domain_status.get('EngineVersion', 'Unknown')
@@ -213,22 +225,29 @@ def run_check_aws_service_software(connector, settings):
             builder.success("✅ AWS OpenSearch Service is well-configured.")
             builder.recs({"general": recs["general"]})
 
-        structured_data["aws_service"] = {
+        # Return structured data with proper format for rules engine
+        return builder.build(), {
             "status": "success",
-            "opensearch_version": opensearch_version,
-            "service_software_current": current_version,
-            "update_available": update_available,
-            "autotune_enabled": autotune_state == 'ENABLED',
-            "dedicated_masters": dedicated_master_enabled,
-            "multi_az": zone_awareness_enabled,
-            "in_vpc": in_vpc,
-            "https_enforced": enforce_https,
-            "recommendations": len(recs["high"])
+            "data": {
+                "opensearch_version": opensearch_version,
+                "service_software_current": current_version,
+                "update_available": update_available,
+                "autotune_enabled": autotune_state == 'ENABLED',
+                "dedicated_masters": dedicated_master_enabled,
+                "multi_az": zone_awareness_enabled,
+                "in_vpc": in_vpc,
+                "https_enforced": enforce_https,
+                "recommendations_count": len(recs["high"]),
+                "has_required_update": update_available and not optional_deployment,
+                "has_security_issues": not enforce_https or not in_vpc,
+                "has_ha_issues": not dedicated_master_enabled or not zone_awareness_enabled,
+            }
         }
 
     except Exception as e:
         logger.error(f"AWS service check failed: {e}", exc_info=True)
         builder.error(f"Check failed: {e}")
-        structured_data["aws_service"] = {"status": "error", "details": str(e)}
-
-    return builder.build(), structured_data
+        return builder.build(), {
+            "status": "error",
+            "error": str(e)
+        }

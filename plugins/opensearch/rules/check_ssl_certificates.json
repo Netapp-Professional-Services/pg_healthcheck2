@@ -1,0 +1,85 @@
+{
+  "ssl_certificate_expired": {
+    "metric_keywords": ["ssl_certificates"],
+    "data_conditions": [
+      { "key": "has_expired", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_expired') == True",
+        "level": "critical",
+        "score": 15,
+        "reasoning": "One or more SSL certificates have expired. This may cause TLS connection failures and service outages.",
+        "recommendations": [
+          "URGENT: Replace expired certificates immediately",
+          "Check cluster logs for TLS handshake failures",
+          "Generate new certificates with appropriate validity period",
+          "Perform rolling restart after certificate replacement",
+          "Consider implementing automated certificate rotation"
+        ]
+      }
+    ]
+  },
+  "ssl_certificate_expiring_critical": {
+    "metric_keywords": ["ssl_certificates"],
+    "data_conditions": [
+      { "key": "earliest_expiry_days", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('earliest_expiry_days') is not None and 0 <= data.get('earliest_expiry_days') < 7",
+        "level": "critical",
+        "score": 12,
+        "reasoning": "SSL certificate(s) will expire within 7 days. Immediate action required to prevent service disruption.",
+        "recommendations": [
+          "Generate new SSL certificates immediately",
+          "Schedule emergency maintenance window for certificate rotation",
+          "Prepare new elasticsearch.yml/opensearch.yml with updated cert paths",
+          "Plan rolling restart of all cluster nodes",
+          "Verify TLS connectivity after rotation"
+        ]
+      }
+    ]
+  },
+  "ssl_certificate_expiring_warning": {
+    "metric_keywords": ["ssl_certificates"],
+    "data_conditions": [
+      { "key": "earliest_expiry_days", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('earliest_expiry_days') is not None and 7 <= data.get('earliest_expiry_days') < 30",
+        "level": "high",
+        "score": 8,
+        "reasoning": "SSL certificate(s) will expire within 30 days. Plan renewal to avoid service disruption.",
+        "recommendations": [
+          "Schedule certificate renewal within the next 2 weeks",
+          "Generate new certificates with extended validity (1-2 years recommended)",
+          "Document certificate rotation procedure",
+          "Plan maintenance window for certificate deployment",
+          "Consider implementing certificate monitoring/alerting"
+        ]
+      }
+    ]
+  },
+  "ssl_certificate_expiring_soon": {
+    "metric_keywords": ["ssl_certificates"],
+    "data_conditions": [
+      { "key": "earliest_expiry_days", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('earliest_expiry_days') is not None and 30 <= data.get('earliest_expiry_days') < 90",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "SSL certificate(s) will expire within 90 days. Add certificate renewal to your maintenance schedule.",
+        "recommendations": [
+          "Add certificate renewal to upcoming maintenance schedule",
+          "Review certificate validity periods and consider longer durations",
+          "Document certificate locations and renewal procedures",
+          "Consider automating certificate management with tools like cert-manager or Let's Encrypt"
+        ]
+      }
+    ]
+  }
+}

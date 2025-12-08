@@ -28,17 +28,11 @@ def run_check_node_metrics(connector, settings):
     """
     Monitor node-level health metrics including JVM, heap, GC, and system resources.
 
-    Args:
-        connector: OpenSearch connector instance
-        settings: Configuration settings
-
     Returns:
-        tuple: (adoc_content, structured_data)
+        tuple: (adoc_content, structured_findings)
     """
     builder = CheckContentBuilder(connector.formatter)
-    structured_data = {}
 
-    # Add check header
     builder.h3("Node Health Metrics")
     builder.para(
         "Comprehensive health monitoring of all OpenSearch nodes including JVM performance, "
@@ -52,10 +46,12 @@ def run_check_node_metrics(connector, settings):
             "metrics": ["jvm", "process", "os", "fs", "thread_pool", "breaker"]
         })
 
-        if "error" in node_stats:
+        if isinstance(node_stats, dict) and "error" in node_stats:
             builder.error(f"Could not retrieve node statistics: {node_stats['error']}")
-            structured_data["node_metrics"] = {"status": "error", "details": node_stats['error']}
-            return builder.build(), structured_data
+            return builder.build(), {
+                "status": "error",
+                "error": node_stats['error']
+            }
 
         # 2. Detect mode and get additional metrics if available
         mode = _detect_monitoring_mode(connector)
@@ -123,20 +119,33 @@ def run_check_node_metrics(connector, settings):
         else:
             builder.success("✅ All nodes are healthy. No issues detected.")
 
-        structured_data["node_metrics"] = {
+        # Calculate aggregate metrics for rules engine
+        max_heap_percent = max((n['heap_percent'] for n in all_nodes_data), default=0)
+        avg_heap_percent = sum(n['heap_percent'] for n in all_nodes_data) / len(all_nodes_data) if all_nodes_data else 0
+
+        return builder.build(), {
             "status": "success",
-            "mode": mode,
-            "nodes": all_nodes_data,
-            "critical_issues": len(critical_issues),
-            "warnings": len(warnings)
+            "data": {
+                "mode": mode,
+                "node_count": len(all_nodes_data),
+                "critical_issues": len(critical_issues),
+                "warnings": len(warnings),
+                "max_heap_percent": round(max_heap_percent, 1),
+                "avg_heap_percent": round(avg_heap_percent, 1),
+                "has_critical_issues": len(critical_issues) > 0,
+                "has_warnings": len(warnings) > 0,
+                "has_heap_pressure": max_heap_percent >= 75,
+                "has_critical_heap": max_heap_percent >= 85,
+            }
         }
 
     except Exception as e:
         logger.error(f"Node metrics check failed: {e}", exc_info=True)
         builder.error(f"Check failed: {e}")
-        structured_data["node_metrics"] = {"status": "error", "details": str(e)}
-
-    return builder.build(), structured_data
+        return builder.build(), {
+            "status": "error",
+            "error": str(e)
+        }
 
 
 def _detect_monitoring_mode(connector):

@@ -1,0 +1,39 @@
+{
+    "many_enrich_policies": {
+        "metric_keywords": ["enrich_policies"],
+        "data_conditions": [
+            {"key": "policy_count", "operator": ">", "value": 10}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('policy_count', 0) > 10",
+                "level": "low",
+                "score": 2,
+                "reasoning": "Many enrich policies configured. This may impact indexing performance.",
+                "recommendations": [
+                    "Review if all policies are actively used",
+                    "Monitor enrich coordinator queue for bottlenecks",
+                    "Consider consolidating similar policies"
+                ]
+            }
+        ]
+    },
+    "policies_executing": {
+        "metric_keywords": ["enrich_policies"],
+        "data_conditions": [
+            {"key": "has_executing", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_executing') == True",
+                "level": "info",
+                "score": 0,
+                "reasoning": "Enrich policies are currently executing. This is normal during policy updates.",
+                "recommendations": [
+                    "Monitor execution time for long-running policies",
+                    "Keep enrich source indices small for faster execution"
+                ]
+            }
+        ]
+    }
+}

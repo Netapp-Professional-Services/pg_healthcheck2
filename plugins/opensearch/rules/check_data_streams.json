@@ -1,0 +1,40 @@
+{
+    "unhealthy_data_streams": {
+        "metric_keywords": ["data_streams"],
+        "data_conditions": [
+            {"key": "has_issues", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_issues') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "One or more data streams are in YELLOW or RED status. Data may not be fully replicated.",
+                "recommendations": [
+                    "Check backing index health: GET /_cluster/health?level=indices",
+                    "Review shard allocation for data stream indices",
+                    "Verify node availability and disk space"
+                ]
+            }
+        ]
+    },
+    "many_backing_indices": {
+        "metric_keywords": ["data_streams"],
+        "data_conditions": [
+            {"key": "streams_with_many_indices", "operator": ">", "value": 0}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('streams_with_many_indices', 0) > 0",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Data streams have many backing indices. This may impact performance and resource usage.",
+                "recommendations": [
+                    "Review ILM rollover policies",
+                    "Consider merging old backing indices",
+                    "Evaluate retention and delete policies"
+                ]
+            }
+        ]
+    }
+}

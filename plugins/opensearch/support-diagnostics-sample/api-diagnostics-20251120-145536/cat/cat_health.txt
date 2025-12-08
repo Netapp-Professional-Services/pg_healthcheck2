@@ -1,0 +1,2 @@
+epoch      timestamp cluster        status node.total node.data shards pri relo init unassign pending_tasks max_task_wait_time active_shards_percent
+1763650535 14:55:35  docker-cluster green           1         1      0   0    0    0        0             0                  -                100.0%
