@@ -190,56 +190,56 @@ def check_prometheus_gc_health(connector, settings):
         builder.text("*⚠️  IMPORTANT: GC Time Interpretation*")
         builder.text("These are cumulative values since broker start, not rates.")
         builder.text("To assess GC health properly:")
-        builder.text("  • Monitor trends - rapid increases indicate memory pressure")
-        builder.text("  • Calculate rate by comparing values over time")
-        builder.text("  • Compare with heap usage metrics")
-        builder.text("  • Look for correlation with latency spikes")
+        builder.text("   Monitor trends - rapid increases indicate memory pressure")
+        builder.text("   Calculate rate by comparing values over time")
+        builder.text("   Compare with heap usage metrics")
+        builder.text("   Look for correlation with latency spikes")
         builder.blank()
 
         # Always show recommendations for GC monitoring
         recommendations = {
             "general": [
-                "GC Health Monitoring Best Practices:",
-                "  • Monitor GC time rate (delta over time), not absolute values",
-                "  • Typical healthy: < 5% time in Young GC, < 2% in Old GC",
-                "  • Old (Full) GC is more concerning than Young GC",
-                "  • Calculate rate: (current_value - previous_value) / time_elapsed",
+                " *GC Health Monitoring Best Practices:*",
+                "** Monitor GC time rate (delta over time), not absolute values",
+                "** Typical healthy: < 5% time in Young GC, < 2% in Old GC",
+                "** Old (Full) GC is more concerning than Young GC",
+                "** Calculate rate: (current_value - previous_value) / time_elapsed",
                 "",
-                "Warning Signs:",
-                "  • Rapidly increasing old GC time",
-                "  • Frequent Full GC events (> 1 per minute)",
-                "  • Long GC pause times (> 100ms for Young, > 1s for Old)",
-                "  • Heap usage consistently > 80%",
-                "  • Latency spikes correlating with GC events",
+                " *Warning Signs:*",
+                "** Rapidly increasing old GC time",
+                "** Frequent Full GC events (> 1 per minute)",
+                "** Long GC pause times (> 100ms for Young, > 1s for Old)",
+                "** Heap usage consistently > 80%",
+                "** Latency spikes correlating with GC events",
                 "",
-                "GC Tuning Recommendations:",
-                "  • Use G1GC for heaps > 4GB (default in Kafka 2.0+)",
-                "    JVM flag: -XX:+UseG1GC",
-                "  • Set Xms = Xmx to avoid heap resizing overhead",
-                "  • Keep heap < 32GB for compressed oops benefit",
-                "  • Typical Kafka heap: 6-8 GB for production brokers",
-                "  • For very large heaps, consider ZGC or Shenandoah (ultra-low pause)",
+                " *GC Tuning Recommendations:*",
+                "** Use G1GC for heaps > 4GB (default in Kafka 2.0+)",
+                "**  JVM flag: -XX:+UseG1GC",
+                "** Set Xms = Xmx to avoid heap resizing overhead",
+                "** Keep heap < 32GB for compressed oops benefit",
+                "** Typical Kafka heap: 6-8 GB for production brokers",
+                "** For very large heaps, consider ZGC or Shenandoah (ultra-low pause)",
                 "",
-                "Root Cause Analysis:",
-                "  • Check heap usage trends (use prometheus_jvm_heap check)",
-                "  • Review partition count (more partitions = more memory)",
-                "  • Analyze message sizes (large messages increase heap pressure)",
-                "  • Check for memory leaks (heap grows but never shrinks)",
-                "  • Review consumer fetch sizes (large fetches = heap spikes)",
+                " *Root Cause Analysis:*",
+                "** Check heap usage trends (use prometheus_jvm_heap check)",
+                "** Review partition count (more partitions = more memory)",
+                "** Analyze message sizes (large messages increase heap pressure)",
+                "** Check for memory leaks (heap grows but never shrinks)",
+                "** Review consumer fetch sizes (large fetches = heap spikes)",
                 "",
-                "Quick Fixes:",
-                "  • Increase heap size if frequently hitting limits",
-                "  • Reduce partition count per broker",
-                "  • Enable compression to reduce memory usage",
-                "  • Tune log.segment.bytes to reduce open file handles",
-                "  • Review and optimize broker configuration",
+                " *Quick Fixes:*",
+                "** Increase heap size if frequently hitting limits",
+                "** Reduce partition count per broker",
+                "** Enable compression to reduce memory usage",
+                "** Tune log.segment.bytes to reduce open file handles",
+                "** Review and optimize broker configuration",
                 "",
-                "Advanced Monitoring:",
-                "  • Enable GC logging: -Xlog:gc*:file=gc.log",
-                "  • Use JVM monitoring tools: JConsole, VisualVM, JMC",
-                "  • Set up alerts on GC time rate (percentage)",
-                "  • Monitor GC pause time distributions (P50, P99)",
-                "  • Track GC event frequency (collections per second)"
+                " *Advanced Monitoring:*",
+                "** Enable GC logging: -Xlog:gc*:file=gc.log",
+                "** Use JVM monitoring tools: JConsole, VisualVM, JMC",
+                "** Set up alerts on GC time rate (percentage)",
+                "** Monitor GC pause time distributions (P50, P99)",
+                "** Track GC event frequency (collections per second)"
             ]
         }
 
