@@ -3,7 +3,7 @@
 import logging
 import json
 import socket
-from kafka import KafkaAdminClient, KafkaConsumer
+from kafka import KafkaAdminClient, KafkaConsumer, TopicPartition
 from kafka.admin import NewTopic, ConfigResource, ConfigResourceType
 from plugins.common.ssh_mixin import SSHSupportMixin
 from plugins.common.output_formatters import AsciiDocFormatter
@@ -854,7 +854,7 @@ class KafkaConnector(SSHSupportMixin):
             elif operation == 'list_topics':
                 return self._list_topics(return_raw)
             elif operation == 'describe_topics':
-                return self._describe_topics(query_obj.get('topics', []), return_raw)
+                return self._describe_topics_from_admin_client(query_obj.get('topics', []), return_raw)
             elif operation == 'list_consumer_groups':
                 return self._list_consumer_groups(return_raw)
             elif operation == 'describe_consumer_groups':
@@ -1043,6 +1043,32 @@ class KafkaConnector(SSHSupportMixin):
         except Exception as e:
             logger.warning(f"SSH topic listing failed: {e}")
             return None
+
+    def _describe_topics_from_admin_client(self, topics, return_raw=False):
+        """Gets detailed information about topics."""
+        topic_metadata = self.admin_client.describe_topics(topics)
+        raw_results = []
+
+        for topic_info in topic_metadata:
+            topic_name = topic_info['topic']
+            partitions = topic_info['partitions']
+            replication_factor = len(partitions[0]['replicas'])
+
+            raw_results.append({
+                'topic': topic_name,
+                'partitions': len(partitions),
+                'replication_factor': replication_factor
+            })
+
+        if not raw_results:
+            formatted = self.formatter.format_note("No topics found.")
+        else:
+            formatted = "|===\n|Topic|Partitions|Replication Factor\n"
+            for t in raw_results:
+                formatted += f"|{t['topic']}|{t['partitions']}|{t['replication_factor']}\n"
+            formatted += "|===\n"
+
+        return (formatted, raw_results) if return_raw else formatted
 
     def _describe_topics(self, topics, return_raw=False):
         """Gets detailed information about topics."""
@@ -1356,10 +1382,15 @@ class KafkaConnector(SSHSupportMixin):
             configs = self.admin_client.describe_configs([config_resource])
             
             config_dict = {}
-            for resource, future in configs.items():
-                config = future.result()
-                for key, value in config.resources[0][4].items():
-                    config_dict[key] = value.value
+            if type(configs) is dict:
+                for resource, future in configs.items():
+                    config = future.result()
+                    for key, value in config.resources[0][4].items():
+                        config_dict[key] = value.value
+            elif type(configs) is list:
+                for config in configs:
+                    for item in config.resources[0][4]:
+                        config_dict[item[0]] = item[1]
             
             raw = {'name': topic, 'configs': config_dict}
             
