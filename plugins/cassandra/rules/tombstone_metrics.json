@@ -1,6 +1,6 @@
 {
   "high_tombstone_metrics": {
-    "metric_keywords": ["cassandra", "tombstones", "performance", "nodetool", "cfstats", "tablehistograms"],
+    "metric_keywords": ["cassandra", "tombstones", "performance", "nodetool", "cfstats", "tablestats"],
     "rules": [
       {
         "expression": "data.get('mean_tombstones', 0) > 1000 or data.get('max_tombstones_per_slice', 0) > 100000",

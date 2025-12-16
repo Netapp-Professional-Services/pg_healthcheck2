@@ -20,7 +20,7 @@ def run_tombstone_metrics(connector, settings):
     """
     adoc_content = format_check_header(
         "Tombstone Metrics Analysis (Nodetool)",
-        "Checking for high tombstone counts across tables using nodetool cfstats or tablehistograms.",
+        "Checking for high tombstone counts across tables using nodetool cfstats or tablestats.",
         requires_ssh=True
     )
     structured_data = {}
@@ -34,7 +34,7 @@ def run_tombstone_metrics(connector, settings):
     
     # Determine version for parsing context
     major_version = getattr(connector, 'version_info', {}).get('major_version', 3) if hasattr(connector, 'version_info') else 3
-    use_tablehistograms = major_version >= 4
+    use_tablestats = major_version >= 3
     
     # Get appropriate query
     query = get_tombstone_metrics_query(connector)
@@ -86,7 +86,7 @@ def run_tombstone_metrics(connector, settings):
             "Consider enabling tombstone_compaction_interval for affected tables",
             "Review application delete patterns to reduce unnecessary tombstones",
             "Run targeted compaction: 'nodetool compact keyspace table'",
-            "Monitor regularly with 'nodetool tablehistograms' or 'cfstats'",
+            "Monitor regularly with 'nodetool tablestats' or, if your version is older than 3, 'cfstats'",
             "For time-series data, evaluate TimeWindowCompactionStrategy (TWCS)"
         ]
         adoc_content.extend(format_recommendations(recommendations))
@@ -103,7 +103,7 @@ def run_tombstone_metrics(connector, settings):
         "status": status_result,
         "data": tables,
         "problematic_count": len(problematic_tables),
-        "use_tablehistograms": use_tablehistograms
+        "use_tablestats": use_tablestats
     }
     
     return "\n".join(adoc_content), structured_data
