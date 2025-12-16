@@ -321,20 +321,32 @@ def run_gc_pauses_check(connector, settings):
             )
 
         # === STRUCTURED DATA ===
+        # Structure with cluster summary as main data (for cluster-wide rules)
+        # and broker details in metadata (per-broker rules access via recursion)
         structured_data["gc_pauses"] = {
             "status": "success",
-            "brokers_checked": len(connector.get_ssh_hosts()),
-            "brokers_with_errors": len(set(e['broker_id'] for e in errors)),
-            "critical_brokers": critical_brokers,
-            "warning_brokers": warning_brokers,
-            "thresholds": {
+            "data": {
+                # Cluster-wide aggregates (for cluster-wide rules - NO LISTS here!)
+                "brokers_checked": len(connector.get_ssh_hosts()),
+                "brokers_with_errors": len(set(e['broker_id'] for e in errors)),
+                "critical_broker_count": len(critical_brokers),
+                "warning_broker_count": len(warning_brokers),
+                "total_brokers_with_issues": len(set(critical_brokers + warning_brokers)),
+                "has_cluster_wide_gc_crisis": len(critical_brokers) >= 2,
+                "has_cluster_wide_gc_pressure": len(warning_brokers) >= 3,
+                # Thresholds
                 "warning_pause_ms": warning_pause_ms,
                 "critical_pause_ms": critical_pause_ms,
                 "high_frequency": high_frequency_threshold
-            },
-            "errors": errors,
-            "data": all_gc_data
+            }
         }
+
+        # Add per-broker data as separate key (will be processed recursively)
+        if all_gc_data:
+            structured_data["gc_pauses_per_broker"] = {
+                "status": "success",
+                "data": all_gc_data
+            }
 
     except Exception as e:
         import traceback

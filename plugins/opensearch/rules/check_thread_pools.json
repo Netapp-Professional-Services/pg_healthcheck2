@@ -1,0 +1,59 @@
+{
+    "critical_thread_pool_rejections": {
+        "metric_keywords": ["thread_pools"],
+        "data_conditions": [
+            {"key": "has_critical_rejections", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_critical_rejections') == True",
+                "level": "critical",
+                "score": 9,
+                "reasoning": "Critical thread pools (search, write, get) have rejected requests. This indicates the cluster cannot keep up with request volume.",
+                "recommendations": [
+                    "Add more nodes to increase capacity",
+                    "Reduce request rate or batch size",
+                    "Optimize queries to reduce resource usage",
+                    "Check for slow queries causing thread pool exhaustion"
+                ]
+            }
+        ]
+    },
+    "thread_pool_rejections": {
+        "metric_keywords": ["thread_pools"],
+        "data_conditions": [
+            {"key": "has_rejections", "operator": "==", "value": true},
+            {"key": "has_critical_rejections", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_rejections') == True and data.get('has_critical_rejections') == False",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Some thread pools have rejected requests. While not critical pools, this may indicate capacity constraints.",
+                "recommendations": [
+                    "Monitor thread pool trends during peak hours",
+                    "Consider scaling if rejections increase"
+                ]
+            }
+        ]
+    },
+    "queue_buildup": {
+        "metric_keywords": ["thread_pools"],
+        "data_conditions": [
+            {"key": "has_queue_buildup", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_queue_buildup') == True",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Thread pool queues are building up. Requests are waiting to be processed.",
+                "recommendations": [
+                    "Monitor queue trends - sustained buildup indicates capacity issues",
+                    "Check for slow operations blocking threads"
+                ]
+            }
+        ]
+    }
+}

@@ -1,6 +1,9 @@
 {
   "broker_unavailable": {
-    "metric_keywords": ["broker_availability", "data"],
+    "metric_keywords": [
+      "broker_availability",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('status') == 'unavailable'",
@@ -18,12 +21,39 @@
           "Common causes: OOM killer, disk full, network failure, configuration errors"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "port",
+        "exists": true
+      },
+      {
+        "key": "status",
+        "exists": true
+      }
     ]
   },
   "controller_unavailable": {
-    "metric_keywords": ["broker_availability"],
+    "metric_keywords": [
+      "broker_availability"
+    ],
     "data_conditions": [
-      {"key": "controller_available", "exists": true}
+      {
+        "key": "controller_available",
+        "exists": true
+      },
+      {
+        "key": "controller_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -43,9 +73,18 @@
     ]
   },
   "multiple_brokers_unavailable": {
-    "metric_keywords": ["broker_availability"],
+    "metric_keywords": [
+      "broker_availability"
+    ],
     "data_conditions": [
-      {"key": "unavailable_count", "exists": true}
+      {
+        "key": "unavailable_count",
+        "exists": true
+      },
+      {
+        "key": "count",
+        "exists": true
+      }
     ],
     "rules": [
       {

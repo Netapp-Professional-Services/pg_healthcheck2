@@ -1,0 +1,42 @@
+{
+    "failed_transforms": {
+        "metric_keywords": ["transforms"],
+        "data_conditions": [
+            {"key": "has_failed", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_failed') == True",
+                "level": "critical",
+                "score": 8,
+                "reasoning": "One or more transform jobs have failed. Data aggregation is not completing.",
+                "recommendations": [
+                    "Check transform job errors: GET /_transform/<transform_id>/_stats",
+                    "Review source index availability and mappings",
+                    "Check for field type conflicts in aggregations",
+                    "Reset and restart failed transforms after fixing issues"
+                ]
+            }
+        ]
+    },
+    "stopped_transforms": {
+        "metric_keywords": ["transforms"],
+        "data_conditions": [
+            {"key": "has_stopped", "operator": "==", "value": true},
+            {"key": "has_failed", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_stopped') == True and data.get('has_failed') == False",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Transform jobs are stopped. Destination indices are not being updated.",
+                "recommendations": [
+                    "Start stopped transforms: POST /_transform/<transform_id>/_start",
+                    "Review if continuous transforms are needed",
+                    "Check if transforms completed successfully and were intentionally stopped"
+                ]
+            }
+        ]
+    }
+}

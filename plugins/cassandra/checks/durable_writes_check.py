@@ -1,5 +1,6 @@
 from plugins.cassandra.utils.qrylib.qry_durable_writes import get_durable_writes_query
-from plugins.common.check_helpers import format_check_header, safe_execute_query, format_recommendations
+from plugins.cassandra.utils.keyspace_filter import filter_user_keyspaces
+from plugins.common.check_helpers import format_check_header, safe_execute_query, format_recommendations, format_data_as_table
 
 def get_weight():
     """Returns the importance score for this module (1-10)."""
@@ -30,11 +31,8 @@ def run_durable_writes_check(connector, settings):
         structured_data["durable_writes"] = {"status": "error", "data": raw}
         return "\n".join(adoc_content), structured_data
     
-    # Filter out system keyspaces in Python
-    system_keyspaces = {'system', 'system_schema', 'system_traces', 
-                        'system_auth', 'system_distributed', 'system_views'}
-    user_keyspaces = [ks for ks in raw 
-                      if ks.get('keyspace_name') not in system_keyspaces]
+    # Filter out system keyspaces using centralized filter
+    user_keyspaces = filter_user_keyspaces(raw, settings)
     
     if not user_keyspaces:
         adoc_content.append("[NOTE]\n====\nNo user keyspaces found.\n====\n")
@@ -44,6 +42,12 @@ def run_durable_writes_check(connector, settings):
     # Find keyspaces with durable_writes false
     false_durable = [ks for ks in user_keyspaces if not ks.get('durable_writes', True)]
     
+    # Format filtered data for display (only user keyspaces)
+    filtered_table = format_data_as_table(
+        user_keyspaces,
+        columns=['keyspace_name', 'durable_writes', 'replication']
+    )
+
     if false_durable:
         adoc_content.append(
             f"[CRITICAL]\n====\n"
@@ -51,15 +55,15 @@ def run_durable_writes_check(connector, settings):
             "This increases risk of data loss on commitlog failure.\n"
             "====\n"
         )
-        adoc_content.append(formatted)
-        
+        adoc_content.append(filtered_table)
+
         recommendations = [
             "For each affected keyspace, execute: ALTER KEYSPACE keyspace_name WITH durable_writes = true",
             "Verify commitlog disk space and configuration in cassandra.yaml",
             "Consider using SSD for commitlog to improve write durability"
         ]
         adoc_content.extend(format_recommendations(recommendations))
-        
+
         status_result = "critical"
     else:
         adoc_content.append(
@@ -67,7 +71,7 @@ def run_durable_writes_check(connector, settings):
             "All user keyspaces have durable_writes enabled.\n"
             "====\n"
         )
-        adoc_content.append(formatted)
+        adoc_content.append(filtered_table)
         status_result = "success"
     
     structured_data["durable_writes"] = {

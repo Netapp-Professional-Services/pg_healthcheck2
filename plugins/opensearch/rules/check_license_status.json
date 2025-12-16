@@ -1,0 +1,106 @@
+{
+  "license_expired": {
+    "metric_keywords": ["license_status"],
+    "data_conditions": [
+      { "key": "is_expired", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('is_expired') == True",
+        "level": "critical",
+        "score": 12,
+        "reasoning": "The Elasticsearch license has expired. Some commercial features may be disabled or degraded.",
+        "recommendations": [
+          "URGENT: Contact Elastic to renew license immediately",
+          "Review which features are impacted by license expiration",
+          "Consider downgrading to basic license if renewal is delayed",
+          "Check cluster logs for license-related warnings",
+          "Verify critical features (security, monitoring) are still operational"
+        ]
+      }
+    ]
+  },
+  "license_expiring_critical": {
+    "metric_keywords": ["license_status"],
+    "data_conditions": [
+      { "key": "days_until_expiry", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('days_until_expiry') is not None and 0 <= data.get('days_until_expiry') < 7",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "License will expire within 7 days. Immediate action required to prevent feature degradation.",
+        "recommendations": [
+          "Contact Elastic immediately to expedite license renewal",
+          "Prepare license key for deployment",
+          "Schedule maintenance window for license update if needed",
+          "Document current feature usage to assess renewal requirements",
+          "Consider temporary basic license as fallback"
+        ]
+      }
+    ]
+  },
+  "license_expiring_warning": {
+    "metric_keywords": ["license_status"],
+    "data_conditions": [
+      { "key": "days_until_expiry", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('days_until_expiry') is not None and 7 <= data.get('days_until_expiry') < 30",
+        "level": "high",
+        "score": 7,
+        "reasoning": "License will expire within 30 days. Plan renewal to maintain commercial feature access.",
+        "recommendations": [
+          "Initiate license renewal process with Elastic",
+          "Review current license tier and feature requirements",
+          "Budget for license renewal costs",
+          "Evaluate if current license tier matches actual usage",
+          "Plan maintenance window for license deployment"
+        ]
+      }
+    ]
+  },
+  "license_expiring_soon": {
+    "metric_keywords": ["license_status"],
+    "data_conditions": [
+      { "key": "days_until_expiry", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('days_until_expiry') is not None and 30 <= data.get('days_until_expiry') < 60",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "License will expire within 60 days. Add license renewal to your planning.",
+        "recommendations": [
+          "Add license renewal to upcoming planning cycle",
+          "Review feature usage to right-size license tier",
+          "Document license renewal process",
+          "Consider multi-year license for cost savings"
+        ]
+      }
+    ]
+  },
+  "trial_license_in_use": {
+    "metric_keywords": ["license_status"],
+    "data_conditions": [
+      { "key": "license_type", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('license_type') == 'trial'",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Cluster is running on a trial license. Trial licenses have limited duration and are not suitable for production use.",
+        "recommendations": [
+          "Evaluate which trial features are being used",
+          "Plan migration to appropriate paid license tier",
+          "Contact Elastic sales for licensing options",
+          "Consider basic (free) license if commercial features not needed",
+          "Trial cannot be renewed - production deployment requires paid license"
+        ]
+      }
+    ]
+  }
+}

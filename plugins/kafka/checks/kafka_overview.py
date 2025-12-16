@@ -49,25 +49,30 @@ def run_kafka_overview(connector, settings):
 def _get_cluster_info(connector, settings):
     """Gets cluster-level metadata including version, cluster ID, and broker count."""
     try:
-        cluster_metadata = connector.admin_client.describe_cluster()
+        # Use cached metadata from connection phase (more reliable)
+        if hasattr(connector, 'cluster_metadata') and connector.cluster_metadata:
+            metadata = connector.cluster_metadata
+            cluster_id = metadata.get('cluster_id', 'Unknown')
+            broker_count = metadata.get('broker_count', 0)
+            controller_id = metadata.get('controller_id', 'N/A')
+        else:
+            # Fallback to admin client if cache not available
+            cluster_metadata = connector.admin_client.describe_cluster()
+            brokers = cluster_metadata.get('brokers', [])
+            broker_count = len(brokers)
+            cluster_id = cluster_metadata.get('cluster_id', 'N/A')
+            controller_id = cluster_metadata.get('controller_id', 'N/A')
 
         # Extract version from connector (uses config or auto-detection)
         version = connector.version_info.get('version_string', 'Unknown')
-        
-        brokers = cluster_metadata.get('brokers', [])
-        broker_count = len(brokers)
-        cluster_id = cluster_metadata.get('cluster_id', 'N/A')
-        
-        # Controller is just an integer in the response
-        controller_id = cluster_metadata.get('controller_id', 'N/A')
-        
+
         result_data = [{
             'version': version,
             'cluster_id': cluster_id,
             'broker_count': broker_count,
             'controller_id': controller_id
         }]
-        
+
         # Format as AsciiDoc table
         adoc = ["\n[cols=\"1,3\"]", "|==="]
         adoc.append(f"| Kafka Version | {version}")
@@ -75,9 +80,9 @@ def _get_cluster_info(connector, settings):
         adoc.append(f"| Broker Count | {broker_count}")
         adoc.append(f"| Controller | Broker {controller_id}")
         adoc.append("|===")
-        
+
         return "\n".join(adoc), result_data
-        
+
     except Exception as e:
         logger.error(f"_get_cluster_info failed: {e}", exc_info=True)
         return f"[ERROR] Could not fetch cluster info: {e}", []
@@ -86,17 +91,33 @@ def _get_cluster_info(connector, settings):
 def _get_broker_details(connector, settings):
     """Gets detailed information about each broker."""
     try:
-        cluster_metadata = connector.admin_client.describe_cluster()
-        
+        # Use cached metadata from connection phase (more reliable)
+        if hasattr(connector, 'cluster_metadata') and connector.cluster_metadata:
+            broker_nodes = connector.cluster_metadata.get('brokers', [])
+        else:
+            # Fallback to admin client if cache not available
+            cluster_metadata = connector.admin_client.describe_cluster()
+            broker_nodes = cluster_metadata.get('brokers', [])
+
         brokers = []
-        for node in cluster_metadata.get('brokers', []):
-            # KRaft kafka-python uses 'node_id' field
-            broker_info = {
-                'broker_id': node.get('node_id', node.get('id', node.get('broker_id', 'N/A'))),
-                'host': node.get('host', 'N/A'),
-                'port': node.get('port', 'N/A'),
-                'rack': node.get('rack') or 'default'
-            }
+        for node in broker_nodes:
+            # Handle both dict and object formats
+            if isinstance(node, dict):
+                broker_info = {
+                    'broker_id': node.get('node_id', node.get('id', node.get('broker_id', 'N/A'))),
+                    'host': node.get('host', 'N/A'),
+                    'port': node.get('port', 'N/A'),
+                    'rack': node.get('rack') or 'default'
+                }
+            else:
+                # Object format (from cluster.brokers())
+                broker_id = node.nodeId if hasattr(node, 'nodeId') else (node.id if hasattr(node, 'id') else 'N/A')
+                broker_info = {
+                    'broker_id': broker_id,
+                    'host': node.host if hasattr(node, 'host') else 'N/A',
+                    'port': node.port if hasattr(node, 'port') else 'N/A',
+                    'rack': (node.rack if hasattr(node, 'rack') else None) or 'default'
+                }
             brokers.append(broker_info)
         
         result_data = brokers
@@ -121,15 +142,36 @@ def _get_broker_details(connector, settings):
 def _get_controller_info(connector, settings):
     """Gets information about the current controller."""
     try:
-        cluster_metadata = connector.admin_client.describe_cluster()
-        
-        # In KRaft, controller_id is just an integer
-        controller_id = cluster_metadata.get('controller_id')
-        
+        # Use cached metadata from connection phase (more reliable)
+        if hasattr(connector, 'cluster_metadata') and connector.cluster_metadata:
+            metadata = connector.cluster_metadata
+            controller_id = metadata.get('controller_id')
+            broker_nodes = metadata.get('brokers', [])
+        else:
+            # Fallback to admin client if cache not available
+            cluster_metadata = connector.admin_client.describe_cluster()
+            controller_id = cluster_metadata.get('controller_id')
+            broker_nodes = cluster_metadata.get('brokers', [])
+
         if controller_id is not None:
             # Find the broker with this ID to get host/port
-            brokers = cluster_metadata.get('brokers', [])
-            controller_broker = next((b for b in brokers if b.get('node_id') == controller_id), None)
+            # Handle both dict and object formats
+            controller_broker = None
+            for b in broker_nodes:
+                if isinstance(b, dict):
+                    if b.get('node_id') == controller_id or b.get('id') == controller_id:
+                        controller_broker = b
+                        break
+                else:
+                    # Object format
+                    broker_id = b.nodeId if hasattr(b, 'nodeId') else (b.id if hasattr(b, 'id') else None)
+                    if broker_id == controller_id:
+                        controller_broker = {
+                            'node_id': broker_id,
+                            'host': b.host if hasattr(b, 'host') else 'N/A',
+                            'port': b.port if hasattr(b, 'port') else 'N/A'
+                        }
+                        break
             
             if controller_broker:
                 result_data = [{

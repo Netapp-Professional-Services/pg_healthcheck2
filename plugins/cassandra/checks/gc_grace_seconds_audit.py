@@ -1,5 +1,6 @@
 from plugins.cassandra.utils.qrylib.qry_gc_grace_seconds_audit import get_gc_grace_seconds_query
-from plugins.common.check_helpers import format_check_header, format_recommendations, safe_execute_query
+from plugins.cassandra.utils.keyspace_filter import filter_tables_by_keyspace
+from plugins.common.check_helpers import format_check_header, format_recommendations, safe_execute_query, format_data_as_table
 
 
 def get_weight():
@@ -33,11 +34,8 @@ def run_gc_grace_seconds_audit(connector, settings):
             structured_data["gc_grace_seconds"] = {"status": "error", "data": raw}
             return "\n".join(adoc_content), structured_data
         
-        # Filter out system keyspaces in Python
-        system_keyspaces = {'system', 'system_schema', 'system_traces', 
-                           'system_auth', 'system_distributed', 'system_views'}
-        user_tables = [t for t in raw 
-                       if t.get('keyspace_name') not in system_keyspaces]
+        # Filter out system keyspaces using centralized filter
+        user_tables = filter_tables_by_keyspace(raw, settings)
         
         if not user_tables:
             adoc_content.append("[NOTE]\n====\nNo user tables found.\n====\n")
@@ -57,8 +55,13 @@ def run_gc_grace_seconds_audit(connector, settings):
                     'table': tbl,
                     'gc_grace_seconds': gc_grace
                 })
-        
-        adoc_content.append(formatted)
+
+        # Format filtered data for display (only user tables)
+        filtered_table = format_data_as_table(
+            user_tables,
+            columns=['keyspace_name', 'table_name', 'gc_grace_seconds']
+        )
+        adoc_content.append(filtered_table)
         
         if problematic_tables:
             adoc_content.append(

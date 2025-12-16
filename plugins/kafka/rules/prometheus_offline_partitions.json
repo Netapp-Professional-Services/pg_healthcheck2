@@ -1,17 +1,28 @@
 {
   "critical_offline_partitions": {
-    "metric_keywords": ["prometheus_offline_partitions", "per_broker_offline", "data"],
+    "metric_keywords": [
+      "prometheus_offline_partitions",
+      "per_broker_offline",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "offline_partitions", "exists": true }
+      {
+        "key": "offline_partitions",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
         "expression": "data.get('offline_partitions', 0) > 0",
         "level": "critical",
         "score": 10,
-        "reasoning": "🚨 EMERGENCY: Broker {data.get('node_id', 'unknown')[:8]} has {data.get('offline_partitions')} offline partition(s) - data is completely inaccessible",
+        "reasoning": "\ud83d\udea8 EMERGENCY: Broker {data.get('node_id', 'unknown')[:8]} has {data.get('offline_partitions')} offline partition(s) - data is completely inaccessible",
         "recommendations": [
-          "🚨 IMMEDIATE ACTION REQUIRED - DATA UNAVAILABLE 🚨",
+          "\ud83d\udea8 IMMEDIATE ACTION REQUIRED - DATA UNAVAILABLE \ud83d\udea8",
           "Offline partitions mean ALL replicas are down - this is more severe than under-replication",
           "Check broker {data.get('node_id', 'unknown')[:8]} status immediately",
           "Review broker logs: grep 'OFFLINE\\|FATAL\\|ERROR' /var/log/kafka/server.log",
@@ -26,17 +37,19 @@
       }
     ]
   },
-
   "cluster_offline_partitions": {
-    "metric_keywords": ["prometheus_offline_partitions", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_offline_partitions",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('total_offline_partitions', 0) >= 10",
         "level": "critical",
         "score": 10,
-        "reasoning": "🚨 CATASTROPHIC: {data.get('total_offline_partitions')} total offline partitions across cluster - widespread data unavailability",
+        "reasoning": "\ud83d\udea8 CATASTROPHIC: {data.get('total_offline_partitions')} total offline partitions across cluster - widespread data unavailability",
         "recommendations": [
-          "🚨 CLUSTER-WIDE EMERGENCY 🚨",
+          "\ud83d\udea8 CLUSTER-WIDE EMERGENCY \ud83d\udea8",
           "Multiple partitions offline indicates systemic issue",
           "Check if this is a cluster-wide outage or cascading failure",
           "Verify all brokers are operational and reachable",
@@ -52,7 +65,7 @@
         "expression": "data.get('total_offline_partitions', 0) > 0 and data.get('total_offline_partitions', 0) < 10",
         "level": "critical",
         "score": 10,
-        "reasoning": "🚨 CRITICAL: {data.get('total_offline_partitions')} offline partition(s) - data unavailable",
+        "reasoning": "\ud83d\udea8 CRITICAL: {data.get('total_offline_partitions')} offline partition(s) - data unavailable",
         "recommendations": [
           "Offline partitions require immediate attention",
           "Check affected brokers and partitions",
@@ -62,11 +75,19 @@
           "Document incident for post-mortem analysis"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "total_offline_partitions",
+        "exists": true
+      }
     ]
   },
-
   "healthy_all_online": {
-    "metric_keywords": ["prometheus_offline_partitions", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_offline_partitions",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('total_offline_partitions', 0) == 0",
@@ -76,11 +97,21 @@
         "recommendations": [
           "Partition availability is healthy",
           "Continue monitoring for broker failures",
-          "Ensure replication factor is adequate (≥3 for critical topics)",
+          "Ensure replication factor is adequate (\u22653 for critical topics)",
           "Verify alerting is configured for offline partitions",
           "Maintain broker health monitoring",
           "Review disaster recovery procedures periodically"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "total_brokers",
+        "exists": true
+      },
+      {
+        "key": "total_offline_partitions",
+        "exists": true
       }
     ]
   }

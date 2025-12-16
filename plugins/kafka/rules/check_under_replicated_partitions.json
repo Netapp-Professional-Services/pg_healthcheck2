@@ -1,0 +1,40 @@
+{
+  "critical_under_replicated": {
+    "metric_keywords": ["check_under_replicated_partitions", "data"],
+    "data_conditions": [
+      {"key": "total_urp", "exists": true}
+    ],
+    "rules": [{
+      "expression": "data.get('total_urp', 0) >= 10",
+      "level": "critical",
+      "score": 10,
+      "reasoning": "🚨 CRITICAL: {data.get('total_urp')} under-replicated partition(s) detected - cluster is at high risk of data loss",
+      "recommendations": [
+        "Check broker health immediately - Are all brokers running?",
+        "Verify network connectivity between brokers",
+        "Review broker logs for replication errors",
+        "Check disk space on all brokers",
+        "Monitor ISR (In-Sync Replicas) status",
+        "Under-replicated partitions are ONE BROKER FAILURE away from permanent data loss"
+      ]
+    }]
+  },
+  "warning_under_replicated": {
+    "metric_keywords": ["check_under_replicated_partitions", "data"],
+    "data_conditions": [
+      {"key": "total_urp", "exists": true}
+    ],
+    "rules": [{
+      "expression": "data.get('total_urp', 0) > 0 and data.get('total_urp', 0) < 10",
+      "level": "high",
+      "score": 7,
+      "reasoning": "⚠️ WARNING: {data.get('total_urp')} under-replicated partition(s) detected",
+      "recommendations": [
+        "Investigate replication lag",
+        "Check broker health and connectivity",
+        "Review disk I/O performance",
+        "Monitor for increasing trend"
+      ]
+    }]
+  }
+}

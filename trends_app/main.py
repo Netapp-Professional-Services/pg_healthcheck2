@@ -24,22 +24,113 @@ from flask_login import login_required, current_user
 from .database import (get_unique_targets, load_user_preferences,
                        fetch_runs_by_ids, save_user_preference,
                        fetch_template_asset)
+from . import analysis_database
 
 from .utils import load_trends_config, format_path
 from .ai_connector import get_ai_recommendation
 from .prompt_generator import generate_web_prompt, generate_slides_prompt
+from .submission_backends import get_submission_backend, DisabledBackend
+from .security import (
+    secure_api_endpoint, validate_submission_payload,
+    log_failed_authentication, enforce_https_middleware
+)
+from functools import wraps
 
 bp = Blueprint('main', __name__)
 
+
+def require_api_key(f):
+    """
+    Decorator to require API key authentication for external API endpoints.
+
+    API keys are validated against the api_keys table in the database.
+    Keys should be provided in the X-API-Key header.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+
+        if not api_key:
+            return jsonify({
+                "error": "Missing API key",
+                "message": "Provide API key in X-API-Key header"
+            }), 401
+
+        # Validate API key against database
+        config = load_trends_config()
+        db_settings = config.get('database')
+
+        conn = None
+        try:
+            conn = psycopg2.connect(**db_settings)
+            cursor = conn.cursor()
+
+            # Check if API key exists and is active
+            cursor.execute("""
+                SELECT ak.id, ak.key_name, ak.company_id, c.company_name
+                FROM api_keys ak
+                JOIN companies c ON ak.company_id = c.id
+                WHERE ak.key_hash = crypt(%s, key_hash)
+                  AND ak.is_active = true
+                  AND (ak.expires_at IS NULL OR ak.expires_at > NOW());
+            """, (api_key,))
+
+            result = cursor.fetchone()
+
+            if not result:
+                # Log failed authentication attempt
+                log_failed_authentication(
+                    api_key[:8] if len(api_key) >= 8 else api_key,
+                    reason="invalid_or_expired"
+                )
+                return jsonify({
+                    "error": "Invalid API key",
+                    "message": "API key is invalid, inactive, or expired"
+                }), 401
+
+            # Store API key info in request context for use in endpoint
+            request.api_key_id = result[0]
+            request.api_key_name = result[1]
+            request.api_company_id = result[2]
+            request.api_company_name = result[3]
+
+            # Update last_used timestamp
+            cursor.execute("""
+                UPDATE api_keys
+                SET last_used_at = NOW(), usage_count = usage_count + 1
+                WHERE id = %s;
+            """, (result[0],))
+            conn.commit()
+
+        except psycopg2.Error as e:
+            current_app.logger.error(f"API key validation error: {e}")
+            return jsonify({
+                "error": "Authentication error",
+                "message": "Unable to validate API key"
+            }), 500
+        finally:
+            if conn:
+                conn.close()
+
+        return f(*args, **kwargs)
+    return decorated_function
+
 @bp.before_request
 def before_request_callback():
-    """Redirects authenticated users to change their password if required.
+    """
+    Runs before every request in the main blueprint.
 
-    This function runs before every request. If the currently logged-in user
-    has the `password_change_required` flag set, it redirects them to the
-    password change page, preventing access to other parts of the application.
+    Handles:
+    1. Optional HTTPS enforcement (if enabled in config)
+    2. Password change requirement for authenticated users
     """
 
+    # Optional HTTPS enforcement (configurable)
+    https_redirect = enforce_https_middleware()
+    if https_redirect:
+        return https_redirect
+
+    # Redirect users who need to change password
     if current_user.is_authenticated and current_user.password_change_required:
         if request.endpoint and 'static' not in request.endpoint and 'auth.' not in request.endpoint:
              return redirect(url_for('auth.change_password'))
@@ -745,20 +836,20 @@ def generate_trend_analysis_api():
     """Generate trend analysis."""
     if not current_user.has_privilege('ViewTrendAnalysis'):
         abort(403)
-    
+
     data = request.get_json()
     company_id = data.get('company_id')
     days = data.get('days', 90)
     profile_id = data.get('profile_id')
     template_id = data.get('template_id')
-    
+
     if not all([company_id, profile_id, template_id]):
         return jsonify({"error": "Missing required parameters"}), 400
-    
+
     config = load_trends_config()
     db_settings = config.get('database')
     accessible_company_ids = [c['id'] for c in current_user.accessible_companies]
-    
+
     from . import trends_analysis
     success, result = trends_analysis.generate_trend_analysis(
         db_config=db_settings,
@@ -769,7 +860,7 @@ def generate_trend_analysis_api():
         accessible_company_ids=accessible_company_ids,
         user_id=current_user.id
     )
-    
+
     if success:
         return jsonify({
             "status": "success",
@@ -778,3 +869,487 @@ def generate_trend_analysis_api():
         })
     else:
         return jsonify({"error": result}), 500
+
+
+# ============================================================================
+# ANALYSIS ROUTES (PostgreSQL, Executive Dashboards)
+# ============================================================================
+
+@bp.route('/analysis')
+@login_required
+def analysis_dashboard():
+    """Main analysis dashboard - shows available schemas."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    # Get schemas user can access
+    schemas = analysis_database.get_accessible_schemas(db_settings)
+
+    return render_template('analysis/dashboard.html', schemas=schemas)
+
+
+@bp.route('/analysis/postgres/migration-candidates')
+@login_required
+def postgres_migration_candidates():
+    """PostgreSQL Kafka/Cassandra migration candidates."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    # Get parameters from query string
+    limit = request.args.get('limit', 50, type=int)
+    min_frequency = request.args.get('min_frequency', 50000, type=int)
+    days = request.args.get('days', 30, type=int)
+
+    # Fetch migration candidates
+    candidates = analysis_database.get_migration_candidates(
+        db_settings, limit, min_frequency, days
+    )
+
+    return render_template(
+        'analysis/migration_candidates.html',
+        candidates=candidates,
+        limit=limit,
+        min_frequency=min_frequency,
+        days=days
+    )
+
+
+@bp.route('/analysis/postgres/write-trends/<int:company_id>')
+@login_required
+def postgres_write_trends(company_id):
+    """Write volume trends for a specific company."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    days = request.args.get('days', 90, type=int)
+
+    # Fetch trends
+    trends = analysis_database.get_write_volume_trends(
+        db_settings, company_id, days
+    )
+
+    return render_template(
+        'analysis/write_trends.html',
+        trends=trends,
+        company_id=company_id,
+        days=days
+    )
+
+
+@bp.route('/analysis/executive/migration-pipeline')
+@login_required
+def executive_migration_pipeline():
+    """Executive dashboard - migration pipeline and consulting opportunities summary."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    # Get migration summary
+    migration_summary = analysis_database.get_migration_pipeline_summary(db_settings)
+
+    # Get consulting opportunities summary
+    consulting_summary = analysis_database.get_consulting_opportunities_summary(db_settings)
+
+    # Get top migration candidates and group by company
+    all_candidates = analysis_database.get_migration_candidates(
+        db_settings, limit=50, min_frequency=100000, days=30
+    )
+
+    # Group by company - take highest priority and highest workload per company
+    company_opportunities = {}
+    for candidate in all_candidates:
+        company_id = candidate['company_id']
+        if company_id not in company_opportunities:
+            company_opportunities[company_id] = candidate
+        else:
+            # Keep the one with higher priority or higher workload
+            existing = company_opportunities[company_id]
+            priority_order = {'critical': 3, 'high': 2, 'medium': 1, 'low': 0}
+            if (priority_order.get(candidate['migration_priority'], 0) >
+                priority_order.get(existing['migration_priority'], 0)):
+                company_opportunities[company_id] = candidate
+            elif (priority_order.get(candidate['migration_priority'], 0) ==
+                  priority_order.get(existing['migration_priority'], 0) and
+                  candidate['calls_per_hour'] > existing['calls_per_hour']):
+                company_opportunities[company_id] = candidate
+
+    # Convert back to list and sort by workload
+    migration_candidates = sorted(
+        company_opportunities.values(),
+        key=lambda x: x['calls_per_hour'],
+        reverse=True
+    )[:10]  # Top 10 companies
+
+    # Get top consulting opportunities
+    consulting_opportunities = analysis_database.get_consulting_opportunities(db_settings, limit=10)
+
+    return render_template(
+        'analysis/executive_pipeline.html',
+        migration_summary=migration_summary,
+        consulting_summary=consulting_summary,
+        migration_candidates=migration_candidates,
+        consulting_opportunities=consulting_opportunities
+    )
+
+
+@bp.route('/analysis/executive/customer-footprint')
+@login_required
+def executive_customer_footprint():
+    """Executive dashboard - customer technology footprint."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    days = request.args.get('days', 90, type=int)
+
+    # Get footprint
+    footprint = analysis_database.get_customer_technology_footprint(
+        db_settings, days
+    )
+
+    return render_template(
+        'analysis/customer_footprint.html',
+        footprint=footprint,
+        days=days
+    )
+
+
+# ============================================================================
+# UPSELL ANALYSIS ROUTES (Kafka, Cassandra, OpenSearch Upgrades)
+# ============================================================================
+
+@bp.route('/analysis/kafka/capacity-upgrades')
+@login_required
+def kafka_capacity_upgrades():
+    """Kafka capacity upgrade candidates."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    # Query the view directly
+    conn = None
+    candidates = []
+    try:
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(**db_settings)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute("""
+            SELECT *
+            FROM kafka_analysis.capacity_upgrade_candidates
+            ORDER BY avg_cpu_percent DESC NULLS LAST
+            LIMIT 50
+        """)
+        candidates = cursor.fetchall()
+    except Exception as e:
+        current_app.logger.error(f"Error fetching Kafka capacity upgrades: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return render_template(
+        'analysis/kafka_capacity_upgrades.html',
+        candidates=candidates
+    )
+
+
+@bp.route('/analysis/cassandra/performance-upgrades')
+@login_required
+def cassandra_performance_upgrades():
+    """Cassandra performance upgrade candidates."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    # Query the view directly
+    conn = None
+    candidates = []
+    try:
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(**db_settings)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute("""
+            SELECT *
+            FROM cassandra_analysis.performance_upgrade_candidates
+            ORDER BY read_p99_ms DESC NULLS LAST
+            LIMIT 50
+        """)
+        candidates = cursor.fetchall()
+    except Exception as e:
+        current_app.logger.error(f"Error fetching Cassandra performance upgrades: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return render_template(
+        'analysis/cassandra_performance_upgrades.html',
+        candidates=candidates
+    )
+
+
+@bp.route('/analysis/opensearch/capacity-upgrades')
+@login_required
+def opensearch_capacity_upgrades():
+    """OpenSearch capacity upgrade candidates."""
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    # Query the view directly
+    conn = None
+    candidates = []
+    try:
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(**db_settings)
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor.execute("""
+            SELECT *
+            FROM opensearch_analysis.capacity_upgrade_candidates
+            ORDER BY heap_used_percent DESC NULLS LAST
+            LIMIT 50
+        """)
+        candidates = cursor.fetchall()
+    except Exception as e:
+        current_app.logger.error(f"Error fetching OpenSearch capacity upgrades: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    return render_template(
+        'analysis/opensearch_capacity_upgrades.html',
+        candidates=candidates
+    )
+
+
+# ============================================================================
+# EXTERNAL SUBMISSION API ENDPOINTS
+# ============================================================================
+
+@bp.route('/api/submit-health-check', methods=['POST'])
+@secure_api_endpoint  # Apply security checks FIRST (before auth)
+@require_api_key       # Then authenticate
+def submit_health_check():
+    """
+    Accept health check data from external tools via HTTP API.
+
+    This endpoint is the receiving side of the HTTP API option in
+    output_handlers/trend_shipper.py. It supports multiple backend modes:
+    - direct: Synchronous insert, returns 201 when complete
+    - pooled: Pooled connection insert, returns 201 when complete
+    - async_queue: Enqueue task, returns 202 with task_id
+    - disabled: Returns 503 Service Unavailable
+
+    Authentication:
+        Requires X-API-Key header with valid API key
+
+    Request Body (JSON):
+        {
+            "target_info": {
+                "db_type": "postgres",
+                "host": "192.168.1.10",
+                "port": 5432,
+                "database": "mydb",
+                "company_name": "Acme Corp",
+                ...
+            },
+            "findings": {
+                "check_name": {
+                    "status": "success",
+                    "data": {...}
+                },
+                ...
+            },
+            "report_adoc": "= Health Check Report\\n...",
+            "analysis_results": {
+                "critical_issues": [...],
+                "high_priority_issues": [...],
+                ...
+            }
+        }
+
+    Returns:
+        201 Created: For synchronous modes (direct, pooled)
+        202 Accepted: For async_queue mode (includes task_id)
+        400 Bad Request: Invalid payload
+        401 Unauthorized: Missing/invalid API key
+        500 Internal Server Error: Processing failed
+        503 Service Unavailable: Endpoint disabled
+
+    Example:
+        curl -X POST https://trends.example.com/api/submit-health-check \\
+          -H "Content-Type: application/json" \\
+          -H "X-API-Key: your-api-key-here" \\
+          -d @health_check_results.json
+    """
+    backend = get_submission_backend()
+
+    # If disabled, reject immediately
+    if isinstance(backend, DisabledBackend):
+        return jsonify({
+            "error": "Service unavailable",
+            "message": "Health check submission is disabled on this instance",
+            "hint": "This deployment accepts data through direct database insertion only"
+        }), 503
+
+    # Validate request payload
+    data = request.get_json()
+    if not data:
+        return jsonify({
+            "error": "Invalid request",
+            "message": "Request body must be valid JSON"
+        }), 400
+
+    # Comprehensive validation (type, value, complexity checks)
+    is_valid, error_msg = validate_submission_payload(data)
+    if not is_valid:
+        current_app.logger.warning(
+            f"Invalid submission from API key '{request.api_key_name}': {error_msg}"
+        )
+        return jsonify({
+            "error": "Validation failed",
+            "message": error_msg
+        }), 400
+
+    target_info = data['target_info']
+
+    # Override company_name with authenticated API key's company
+    # This prevents API key from submitting data for other companies
+    target_info['company_name'] = request.api_company_name
+
+    # Log submission
+    current_app.logger.info(
+        f"Health check submission from API key '{request.api_key_name}' "
+        f"for {target_info['db_type']}:{target_info['host']}:{target_info['port']}"
+    )
+
+    # Submit via configured backend
+    try:
+        result = backend.submit(
+            target_info=target_info,
+            findings_json=json.dumps(data['findings']),
+            structured_findings=data['findings'],
+            adoc_content=data['report_adoc'],
+            analysis_results=data.get('analysis_results')
+        )
+
+        # Add API key info to response
+        result['submitted_by'] = request.api_key_name
+        result['company'] = request.api_company_name
+
+        # Return appropriate status code based on backend mode
+        if result.get('status') == 'accepted':
+            return jsonify(result), 202  # Async: Accepted
+        else:
+            return jsonify(result), 201  # Sync: Created
+
+    except Exception as e:
+        current_app.logger.error(f"Submission failed: {e}", exc_info=True)
+        return jsonify({
+            "error": "Submission failed",
+            "message": str(e),
+            "hint": "Check server logs for details"
+        }), 500
+
+
+@bp.route('/api/submission-status', methods=['GET'])
+@login_required
+def submission_status():
+    """
+    Get current submission backend status and health.
+
+    This endpoint provides operational visibility into the submission system.
+    Useful for monitoring, health checks, and troubleshooting.
+
+    Authentication:
+        Requires user login (not API key)
+
+    Returns:
+        200 OK: Status information
+        {
+            "submission_backend": {
+                "mode": "pooled",
+                "healthy": true,
+                "description": "...",
+                "pool_config": {...},
+                "capabilities": {...}
+            },
+            "timestamp": "2025-11-12T10:30:00Z"
+        }
+
+    Example:
+        curl https://trends.example.com/api/submission-status \\
+          -H "Cookie: session=..."
+    """
+    from .security import get_security_status
+
+    if not current_user.has_privilege('ViewSystemStatus'):
+        # Allow any logged-in user to view status (not just admins)
+        pass
+
+    backend = get_submission_backend()
+    status = backend.get_status()
+    security_status = get_security_status()
+
+    return jsonify({
+        "submission_backend": status,
+        "security": security_status,
+        "timestamp": datetime.utcnow().isoformat() + 'Z'
+    })
+
+
+@bp.route('/api/health', methods=['GET'])
+def api_health():
+    """
+    Public health check endpoint for load balancers and monitoring.
+
+    This endpoint does NOT require authentication and is designed to be
+    called frequently by monitoring systems.
+
+    Returns:
+        200 OK: System is healthy
+        503 Service Unavailable: System is unhealthy
+
+    Response:
+        {
+            "status": "healthy",
+            "timestamp": "2025-11-12T10:30:00Z",
+            "version": "2.1.0"
+        }
+    """
+    # Check if we can connect to database
+    config = load_trends_config()
+    db_settings = config.get('database')
+
+    healthy = True
+    checks = {}
+
+    # Database check
+    try:
+        conn = psycopg2.connect(**db_settings)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1;")
+        conn.close()
+        checks['database'] = 'ok'
+    except Exception as e:
+        healthy = False
+        checks['database'] = f'error: {str(e)}'
+
+    # Submission backend check
+    try:
+        backend = get_submission_backend()
+        if backend.health_check():
+            checks['submission_backend'] = 'ok'
+        else:
+            checks['submission_backend'] = 'degraded'
+            # Don't mark overall health as failed if submission is disabled
+            if not isinstance(backend, DisabledBackend):
+                healthy = False
+    except Exception as e:
+        checks['submission_backend'] = f'error: {str(e)}'
+        healthy = False
+
+    status_code = 200 if healthy else 503
+
+    return jsonify({
+        "status": "healthy" if healthy else "unhealthy",
+        "checks": checks,
+        "timestamp": datetime.utcnow().isoformat() + 'Z',
+        "version": "2.1.0"
+    }), status_code

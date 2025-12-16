@@ -1,6 +1,10 @@
 {
   "critical_gc_pauses": {
-    "metric_keywords": ["gc_pauses", "kafka", "jvm"],
+    "metric_keywords": [
+      "gc_pauses_per_broker",
+      "kafka",
+      "jvm"
+    ],
     "rules": [
       {
         "expression": "data.get('max_pause_ms', 0) >= 5000",
@@ -44,10 +48,30 @@
           "Consider heap increase: If consistently high usage, add more heap memory"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_pause_ms",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "max_pause_ms",
+        "exists": true
+      }
     ]
   },
   "high_gc_pauses": {
-    "metric_keywords": ["gc_pauses"],
+    "metric_keywords": [
+      "gc_pauses_per_broker"
+    ],
     "rules": [
       {
         "expression": "data.get('max_pause_ms', 0) >= 500 and data.get('max_pause_ms', 0) < 1000",
@@ -75,10 +99,31 @@
           "Monitor GC overhead percentage: Should be <5% of total time"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_pause_ms",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "max_pause_ms",
+        "exists": true
+      },
+      {
+        "key": "p95_pause_ms",
+        "exists": true
+      }
     ]
   },
   "full_gc_warnings": {
-    "metric_keywords": ["gc_pauses", "full_gc"],
+    "metric_keywords": [
+      "gc_pauses_per_broker",
+      "full_gc"
+    ],
     "rules": [
       {
         "expression": "data.get('full_gc_count', 0) >= 20",
@@ -119,10 +164,22 @@
           "Review if Full GC frequency correlates with specific workload patterns"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "full_gc_count",
+        "exists": true
+      }
     ]
   },
   "high_gc_frequency": {
-    "metric_keywords": ["gc_pauses"],
+    "metric_keywords": [
+      "gc_pauses_per_broker"
+    ],
     "rules": [
       {
         "expression": "data.get('gc_count', 0) >= 100",
@@ -150,13 +207,55 @@
           "Consider if heap sizing is appropriate"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "gc_count",
+        "exists": true
+      }
     ]
   },
   "broker_gc_health": {
-    "metric_keywords": ["gc_pauses"],
+    "metric_keywords": [
+      "gc_pauses_per_broker"
+    ],
     "data_conditions": [
-      {"key": "broker_id", "exists": true},
-      {"key": "max_pause_ms", "exists": true}
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "max_pause_ms",
+        "exists": true
+      },
+      {
+        "key": "exceeds_critical",
+        "exists": true
+      },
+      {
+        "key": "exceeds_warning",
+        "exists": true
+      },
+      {
+        "key": "full_gc_count",
+        "exists": true
+      },
+      {
+        "key": "gc_count",
+        "exists": true
+      },
+      {
+        "key": "has_full_gc",
+        "exists": true
+      },
+      {
+        "key": "high_frequency",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -195,13 +294,15 @@
     ]
   },
   "multiple_brokers_gc_issues": {
-    "metric_keywords": ["gc_pauses"],
+    "metric_keywords": [
+      "gc_pauses"
+    ],
     "rules": [
       {
-        "expression": "len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('critical_brokers', [])) >= 2",
+        "expression": "data.get('critical_broker_count', 0) >= 2",
         "level": "critical",
         "score": 10,
-        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('critical_brokers', []))}) have critical GC pauses. Cluster-wide memory crisis.",
+        "reasoning": "Multiple brokers ({data.get('critical_broker_count')}) have critical GC pauses. Cluster-wide memory crisis.",
         "recommendations": [
           "URGENT: Cluster-wide GC crisis requires immediate attention",
           "Check for common memory leak across all brokers",
@@ -213,10 +314,10 @@
         ]
       },
       {
-        "expression": "len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('warning_brokers', [])) >= 3",
+        "expression": "data.get('warning_broker_count', 0) >= 3",
         "level": "high",
         "score": 8,
-        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_gc_pauses', {}).get('gc_pauses', {}).get('warning_brokers', []))}) have elevated GC pauses. Cluster-wide heap pressure detected.",
+        "reasoning": "Multiple brokers ({data.get('warning_broker_count')}) have elevated GC pauses. Cluster-wide heap pressure detected.",
         "recommendations": [
           "Cluster-wide GC pressure indicates systemic issue",
           "Review heap sizing strategy across entire cluster",
@@ -226,10 +327,22 @@
           "Monitor for trend: is pressure increasing over time?"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "critical_broker_count",
+        "exists": true
+      },
+      {
+        "key": "warning_broker_count",
+        "exists": true
+      }
     ]
   },
   "gc_performance_optimization": {
-    "metric_keywords": ["gc_pauses"],
+    "metric_keywords": [
+      "gc_pauses_per_broker"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_pause_ms', 0) >= 200 and data.get('avg_pause_ms', 0) < 500",
@@ -256,6 +369,20 @@
           "Review if this correlates with performance degradation",
           "Consider heap and GC tuning to reduce total pause time"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_pause_ms",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "total_pause_ms",
+        "exists": true
       }
     ]
   }

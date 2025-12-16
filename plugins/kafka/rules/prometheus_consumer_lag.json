@@ -1,8 +1,19 @@
 {
   "critical_consumer_group_lag": {
-    "metric_keywords": ["prometheus_consumer_lag", "per_consumer_group_lag", "data"],
+    "metric_keywords": [
+      "prometheus_consumer_lag",
+      "per_consumer_group_lag",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "total_lag", "exists": true }
+      {
+        "key": "total_lag",
+        "exists": true
+      },
+      {
+        "key": "group_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -22,11 +33,21 @@
       }
     ]
   },
-
   "warning_consumer_group_lag": {
-    "metric_keywords": ["prometheus_consumer_lag", "per_consumer_group_lag", "data"],
+    "metric_keywords": [
+      "prometheus_consumer_lag",
+      "per_consumer_group_lag",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "total_lag", "exists": true }
+      {
+        "key": "total_lag",
+        "exists": true
+      },
+      {
+        "key": "group_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -45,9 +66,11 @@
       }
     ]
   },
-
   "cluster_consumer_lag_pressure": {
-    "metric_keywords": ["prometheus_consumer_lag", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_consumer_lag",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('groups_with_critical_lag', 0) >= 3",
@@ -77,11 +100,23 @@
           "Review message retention to ensure consumers can catch up"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "groups_with_critical_lag",
+        "exists": true
+      },
+      {
+        "key": "total_lag_all_groups",
+        "exists": true
+      }
     ]
   },
-
   "healthy_consumer_lag": {
-    "metric_keywords": ["prometheus_consumer_lag", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_consumer_lag",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('groups_with_critical_lag', 0) == 0 and data.get('groups_with_warning_lag', 0) == 0",
@@ -95,6 +130,20 @@
           "Ensure alerting is configured for lag thresholds",
           "Document successful consumer configuration for reference"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "groups_with_critical_lag",
+        "exists": true
+      },
+      {
+        "key": "groups_with_warning_lag",
+        "exists": true
+      },
+      {
+        "key": "total_groups",
+        "exists": true
       }
     ]
   }

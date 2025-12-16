@@ -1,6 +1,9 @@
 {
   "fatal_errors_detected": {
-    "metric_keywords": ["log_errors", "kafka"],
+    "metric_keywords": [
+      "log_errors",
+      "kafka"
+    ],
     "rules": [
       {
         "expression": "data.get('fatal_count', 0) >= 5",
@@ -27,10 +30,26 @@
           "Investigate root cause within 1 hour"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "fatal_count",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      }
     ]
   },
   "high_error_count": {
-    "metric_keywords": ["log_errors"],
+    "metric_keywords": [
+      "log_errors"
+    ],
     "rules": [
       {
         "expression": "data.get('error_count', 0) >= 50",
@@ -68,13 +87,59 @@
           "Review error messages for actionable issues"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "error_count",
+        "exists": true
+      },
+      {
+        "key": "host",
+        "exists": true
+      },
+      {
+        "key": "warning_count",
+        "exists": true
+      }
     ]
   },
   "broker_log_health": {
-    "metric_keywords": ["log_errors"],
+    "metric_keywords": [
+      "log_errors"
+    ],
     "data_conditions": [
-      {"key": "broker_id", "exists": true},
-      {"key": "fatal_count", "exists": true}
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "fatal_count",
+        "exists": true
+      },
+      {
+        "key": "error_count",
+        "exists": true
+      },
+      {
+        "key": "exceeds_error",
+        "exists": true
+      },
+      {
+        "key": "exceeds_fatal",
+        "exists": true
+      },
+      {
+        "key": "exceeds_warning",
+        "exists": true
+      },
+      {
+        "key": "warning_count",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -110,7 +175,10 @@
     ]
   },
   "multiple_brokers_log_issues": {
-    "metric_keywords": ["log_errors"],
+    "metric_keywords": [
+      "log_errors",
+      "health_summary"
+    ],
     "rules": [
       {
         "expression": "len(all_structured_findings.get('check_log_errors', {}).get('log_errors', {}).get('critical_brokers', [])) >= 2",
@@ -136,6 +204,12 @@
           "Check for infrastructure issues affecting multiple nodes",
           "Plan coordinated remediation"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "warning_count",
+        "exists": true
       }
     ]
   }

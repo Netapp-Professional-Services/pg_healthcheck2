@@ -1,8 +1,26 @@
 {
   "critical_heap_usage": {
-    "metric_keywords": ["prometheus_jvm_heap", "data"],
+    "metric_keywords": [
+      "prometheus_jvm_heap",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "heap_percent", "exists": true }
+      {
+        "key": "heap_percent",
+        "exists": true
+      },
+      {
+        "key": "heap_max_gb",
+        "exists": true
+      },
+      {
+        "key": "heap_used_gb",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -22,11 +40,20 @@
       }
     ]
   },
-
   "warning_heap_usage": {
-    "metric_keywords": ["prometheus_jvm_heap", "data"],
+    "metric_keywords": [
+      "prometheus_jvm_heap",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "heap_percent", "exists": true }
+      {
+        "key": "heap_percent",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -45,9 +72,11 @@
       }
     ]
   },
-
   "cluster_heap_pressure": {
-    "metric_keywords": ["prometheus_jvm_heap", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_jvm_heap",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('average_heap_percent', 0) >= 80",
@@ -63,11 +92,23 @@
           "Verify message sizes and batching are appropriate"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "average_heap_percent",
+        "exists": true
+      },
+      {
+        "key": "broker_count",
+        "exists": true
+      }
     ]
   },
-
   "healthy_heap_usage": {
-    "metric_keywords": ["prometheus_jvm_heap", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_jvm_heap",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('average_heap_percent', 0) < 65",
@@ -81,6 +122,12 @@
           "Maintain current JVM configuration",
           "Document successful heap sizing for future reference"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "average_heap_percent",
+        "exists": true
       }
     ]
   }

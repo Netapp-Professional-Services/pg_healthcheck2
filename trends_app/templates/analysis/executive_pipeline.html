@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Pipeline{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-900">Executive Revenue Pipeline</h2>
+            <p class="text-slate-600 mt-1">Technology migrations and consulting engagement opportunities</p>
+        </div>
+        <a href="{{ url_for('main.analysis_dashboard') }}"
+           class="px-4 py-2 text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+            ← Back to Analysis
+        </a>
+    </div>
+</div>
+
+<!-- Two-Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Migration Pipeline Section -->
+    <div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-4">Technology Migrations</h3>
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-white border border-slate-200 p-4">
+                <div class="text-2xl font-bold text-slate-900">{{ migration_summary.total_opportunities or 0 }}</div>
+                <div class="text-xs text-slate-600 mt-1">Migration Opportunities</div>
+            </div>
+            <div class="bg-green-50 border border-green-200 p-4">
+                <div class="text-2xl font-bold text-green-900">{{ migration_summary.estimated_monthly_revenue or '$0' }}</div>
+                <div class="text-xs text-green-700 mt-1">Migration Revenue/mo</div>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-red-50 border border-red-200 p-3">
+                <div class="text-xl font-bold text-red-900">{{ migration_summary.critical_count or 0 }}</div>
+                <div class="text-xs text-red-700 mt-1">Critical Priority</div>
+            </div>
+            <div class="bg-orange-50 border border-orange-200 p-3">
+                <div class="text-xl font-bold text-orange-900">{{ migration_summary.high_count or 0 }}</div>
+                <div class="text-xs text-orange-700 mt-1">High Priority</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Consulting Opportunities Section -->
+    <div>
+        <h3 class="text-lg font-semibold text-slate-900 mb-4">Consulting Engagements</h3>
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-white border border-slate-200 p-4">
+                <div class="text-2xl font-bold text-slate-900">{{ consulting_summary.total_opportunities or 0 }}</div>
+                <div class="text-xs text-slate-600 mt-1">Consulting Opportunities</div>
+            </div>
+            <div class="bg-purple-50 border border-purple-200 p-4">
+                <div class="text-2xl font-bold text-purple-900">{{ consulting_summary.estimated_revenue_range or '$0' }}</div>
+                <div class="text-xs text-purple-700 mt-1">Consulting Revenue</div>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-red-50 border border-red-200 p-3">
+                <div class="text-xl font-bold text-red-900">{{ consulting_summary.critical_priority_count or 0 }}</div>
+                <div class="text-xs text-red-700 mt-1">Critical Priority</div>
+            </div>
+            <div class="bg-orange-50 border border-orange-200 p-3">
+                <div class="text-xl font-bold text-orange-900">{{ consulting_summary.high_priority_count or 0 }}</div>
+                <div class="text-xs text-orange-700 mt-1">High Priority</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Two Tables: Migration and Consulting -->
+<div class="grid grid-cols-1 gap-8">
+    <!-- Migration Opportunities Table -->
+    <div class="bg-white border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200">
+            <h3 class="text-lg font-semibold text-slate-900">Top Migration Opportunities</h3>
+        </div>
+
+        {% if migration_candidates %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Company</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">Workload</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Priority</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">CPU Impact</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Recommendation</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">Est. Revenue</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-slate-100">
+                    {% for candidate in migration_candidates %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 text-sm font-medium text-slate-900">
+                            {{ candidate.company_name }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-mono text-slate-900">
+                            {{ "{:,.0f}".format(candidate.calls_per_hour) }}/hr
+                        </td>
+                        <td class="px-4 py-3 text-sm">
+                            {% if candidate.migration_priority == 'critical' %}
+                            <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800">CRITICAL</span>
+                            {% elif candidate.migration_priority == 'high' %}
+                            <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800">HIGH</span>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800">MEDIUM</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-mono text-slate-900">
+                            {{ "{:.2f}".format(candidate.cpu_percent) }}%
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700">
+                            {{ candidate.recommendation }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-medium text-green-700">
+                            ~$2,000/mo
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-slate-600">
+            No migration opportunities found in current data.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Consulting Opportunities Table -->
+    <div class="bg-white border border-slate-200">
+        <div class="px-6 py-4 border-b border-slate-200">
+            <h3 class="text-lg font-semibold text-slate-900">Top Consulting Engagement Opportunities</h3>
+        </div>
+
+        {% if consulting_opportunities %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Company</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Technology</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Engagement Type</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">Triggered Rules</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Priority</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">Est. Value</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-slate-100">
+                    {% for opp in consulting_opportunities %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 text-sm font-medium text-slate-900">
+                            {{ opp.company_name }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700 uppercase">
+                            {{ opp.db_technology }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700">
+                            {{ opp.engagement_name }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-mono text-slate-900">
+                            {{ opp.triggered_rule_count }} ({{ opp.critical_count }} crit, {{ opp.high_count }} high)
+                        </td>
+                        <td class="px-4 py-3 text-sm">
+                            {% if opp.consulting_priority == 'critical' %}
+                            <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800">CRITICAL</span>
+                            {% elif opp.consulting_priority == 'high' %}
+                            <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800">HIGH</span>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800">MEDIUM</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-medium text-purple-700">
+                            {{ opp.estimated_value }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-slate-600">
+            No consulting opportunities found in current data.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Revenue Model Explanation -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+    <div class="bg-slate-50 border border-slate-200 p-6">
+        <h3 class="text-sm font-semibold text-slate-900 mb-3">Migration Revenue Model</h3>
+        <div class="text-sm text-slate-700 space-y-2">
+            <p><strong>Kafka Cluster:</strong> ~$2,000/month (3-node production)</p>
+            <p><strong>PostgreSQL Savings:</strong> ~$500-1,000/month (reduced needs)</p>
+            <p><strong>Net New Revenue:</strong> ~$1,500-2,000/month per migration</p>
+            <p class="pt-3 mt-3 border-t border-slate-300">
+                <strong>Total Pipeline Value:</strong> {{ migration_summary.estimated_monthly_revenue or '$0' }}/month
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-purple-50 border border-purple-200 p-6">
+        <h3 class="text-sm font-semibold text-purple-900 mb-3">Consulting Revenue Model</h3>
+        <div class="text-sm text-purple-800 space-y-2">
+            <p><strong>Critical Priority:</strong> $15,000-$25,000 per engagement</p>
+            <p><strong>High Priority:</strong> $10,000-$18,000 per engagement</p>
+            <p><strong>Medium Priority:</strong> $5,000-$12,000 per engagement</p>
+            <p class="pt-3 mt-3 border-t border-purple-300">
+                <strong>Total Pipeline Value:</strong> {{ consulting_summary.estimated_revenue_range or '$0' }}
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

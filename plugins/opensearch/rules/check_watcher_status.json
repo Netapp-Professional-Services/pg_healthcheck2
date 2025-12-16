@@ -1,0 +1,60 @@
+{
+    "watcher_stopped": {
+        "metric_keywords": ["watcher_status"],
+        "data_conditions": [
+            {"key": "manually_stopped", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('manually_stopped') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Watcher has been manually stopped. No alerts or watches are being executed.",
+                "recommendations": [
+                    "Review why Watcher was stopped",
+                    "Start Watcher if alerting is needed: POST /_watcher/_start",
+                    "Check cluster logs for Watcher-related errors"
+                ]
+            }
+        ]
+    },
+    "watcher_node_issues": {
+        "metric_keywords": ["watcher_status"],
+        "data_conditions": [
+            {"key": "all_nodes_started", "operator": "==", "value": false},
+            {"key": "manually_stopped", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('all_nodes_started') == False and data.get('manually_stopped') == False",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "Watcher is not running on all nodes. Some nodes may not be processing watches.",
+                "recommendations": [
+                    "Check node roles - only data nodes run Watcher",
+                    "Review node health and connectivity",
+                    "Check Watcher logs on affected nodes"
+                ]
+            }
+        ]
+    },
+    "watcher_queue_buildup": {
+        "metric_keywords": ["watcher_status"],
+        "data_conditions": [
+            {"key": "has_queue_buildup", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_queue_buildup') == True",
+                "level": "medium",
+                "score": 4,
+                "reasoning": "Watcher execution queue is building up. Watches may be delayed.",
+                "recommendations": [
+                    "Review watch execution frequency",
+                    "Optimize heavy watch queries",
+                    "Consider adding more nodes if queue persists"
+                ]
+            }
+        ]
+    }
+}

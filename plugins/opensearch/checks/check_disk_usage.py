@@ -51,11 +51,13 @@ def run_check_disk_usage(connector, settings):
             "* AWS credentials for AWS OpenSearch Service\n\n"
             "Configure the appropriate access method in your settings."
         )
-        structured_data["disk_usage"] = {"status": "skipped", "reason": "No monitoring method available"}
-        return builder.build(), structured_data
+        return builder.build(), {
+            "status": "skipped",
+            "data": {"reason": "No monitoring method available"}
+        }
 
 
-def _run_aws_disk_check(connector, settings, builder, structured_data):
+def _run_aws_disk_check(connector, settings, builder, _):
     """Run disk check using AWS CloudWatch metrics."""
 
     # Check AWS availability
@@ -188,27 +190,32 @@ def _run_aws_disk_check(connector, settings, builder, structured_data):
                     f"Usage is below {warning_percent}% threshold."
                 )
 
-            structured_data["disk_usage"] = {
+            return builder.build(), {
                 "status": "success",
-                "mode": "aws_cloudwatch",
-                "free_gb": round(free_gb, 2),
-                "used_gb": round(used_gb, 2) if latest_used else None,
-                "total_gb": round(total_gb, 2) if total_gb > 0 else None,
-                "use_percent": round(use_percent, 1),
-                "critical_threshold": critical_percent,
-                "warning_threshold": warning_percent,
-                "issues_found": issues_found
+                "data": {
+                    "mode": "aws_cloudwatch",
+                    "free_gb": round(free_gb, 2),
+                    "used_gb": round(used_gb, 2) if latest_used else None,
+                    "total_gb": round(total_gb, 2) if total_gb > 0 else None,
+                    "use_percent": round(use_percent, 1),
+                    "critical_threshold": critical_percent,
+                    "warning_threshold": warning_percent,
+                    "issues_found": issues_found,
+                    "has_critical_disk": use_percent >= critical_percent,
+                    "has_warning_disk": use_percent >= warning_percent,
+                }
             }
 
     except Exception as e:
         logger.error(f"AWS disk usage check failed: {e}", exc_info=True)
         builder.error(f"Check failed: {e}")
-        structured_data["disk_usage"] = {"status": "error", "details": str(e)}
+        return builder.build(), {
+            "status": "error",
+            "error": str(e)
+        }
 
-    return builder.build(), structured_data
 
-
-def _run_ssh_disk_check(connector, settings, builder, structured_data):
+def _run_ssh_disk_check(connector, settings, builder, _):
     """Run disk check using SSH commands (similar to Cassandra pattern)."""
 
     # Check SSH availability
@@ -429,30 +436,32 @@ def _run_ssh_disk_check(connector, settings, builder, structured_data):
                 f"All monitored data directories are below {warning_percent}% usage."
             )
 
-        # Structured data
-        structured_data["disk_usage"] = {
+        # Calculate max disk usage
+        max_disk_percent = max((d['use_percent'] for d in all_disk_data), default=0)
+
+        # Return structured data with proper format for rules engine
+        return builder.build(), {
             "status": "success",
-            "mode": "ssh",
-            "nodes_checked": len(connector.get_ssh_hosts()),
-            "directories_checked": standard_opensearch_paths,
-            "nodes_with_errors": len(set(e['node_id'] for e in errors)),
-            "critical_nodes": critical_nodes,
-            "warning_nodes": warning_nodes,
-            "thresholds": {
-                "warning_percent": warning_percent,
-                "critical_percent": critical_percent
-            },
-            "errors": errors,
-            "data": all_disk_data
+            "data": {
+                "mode": "ssh",
+                "nodes_checked": len(connector.get_ssh_hosts()),
+                "nodes_with_errors": len(set(e['node_id'] for e in errors)),
+                "critical_node_count": len(critical_nodes),
+                "warning_node_count": len(warning_nodes),
+                "max_disk_percent": max_disk_percent,
+                "warning_threshold": warning_percent,
+                "critical_threshold": critical_percent,
+                "has_critical_disk": len(critical_nodes) > 0,
+                "has_warning_disk": len(warning_nodes) > 0,
+                "issues_found": issues_found,
+            }
         }
 
     except Exception as e:
         import traceback
         logger.error(f"Disk usage check failed: {e}\n{traceback.format_exc()}")
         builder.error(f"Disk usage check failed: {e}")
-        structured_data["disk_usage"] = {
+        return builder.build(), {
             "status": "error",
-            "details": str(e)
+            "error": str(e)
         }
-
-    return builder.build(), structured_data

@@ -1,6 +1,9 @@
 {
   "critical_heap_usage": {
-    "metric_keywords": ["jvm_stats", "data"],
+    "metric_keywords": [
+      "jvm_stats",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('heap_util_percent', 0) >= 90",
@@ -25,10 +28,23 @@
           "Review GC settings and consider G1GC tuning"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "heap_util_percent",
+        "exists": true
+      }
     ]
   },
   "old_generation_pressure": {
-    "metric_keywords": ["jvm_stats", "data"],
+    "metric_keywords": [
+      "jvm_stats",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('old_util_percent', 0) >= 90",
@@ -53,10 +69,23 @@
           "Review long-lived object creation"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "old_util_percent",
+        "exists": true
+      }
     ]
   },
   "excessive_full_gc": {
-    "metric_keywords": ["jvm_stats", "data"],
+    "metric_keywords": [
+      "jvm_stats",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('full_gc_count', 0) >= 50",
@@ -93,10 +122,27 @@
           "Review heap size - very large heaps cause long GC pauses"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_full_gc_time_ms",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "full_gc_count",
+        "exists": true
+      }
     ]
   },
   "metaspace_issues": {
-    "metric_keywords": ["jvm_stats", "data"],
+    "metric_keywords": [
+      "jvm_stats",
+      "data"
+    ],
     "rules": [
       {
         "expression": "data.get('metaspace_util_percent', 0) >= 95",
@@ -109,10 +155,22 @@
           "Review plugin or library usage"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "metaspace_util_percent",
+        "exists": true
+      }
     ]
   },
   "cluster_wide_memory_issues": {
-    "metric_keywords": ["jvm_summary"],
+    "metric_keywords": [
+      "jvm_summary"
+    ],
     "rules": [
       {
         "expression": "data.get('critical_broker_count', 0) >= 2",
@@ -136,6 +194,16 @@
           "Review and increase heap sizes cluster-wide",
           "Analyze workload patterns for optimization opportunities"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "critical_broker_count",
+        "exists": true
+      },
+      {
+        "key": "total_fgc_count",
+        "exists": true
       }
     ]
   }

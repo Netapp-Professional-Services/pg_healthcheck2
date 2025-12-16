@@ -1,0 +1,61 @@
+{
+    "ml_upgrade_mode": {
+        "metric_keywords": ["ml_status"],
+        "data_conditions": [
+            {"key": "upgrade_mode", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('upgrade_mode') == True",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Machine Learning is in upgrade mode. All ML jobs are paused.",
+                "recommendations": [
+                    "Complete the upgrade process",
+                    "Disable upgrade mode when ready: POST /_ml/set_upgrade_mode?enabled=false",
+                    "Monitor cluster stability before restarting jobs"
+                ]
+            }
+        ]
+    },
+    "failed_ml_jobs": {
+        "metric_keywords": ["ml_status"],
+        "data_conditions": [
+            {"key": "has_failed_jobs", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_failed_jobs') == True",
+                "level": "critical",
+                "score": 8,
+                "reasoning": "One or more ML anomaly detection jobs have failed. Anomaly detection is not running.",
+                "recommendations": [
+                    "Check job errors: GET /_ml/anomaly_detectors/<job_id>/_stats",
+                    "Review datafeed connectivity and index availability",
+                    "Check for memory constraints on ML nodes",
+                    "Restart jobs after resolving issues"
+                ]
+            }
+        ]
+    },
+    "stopped_datafeeds": {
+        "metric_keywords": ["ml_status"],
+        "data_conditions": [
+            {"key": "has_stopped_feeds", "operator": "==", "value": true},
+            {"key": "has_failed_jobs", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_stopped_feeds') == True and data.get('has_failed_jobs') == False",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "ML datafeeds are stopped. Anomaly detection jobs are not receiving data.",
+                "recommendations": [
+                    "Start datafeeds: POST /_ml/datafeeds/<datafeed_id>/_start",
+                    "Review if datafeeds should be running continuously",
+                    "Check source index for recent data"
+                ]
+            }
+        ]
+    }
+}

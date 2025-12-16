@@ -3,6 +3,7 @@
 from collections import defaultdict
 import re
 from plugins.cassandra.utils.qrylib.qry_disk_space_per_keyspace import get_nodetool_tablestats_query
+from plugins.cassandra.utils.keyspace_filter import KeyspaceFilter
 from plugins.common.check_helpers import require_ssh, format_check_header, format_recommendations, safe_execute_query
 
 
@@ -140,14 +141,11 @@ def run_disk_space_per_keyspace_check(connector, settings):
         }
         return "\n".join(adoc_content), structured_data
     
-    # Filter system keyspaces
-    system_keyspaces = {
-        'system', 'system_schema', 'system_traces',
-        'system_auth', 'system_distributed', 'system_views'
-    }
+    # Filter system keyspaces using centralized filter
+    ks_filter = KeyspaceFilter(settings)
     user_tables = [
         t for t in tables
-        if t.get('keyspace', '').lower() not in [s.lower() for s in system_keyspaces]
+        if not ks_filter.is_excluded(t.get('keyspace', ''))
     ]
     
     if not user_tables:
@@ -208,10 +206,8 @@ def run_disk_space_per_keyspace_check(connector, settings):
         adoc_content.append("[NOTE]\n====\n"
                           f"Disk usage distributed across {len(usage_list)} user keyspace(s). "
                           f"Total live space: {total_bytes / (1024**3):.2f} GB.\n====\n")
-    
-    adoc_content.append(formatted)
-    
-    # Summary table
+
+    # Summary table (using filtered user keyspaces only)
     adoc_content.append("\n==== Keyspace Disk Usage Summary")
     adoc_content.append("|===\n| Keyspace | Live Space (GB) | Percentage (%)")
     for u in usage_list:

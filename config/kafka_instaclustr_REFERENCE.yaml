@@ -1,4 +1,4 @@
-# Instaclustr Kafka Cluster Configuration
+# Instaclustr Kafka Cluster Configuration - REFERENCE
 db_type: "kafka"
 
 company_name: "Instaclustr Kafka Test"
@@ -6,35 +6,64 @@ report_title: "Kafka Health Check Report - Instaclustr"
 logo_image: MyLogo.svg[900,900]
 
 # Kafka Configuration
-kafka_version: "Apache Kafka 4.0.0"
+# kafka_version: "Apache Kafka 3.9.1"  # Optional - will auto-detect version
 # API version tuple for kafka-python library (major, minor, patch)
-# Use [3, 7, 0] for Kafka 3.7.x, or comment out to auto-detect
-#api_version: [3, 7, 0]
+# Match your Kafka version: [3, 9, 1] for Kafka 3.9.x, [4, 0, 0] for Kafka 4.x
+# Comment out to auto-detect
+api_version: [3, 9, 1]
 
 # Instaclustr Public Broker Addresses
-# Port 9082 for SSL/mTLS (mutual TLS authentication)
 bootstrap_servers:
- - 10.10.10.10:9082
- - 10.10.10.11:9082
- - 10.10.10.12:9082
+ - 10.10.10.10:9092
+ - 10.10.10.11:9092
+ - 10.10.10.12:9092
 
-# Security Configuration - SSL with mTLS (Mutual TLS Authentication)
-security_protocol: "SSL"
+# =============================================================================
+# SECURITY CONFIGURATION - Choose ONE option below
+# =============================================================================
 
-# SSL/TLS Configuration with Client Certificates
-# See your Instaclustr console - Certificates for Client ⇄ Node Encryption
+# -------------------------------------------------------------------------
+# OPTION 1: SASL_SSL (Username/Password Authentication over TLS)
+# -------------------------------------------------------------------------
+# Use this for SCRAM-based authentication with TLS encryption
+# Port 9092 is typically used for SASL_SSL
+
+security_protocol: "SASL_SSL"
+sasl_mechanism: "SCRAM-SHA-256"  # or SCRAM-SHA-512, PLAIN
+sasl_username: "your_username"
+sasl_password: "your_password"
+
+# SSL/TLS Configuration - CA certificate ONLY (no client certs needed)
 ssl_cafile: "config/certs/cluster-ca-certificate.pem"
-ssl_certfile: "config/certs/certificate.pem"
-ssl_keyfile: "config/certs/key.pem"
 ssl_check_hostname: true
+
+# NOTE: For SASL_SSL, you do NOT need ssl_certfile or ssl_keyfile
+
+# -------------------------------------------------------------------------
+# OPTION 2: SSL with mTLS (Mutual TLS Authentication with Client Certificates)
+# -------------------------------------------------------------------------
+# Use this for certificate-based authentication (no username/password)
+# Port 9082 is typically used for SSL/mTLS
+# Uncomment the lines below and comment out SASL_SSL section above
+
+# security_protocol: "SSL"
+#
+# # SSL/TLS Configuration with Client Certificates
+# # See your Instaclustr console - Certificates for Client ⇄ Node Encryption
+# ssl_cafile: "config/certs/cluster-ca-certificate.pem"
+# ssl_certfile: "config/certs/certificate.pem"
+# ssl_keyfile: "config/certs/key.pem"
+# ssl_check_hostname: true
+#
+# NOTE: For mTLS, you do NOT need sasl_username, sasl_password, or sasl_mechanism
 
 # Prometheus Monitoring Configuration (Instaclustr)
 # Provides rich metrics without requiring SSH access to managed Kafka brokers
-instaclustr_prometheus_enabled: true
-instaclustr_cluster_id: "<YOUR_IC_KAFKA_CLUSTER_ID"
-instaclustr_prometheus_base_url: "https://<YOUR_IC_ACCOUNT>.prometheus.monitoring.instaclustr.com"
-instaclustr_prometheus_username: "YOUR_IC_USER"
-instaclustr_prometheus_api_key: "YOUR_IC_PROMETHEUS_API_KEY"
+instaclustr_prometheus_enabled: false
+# instaclustr_cluster_id: "<YOUR_IC_KAFKA_CLUSTER_ID>"
+# instaclustr_prometheus_base_url: "https://<YOUR_IC_ACCOUNT>.prometheus.monitoring.instaclustr.com"
+# instaclustr_prometheus_username: "YOUR_IC_USER"
+# instaclustr_prometheus_api_key: "YOUR_IC_PROMETHEUS_API_KEY"
 
 # SSH Configuration (OPTIONAL - only for OS-level checks)
 # Note: Instaclustr is a managed service, so SSH access is typically not available
@@ -67,22 +96,19 @@ instaclustr_prometheus_api_key: "YOUR_IC_PROMETHEUS_API_KEY"
 #kafka_cpu_iowait_warning_percent: 10
 #kafka_cpu_iowait_critical_percent: 25
 
-# AI Configuration
-ai_analyze: true
-
-# set to true to run in-line with health check.  
-# Otherwise, you can pass the structured findings to AI with utils/offline_ai_processor.py
-ai_run_integrated: false 
-
-ai_provider: AIPROVIDER
-ai_endpoint: https://api.ai.endpoint/
-ai_api_key: AI_API_KEY
-ai_model: AI_MODEL
-ai_temperature: 0.1
-ai_max_output_tokens: 20000
-ai_max_prompt_tokens: 20000
-
-# ai_user: anonymous #IF REQUIRED
-# ai_user_header: "X-User-ID" # IF REQUIRED
+# AI Configuration (Optional)
+# ai_analyze: false
+# # set to true to run in-line with health check.
+# # Otherwise, you can pass the structured findings to AI with utils/offline_ai_processor.py
+# ai_run_integrated: false
+# ai_provider: AIPROVIDER
+# ai_endpoint: https://api.ai.endpoint/
+# ai_api_key: AI_API_KEY
+# ai_model: AI_MODEL
+# ai_temperature: 0.1
+# ai_max_output_tokens: 20000
+# ai_max_prompt_tokens: 20000
+# ai_user: anonymous  # IF REQUIRED
+# ai_user_header: "X-User-ID"  # IF REQUIRED
 # Optional: Path to a custom SSL certificate for verifying AI endpoint (e.g., for corporate proxies)
 # ssl_cert_path: "/path/to/your/custom/cert.pem" 

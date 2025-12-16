@@ -1,0 +1,97 @@
+{
+  "oversized_shards": {
+    "metric_keywords": ["shard_sizing"],
+    "data_conditions": [
+      { "key": "has_oversized_shards", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_oversized_shards') == True",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Shards exceeding 50GB significantly impact recovery times, rebalancing performance, and cluster stability. Large shards can take hours to recover after node failure.",
+        "recommendations": [
+          "Implement ILM rollover policy to create new indices at target size",
+          "Reindex large indices with more primary shards",
+          "Use time-based indices with appropriate rollover conditions",
+          "Consider split index API for existing oversized indices",
+          "Monitor shard sizes as part of capacity planning"
+        ]
+      }
+    ]
+  },
+  "too_many_small_shards": {
+    "metric_keywords": ["shard_sizing"],
+    "data_conditions": [
+      { "key": "has_too_many_small_shards", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_too_many_small_shards') == True",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Many indices have unnecessarily small shards (<1GB). Each shard consumes memory overhead (10-50MB) and contributes to cluster state bloat.",
+        "recommendations": [
+          "Reduce primary shard count for small indices",
+          "Use shrink API to consolidate shards on closed indices",
+          "Review index templates to set appropriate shard counts",
+          "Consider single-shard indices for datasets under 10GB",
+          "Implement index lifecycle management with proper sizing"
+        ]
+      }
+    ]
+  },
+  "shard_optimization_opportunity": {
+    "metric_keywords": ["shard_sizing"],
+    "data_conditions": [
+      { "key": "shard_optimization_opportunity", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('shard_optimization_opportunity') == True",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Shard sizing issues detected that may benefit from capacity planning and optimization consulting.",
+        "recommendations": [
+          "Conduct shard sizing assessment",
+          "Review data modeling and index patterns",
+          "Implement shard sizing governance process",
+          "Engage performance optimization consulting"
+        ]
+      }
+    ]
+  },
+  "high_shards_per_node": {
+    "metric_keywords": ["shard_sizing"],
+    "data_conditions": [
+      { "key": "max_shards_per_node", "operator": ">", "value": 600 }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('max_shards_per_node', 0) > 1000",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Node has more than 1000 shards which exceeds recommended limits. This causes high heap usage, slow cluster state updates, and increased GC pressure.",
+        "recommendations": [
+          "Add nodes to distribute shard load",
+          "Consolidate small indices using shrink API",
+          "Reduce replica count if appropriate",
+          "Implement stricter shard allocation awareness",
+          "Review index lifecycle to delete old indices"
+        ]
+      },
+      {
+        "expression": "data.get('max_shards_per_node', 0) > 600",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Node has high shard count approaching recommended limits. Consider reducing shards or adding capacity.",
+        "recommendations": [
+          "Monitor node heap usage and GC patterns",
+          "Plan capacity expansion before hitting limits",
+          "Review shard allocation settings",
+          "Consider time-based index cleanup"
+        ]
+      }
+    ]
+  }
+}

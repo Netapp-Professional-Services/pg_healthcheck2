@@ -1,21 +1,29 @@
 """
-Kafka JVM Heap Check (Prometheus - Instaclustr)
+Kafka JVM Heap Usage Check (Unified Adaptive)
 
-Monitors JVM heap memory usage from Instaclustr Prometheus endpoints.
-Uses ic_node_heap* metrics specific to Instaclustr's managed Kafka service.
+Monitors JVM heap memory usage using adaptive collection strategy.
+High heap usage can lead to performance degradation and OutOfMemoryErrors.
 
 Health Check: prometheus_jvm_heap
-Source: Instaclustr Prometheus endpoints
-Requires: instaclustr_prometheus_enabled: true
+Collection Methods (in order of preference):
+1. Instaclustr Prometheus API
+2. Local Prometheus JMX Exporter (port 7500)
+3. Standard JMX (port 9999)
 
-Note: This check uses Instaclustr-specific metrics (ic_node_heap*).
-For self-hosted Kafka with SSH access, use check_jvm_stats.py instead.
+Metrics:
+- jvm_memory_bytes_used{area="heap"} / jvm_memory_bytes_max{area="heap"}
+
+IMPORTANCE:
+- High heap usage causes increased GC frequency and pause times
+- > 90% heap usage is dangerous - can lead to OutOfMemoryError
+- Monitor trends - consistently high usage indicates need for more heap
 """
 
 import logging
-from typing import Dict
 from datetime import datetime
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.metric_collection_strategies import collect_metric_adaptive
+from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +35,11 @@ def get_weight():
 
 def check_prometheus_jvm_heap(connector, settings):
     """
-    Check JVM heap memory usage via Prometheus (Instaclustr managed service).
+    Check JVM heap memory usage via adaptive collection strategy.
 
     Monitors:
-    - Heap memory used (ic_node_heapmemoryused_bytes)
-    - Heap memory max (ic_node_heapmemorymax_bytes)
+    - Heap memory used
+    - Heap memory max
     - Heap usage percentage
 
     Thresholds:
@@ -39,272 +47,241 @@ def check_prometheus_jvm_heap(connector, settings):
     - CRITICAL: > 90% heap usage
 
     Args:
-        connector: Kafka connector (not used for Prometheus checks)
-        settings: Configuration dictionary with Prometheus credentials
+        connector: Kafka connector with adaptive metric collection support
+        settings: Configuration dictionary
 
     Returns:
-        Structured findings with per-broker heap metrics
+        tuple: (adoc_content, structured_findings)
     """
-    # Initialize builder
     builder = CheckContentBuilder()
     builder.h3("JVM Heap Usage (Prometheus)")
 
-    # Check if Prometheus is enabled
-    if not settings.get('instaclustr_prometheus_enabled'):
-        findings = {
-            'prometheus_jvm_heap': {
+    try:
+        # Get metric definitions
+        heap_used_def = get_metric_definition('jvm_heap_used')
+        heap_max_def = get_metric_definition('jvm_heap_max')
+
+        if not heap_used_def or not heap_max_def:
+            builder.error("❌ JVM heap metric definitions not found")
+            findings = {
+                'status': 'error',
+                'error_message': 'Metric definitions not found',
+                'data': [],
+                'metadata': {'timestamp': datetime.utcnow().isoformat() + 'Z'}
+            }
+            return builder.build(), findings
+
+        # Collect both metrics adaptively
+        used_result = collect_metric_adaptive(heap_used_def, connector, settings)
+        max_result = collect_metric_adaptive(heap_max_def, connector, settings)
+
+        if not used_result and not max_result:
+            builder.warning(
+                "⚠️ Could not collect JVM heap metrics\n\n"
+                "*Tried collection methods:*\n"
+                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
+                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
+                "3. Standard JMX - Not available or SSH unavailable"
+            )
+            findings = {
                 'status': 'skipped',
-                'reason': 'Prometheus monitoring not enabled',
+                'reason': 'Unable to collect JVM heap metrics using any method',
                 'data': [],
                 'metadata': {
-                    'source': 'prometheus',
+                    'attempted_methods': ['instaclustr_prometheus', 'local_prometheus', 'jmx'],
                     'timestamp': datetime.utcnow().isoformat() + 'Z'
                 }
             }
-        }
-        return builder.build(), findings
-
-    try:
-        # Import here to avoid dependency if not using Prometheus
-        from plugins.common.prometheus_client import get_instaclustr_client
-
-        # Get cached Prometheus client (avoids rate limiting)
-        client = get_instaclustr_client(
-            cluster_id=settings['instaclustr_cluster_id'],
-            username=settings['instaclustr_prometheus_username'],
-            api_key=settings['instaclustr_prometheus_api_key'],
-            prometheus_base_url=settings.get('instaclustr_prometheus_base_url')
-        )
-
-        # Scrape all metrics from service discovery
-        all_metrics = client.scrape_all_nodes()
-
-        if not all_metrics:
-            builder.error("❌ No metrics available from Prometheus")
-            findings = {
-                'prometheus_jvm_heap': {
-                    'status': 'error',
-                    'error_message': 'No metrics available from Prometheus',
-                    'data': [],
-                    'metadata': {
-                        'source': 'prometheus',
-                        'timestamp': datetime.utcnow().isoformat() + 'Z'
-                    }
-                }
-            }
             return builder.build(), findings
 
-        # Extract JVM heap metrics (Instaclustr-specific ic_node_heap* metrics)
-        heap_used_metrics = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_heapmemoryused_bytes$')
-        heap_max_metrics = client.filter_metrics(all_metrics, name_pattern=r'^ic_node_heapmemorymax_bytes$')
-
-        if not heap_used_metrics or not heap_max_metrics:
-            builder.error("❌ JVM heap metrics not found")
-            findings = {
-                'prometheus_jvm_heap': {
-                    'status': 'error',
-                    'error_message': 'JVM heap metrics not found in Prometheus',
-                    'data': [],
-                    'metadata': {
-                        'source': 'prometheus',
-                        'timestamp': datetime.utcnow().isoformat() + 'Z'
-                    }
-                }
-            }
-            return builder.build(), findings
+        # Extract data
+        method = used_result.get('method') if used_result else max_result.get('method')
+        used_metrics = used_result.get('node_metrics', {}) if used_result else {}
+        max_metrics = max_result.get('node_metrics', {}) if max_result else {}
 
         # Get thresholds
-        heap_warning = settings.get('kafka_jvm_heap_warning_percent', 75)
-        heap_critical = settings.get('kafka_jvm_heap_critical_percent', 90)
+        warning_pct = settings.get('kafka_heap_warning_pct', 75)
+        critical_pct = settings.get('kafka_heap_critical_pct', 90)
 
-        # Group by broker/node
-        broker_data = {}
-
-        # Process heap used metrics
-        for metric in heap_used_metrics:
-            labels = metric.get('labels', {})
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', labels.get('nodeID', 'unknown'))
-
-            if node_id not in broker_data:
-                broker_data[node_id] = {
-                    'node_id': node_id,
-                    'public_ip': target_labels.get('PublicIp', 'unknown'),
-                    'rack': target_labels.get('Rack', 'unknown'),
-                    'datacenter': target_labels.get('ClusterDataCenterName', 'unknown')
-                }
-
-            broker_data[node_id]['heap_used_bytes'] = metric['value']
-
-        # Process heap max metrics
-        for metric in heap_max_metrics:
-            labels = metric.get('labels', {})
-            target_labels = metric.get('target_labels', {})
-            node_id = target_labels.get('NodeId', labels.get('nodeID', 'unknown'))
-
-            if node_id in broker_data:
-                broker_data[node_id]['heap_max_bytes'] = metric['value']
-
-        # Calculate heap percentage and check thresholds
+        # Combine broker data and calculate percentages
+        all_hosts = set(used_metrics.keys()) | set(max_metrics.keys())
+        node_data = []
         critical_brokers = []
         warning_brokers = []
-        healthy_brokers = []
-        broker_list = []
 
-        for node_id, data in broker_data.items():
-            heap_used = data.get('heap_used_bytes', 0)
-            heap_max = data.get('heap_max_bytes', 1)  # Avoid division by zero
+        for host in all_hosts:
+            heap_used = used_metrics.get(host, 0)
+            heap_max = max_metrics.get(host, 1)  # Avoid division by zero
+            heap_pct = (heap_used / heap_max * 100) if heap_max > 0 else 0
 
-            if heap_max > 0:
-                heap_percent = (heap_used / heap_max) * 100
-            else:
-                heap_percent = 0
-
-            # Convert to GB for display
-            heap_used_gb = heap_used / (1024**3)
-            heap_max_gb = heap_max / (1024**3)
-
-            broker_info = {
-                'node_id': node_id,
-                'public_ip': data.get('public_ip', 'unknown'),
-                'rack': data.get('rack', 'unknown'),
-                'heap_used_gb': round(heap_used_gb, 2),
-                'heap_max_gb': round(heap_max_gb, 2),
-                'heap_percent': round(heap_percent, 1)
+            broker_entry = {
+                'node_id': host,
+                'host': host,
+                'heap_used_bytes': int(heap_used),
+                'heap_max_bytes': int(heap_max),
+                'heap_used_mb': round(heap_used / 1024 / 1024, 1),
+                'heap_max_mb': round(heap_max / 1024 / 1024, 1),
+                'heap_usage_pct': round(heap_pct, 1)
             }
+            node_data.append(broker_entry)
 
-            broker_list.append(broker_info)
+            # Check thresholds
+            if heap_pct >= critical_pct:
+                critical_brokers.append(broker_entry)
+            elif heap_pct >= warning_pct:
+                warning_brokers.append(broker_entry)
 
-            # Categorize by severity
-            if heap_percent >= heap_critical:
-                critical_brokers.append(broker_info)
-            elif heap_percent >= heap_warning:
-                warning_brokers.append(broker_info)
-            else:
-                healthy_brokers.append(broker_info)
+        if not node_data:
+            builder.error("❌ No broker data available")
+            findings = {
+                'status': 'error',
+                'error_message': 'No broker data available',
+                'data': [],
+                'metadata': {'method': method, 'timestamp': datetime.utcnow().isoformat() + 'Z'}
+            }
+            return builder.build(), findings
 
-        # === REPORT FINDINGS ===
+        # Determine overall status
         if critical_brokers:
-            builder.critical_issue(
-                f"🔴 Critical heap usage on {len(critical_brokers)} broker(s)",
-                {
-                    "Threshold": f">{heap_critical}%",
-                    "Action Required": "Immediate investigation needed"
-                }
-            )
-            builder.blank()
+            status = 'critical'
+            severity = 10
+            message = f"🔴 CRITICAL: {len(critical_brokers)} broker(s) with dangerous heap usage (>{critical_pct}%)"
+        elif warning_brokers:
+            status = 'warning'
+            severity = 7
+            message = f"⚠️  {len(warning_brokers)} broker(s) with high heap usage (>{warning_pct}%)"
+        else:
+            status = 'healthy'
+            severity = 0
+            message = f"✅ JVM heap usage healthy across {len(node_data)} brokers"
 
-            for broker in critical_brokers:
-                builder.para(
-                    f"**Broker {broker['node_id']}** ({broker['public_ip']}): "
-                    f"{broker['heap_percent']}% heap usage "
-                    f"({broker['heap_used_gb']:.1f}GB / {broker['heap_max_gb']:.1f}GB)"
-                )
+        # Calculate cluster aggregates
+        avg_heap_pct = sum(b['heap_usage_pct'] for b in node_data) / len(node_data)
+        total_heap_used_gb = sum(b['heap_used_bytes'] for b in node_data) / 1024 / 1024 / 1024
+        total_heap_max_gb = sum(b['heap_max_bytes'] for b in node_data) / 1024 / 1024 / 1024
 
-            builder.blank()
+        # Build structured findings
+        findings = {
+            'status': status,
+            'severity': severity,
+            'message': message,
+            'data': {
+                'per_broker_heap': node_data,
+                'cluster_aggregate': {
+                    'avg_heap_usage_pct': round(avg_heap_pct, 1),
+                    'total_heap_used_gb': round(total_heap_used_gb, 2),
+                    'total_heap_max_gb': round(total_heap_max_gb, 2),
+                    'brokers_critical': len(critical_brokers),
+                    'brokers_warning': len(warning_brokers),
+                    'broker_count': len(node_data),
+                    'thresholds': {
+                        'warning_pct': warning_pct,
+                        'critical_pct': critical_pct
+                    }
+                },
+                'collection_method': method
+            },
+            'metadata': {
+                'source': method,
+                'metrics': ['jvm_heap_used', 'jvm_heap_max'],
+                'broker_count': len(node_data),
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+        }
+
+        if critical_brokers:
+            findings['data']['critical_heap_usage'] = {
+                'count': len(critical_brokers),
+                'brokers': critical_brokers,
+                'recommendation': 'URGENT: Increase heap size or reduce memory usage - OutOfMemoryError imminent'
+            }
 
         if warning_brokers:
-            builder.warning(
-                f"⚠️ High heap usage on {len(warning_brokers)} broker(s)"
+            findings['data']['warning_heap_usage'] = {
+                'count': len(warning_brokers),
+                'brokers': warning_brokers,
+                'recommendation': 'Monitor heap usage trends - plan heap increase'
+            }
+
+        # Generate AsciiDoc output
+        if status == 'critical':
+            builder.critical(message)
+            builder.blank()
+            builder.text("*🚨 CRITICAL: OutOfMemoryError Risk 🚨*")
+            builder.blank()
+            builder.text("High heap usage (>90%) can cause:")
+            builder.text("• Frequent Full GC pauses (broker unresponsiveness)")
+            builder.text("• OutOfMemoryError crashes")
+            builder.text("• Severe performance degradation")
+            builder.blank()
+        elif status == 'warning':
+            builder.warning(message)
+            builder.blank()
+        else:
+            builder.success(message)
+            builder.blank()
+
+        builder.text("*Cluster Summary:*")
+        builder.text(f"- Avg Heap Usage: {round(avg_heap_pct, 1)}%")
+        builder.text(f"- Total Heap Allocated: {round(total_heap_max_gb, 2)} GB")
+        builder.text(f"- Total Heap Used: {round(total_heap_used_gb, 2)} GB")
+        builder.text(f"- Brokers at Risk: {len(critical_brokers)} critical, {len(warning_brokers)} warning")
+        builder.text(f"- Brokers Monitored: {len(node_data)}")
+        builder.text(f"- Collection Method: {method}")
+        builder.blank()
+
+        builder.text("*Per-Broker Heap Usage:*")
+        for broker in sorted(node_data, key=lambda x: x['heap_usage_pct'], reverse=True):
+            status_icon = "🔴" if broker['heap_usage_pct'] >= critical_pct else "⚠️" if broker['heap_usage_pct'] >= warning_pct else "✅"
+            builder.text(
+                f"{status_icon} Broker {broker['node_id']}: "
+                f"{broker['heap_used_mb']:.1f}/{broker['heap_max_mb']:.1f} MB ({broker['heap_usage_pct']}%)"
             )
-            builder.blank()
+        builder.blank()
 
-            for broker in warning_brokers:
-                builder.para(
-                    f"**Broker {broker['node_id']}** ({broker['public_ip']}): "
-                    f"{broker['heap_percent']}% heap usage "
-                    f"({broker['heap_used_gb']:.1f}GB / {broker['heap_max_gb']:.1f}GB)"
-                )
-
-            builder.blank()
-
-        if healthy_brokers and not critical_brokers and not warning_brokers:
-            builder.success(
-                f"✅ All {len(healthy_brokers)} brokers have healthy heap usage"
-            )
-            builder.blank()
-
-        # === SUMMARY TABLE ===
-        if broker_list:
-            # Calculate cluster-wide stats
-            total_heap_used = sum(b['heap_used_gb'] for b in broker_list)
-            total_heap_max = sum(b['heap_max_gb'] for b in broker_list)
-            avg_heap_percent = sum(b['heap_percent'] for b in broker_list) / len(broker_list)
-
-            builder.para("*Cluster Summary:*")
-            builder.blank()
-            builder.para(f"- Average Heap Usage: {avg_heap_percent:.1f}%")
-            builder.para(f"- Total Heap Used: {total_heap_used:.1f} GB")
-            builder.para(f"- Total Heap Max: {total_heap_max:.1f} GB")
-            builder.para(f"- Brokers Monitored: {len(broker_list)}")
-            builder.blank()
-
-        # === RECOMMENDATIONS ===
         if critical_brokers or warning_brokers:
-            recommendations = {}
-
-            if critical_brokers:
-                recommendations["critical"] = [
-                    "Investigate high heap usage immediately - may indicate memory leak or undersized heap",
-                    "Review application memory usage patterns and GC behavior",
-                    "Consider increasing heap size if sustained high usage",
-                    "Check for memory-intensive operations (large messages, excessive buffering)"
+            recommendations = {
+                "critical" if critical_brokers else "high": [
+                    "JVM Heap Issues - Immediate Actions:",
+                    "  1. Increase heap size: Edit -Xms and -Xmx JVM options",
+                    "  2. Typical Kafka heap: 6-8 GB (but keep < 32 GB for compressed oops)",
+                    "  3. Restart broker (rolling restart for zero downtime)",
+                    "  4. Monitor heap usage after restart",
+                    "",
+                    "Root Cause Analysis:",
+                    "  • Check for memory leaks (heap grows continuously)",
+                    "  • Review partition count (2 FDs + memory per partition)",
+                    "  • Check message sizes (large messages increase heap pressure)",
+                    "  • Review consumer fetch sizes (fetch.max.bytes)",
+                    "  • Analyze GC logs for patterns",
+                    "",
+                    "Tuning Recommendations:",
+                    "  • Use G1GC: -XX:+UseG1GC (default in modern Kafka)",
+                    "  • Set Xms = Xmx (avoid heap resizing overhead)",
+                    "  • Keep heap < 32 GB (compressed oops boundary)",
+                    "  • For very large heaps, consider ZGC or Shenandoah",
+                    "  • Monitor off-heap memory (page cache) usage"
+                ],
+                "general": [
+                    "Best Practices:",
+                    "  • Typical production heap: 6-8 GB",
+                    "  • Alert at 75% (warning), 90% (critical)",
+                    "  • Monitor heap trends over time",
+                    "  • Plan for 2x expected usage as buffer",
+                    "  • Remember: Kafka relies heavily on page cache, not just heap"
                 ]
-
-            if warning_brokers:
-                recommendations["high"] = [
-                    "Monitor heap trends to detect gradual memory growth",
-                    "Review GC logs for excessive full garbage collections",
-                    "Consider heap size optimization based on workload",
-                    "Plan capacity upgrades if heap usage continues to grow"
-                ]
-
-            recommendations["general"] = [
-                "Set appropriate -Xmx and -Xms JVM flags (typically 6-8GB for production)",
-                "Monitor GC pause times in addition to heap usage",
-                "Use G1GC or ZGC for better heap management on large heaps",
-                "Keep heap usage below 75% for optimal performance",
-                "Set up alerts for heap usage thresholds (warning: 75%, critical: 90%)"
-            ]
-
+            }
             builder.recs(recommendations)
 
-        # === STRUCTURED DATA ===
-        findings = {
-            'prometheus_jvm_heap': {
-                'status': 'success',
-                'brokers_checked': len(broker_list),
-                'critical_count': len(critical_brokers),
-                'warning_count': len(warning_brokers),
-                'healthy_count': len(healthy_brokers),
-                'average_heap_percent': round(avg_heap_percent, 1) if broker_list else 0,
-                'total_heap_used_gb': round(total_heap_used, 2) if broker_list else 0,
-                'total_heap_max_gb': round(total_heap_max, 2) if broker_list else 0,
-                'thresholds': {
-                    'heap_warning_percent': heap_warning,
-                    'heap_critical_percent': heap_critical
-                },
-                'data': broker_list,
-                'metadata': {
-                    'source': 'prometheus',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
-            }
-        }
+        return builder.build(), findings
 
     except Exception as e:
-        import traceback
-        logger.error(f"Prometheus JVM heap check failed: {e}\n{traceback.format_exc()}")
-        builder.error(f"Check failed: {e}")
+        logger.error(f"JVM heap check failed: {e}", exc_info=True)
+        builder.error(f"❌ Check failed: {str(e)}")
         findings = {
-            'prometheus_jvm_heap': {
-                'status': 'error',
-                'details': str(e),
-                'metadata': {
-                    'source': 'prometheus',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
-            }
+            'status': 'error',
+            'error_message': str(e),
+            'data': [],
+            'metadata': {'timestamp': datetime.utcnow().isoformat() + 'Z'}
         }
-
-    return builder.build(), findings
+        return builder.build(), findings

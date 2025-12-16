@@ -1,0 +1,80 @@
+{
+    "no_backup_configured": {
+        "metric_keywords": ["snapshot_status"],
+        "data_conditions": [
+            {"key": "no_backup_configured", "operator": "==", "value": true}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('no_backup_configured') == True",
+                "level": "critical",
+                "score": 10,
+                "reasoning": "No snapshot repositories or SLM policies are configured. Without backups, data recovery after failure is impossible.",
+                "recommendations": [
+                    "Configure a snapshot repository (S3, GCS, Azure, or shared filesystem)",
+                    "Create SLM policies for automated daily snapshots",
+                    "Test restore procedures regularly"
+                ]
+            }
+        ]
+    },
+    "no_slm_policies": {
+        "metric_keywords": ["snapshot_status"],
+        "data_conditions": [
+            {"key": "has_repositories", "operator": "==", "value": true},
+            {"key": "has_policies", "operator": "==", "value": false}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('has_repositories') == True and data.get('has_policies') == False",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Snapshot repositories exist but no automated backup policies (SLM) are configured. Manual snapshots are required.",
+                "recommendations": [
+                    "Create SLM policies for automated backup scheduling",
+                    "Recommended: Daily snapshots with at least 7-day retention",
+                    "Configure retention policies to manage storage costs"
+                ]
+            }
+        ]
+    },
+    "high_snapshot_failure_rate": {
+        "metric_keywords": ["snapshot_status"],
+        "data_conditions": [
+            {"key": "snapshot_failure_rate", "operator": ">", "value": 10}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('snapshot_failure_rate', 0) > 10",
+                "level": "high",
+                "score": 7,
+                "reasoning": "Snapshot failure rate exceeds 10%. Backups may not be reliable for disaster recovery.",
+                "recommendations": [
+                    "Review snapshot logs to identify failure causes",
+                    "Check repository connectivity and permissions",
+                    "Verify sufficient storage space in repository",
+                    "Consider adjusting snapshot timeouts for large indices"
+                ]
+            }
+        ]
+    },
+    "policies_without_success": {
+        "metric_keywords": ["snapshot_status"],
+        "data_conditions": [
+            {"key": "policies_without_success_count", "operator": ">", "value": 0}
+        ],
+        "rules": [
+            {
+                "expression": "data.get('policies_without_success_count', 0) > 0",
+                "level": "medium",
+                "score": 5,
+                "reasoning": "One or more SLM policies have no recorded successful snapshots. Backup reliability is uncertain.",
+                "recommendations": [
+                    "Manually trigger a snapshot to test policy configuration",
+                    "Check SLM stats for failure details",
+                    "Verify repository is accessible and writable"
+                ]
+            }
+        ]
+    }
+}

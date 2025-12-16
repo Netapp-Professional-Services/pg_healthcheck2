@@ -1,6 +1,9 @@
 {
   "critical_io_utilization": {
-    "metric_keywords": ["iostat", "io_data"],
+    "metric_keywords": [
+      "iostat",
+      "io_data"
+    ],
     "rules": [
       {
         "expression": "data.get('util', 0) >= 95",
@@ -25,10 +28,31 @@
           "Review and optimize Kafka flush settings"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "await",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "device",
+        "exists": true
+      },
+      {
+        "key": "util",
+        "exists": true
+      }
     ]
   },
   "high_io_latency": {
-    "metric_keywords": ["iostat", "io_data"],
+    "metric_keywords": [
+      "iostat",
+      "io_data"
+    ],
     "rules": [
       {
         "expression": "data.get('await', 0) >= 50",
@@ -53,10 +77,27 @@
           "Check if compaction is causing temporary spikes"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "await",
+        "exists": true
+      },
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "device",
+        "exists": true
+      }
     ]
   },
   "high_cpu_iowait": {
-    "metric_keywords": ["iostat", "cpu_data"],
+    "metric_keywords": [
+      "iostat",
+      "cpu_data"
+    ],
     "rules": [
       {
         "expression": "data.get('iowait', 0) >= 25",
@@ -81,10 +122,23 @@
           "Consider storage upgrade or workload optimization"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "iowait",
+        "exists": true
+      }
     ]
   },
   "low_throughput_high_ops": {
-    "metric_keywords": ["iostat", "io_data"],
+    "metric_keywords": [
+      "iostat",
+      "io_data"
+    ],
     "rules": [
       {
         "expression": "data.get('r_s', 0) + data.get('w_s', 0) > 500 and (data.get('rkB_s', 0) + data.get('wkB_s', 0)) / (data.get('r_s', 0) + data.get('w_s', 0) + 1) < 32",
@@ -97,10 +151,38 @@
           "Small I/O operations are less efficient than larger batched writes"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "broker_id",
+        "exists": true
+      },
+      {
+        "key": "device",
+        "exists": true
+      },
+      {
+        "key": "r_s",
+        "exists": true
+      },
+      {
+        "key": "rkB_s",
+        "exists": true
+      },
+      {
+        "key": "w_s",
+        "exists": true
+      },
+      {
+        "key": "wkB_s",
+        "exists": true
+      }
     ]
   },
   "cluster_wide_io_issues": {
-    "metric_keywords": ["iostat_summary"],
+    "metric_keywords": [
+      "iostat_summary"
+    ],
     "rules": [
       {
         "expression": "data.get('critical_broker_count', 0) >= 2",
@@ -135,6 +217,20 @@
           "Consider faster storage across all brokers",
           "Review and optimize I/O patterns"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "critical_broker_count",
+        "exists": true
+      },
+      {
+        "key": "max_iowait",
+        "exists": true
+      },
+      {
+        "key": "warning_broker_count",
+        "exists": true
       }
     ]
   }

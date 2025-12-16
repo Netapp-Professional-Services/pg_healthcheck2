@@ -1,29 +1,79 @@
 {
   "critical_network_errors": {
-    "metric_keywords": ["prometheus_network_errors", "per_broker_network", "data"],
-    "data_conditions": [{"key": "total_errors", "exists": true}],
-    "rules": [{
-      "expression": "data.get('total_errors', 0) >= 100",
-      "level": "critical",
-      "score": 10,
-      "reasoning": "🚨 Broker {data.get('node_id', 'unknown')[:8]} has critical network errors: {data.get('total_errors')} (RX: {data.get('rx_errors', 0)}, TX: {data.get('tx_errors', 0)}, Drops: {data.get('rx_drops', 0) + data.get('tx_drops', 0)})",
-      "recommendations": [
-        "Check NIC status: ethtool eth0",
-        "Check switch port statistics",
-        "Verify cable connections",
-        "Network errors cause message corruption/loss"
-      ]
-    }]
+    "metric_keywords": [
+      "prometheus_network_errors",
+      "per_broker_network",
+      "data"
+    ],
+    "data_conditions": [
+      {
+        "key": "total_errors",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      },
+      {
+        "key": "rx_drops",
+        "exists": true
+      },
+      {
+        "key": "rx_errors",
+        "exists": true
+      },
+      {
+        "key": "tx_drops",
+        "exists": true
+      },
+      {
+        "key": "tx_errors",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_errors', 0) >= 100",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "\ud83d\udea8 Broker {data.get('node_id', 'unknown')[:8]} has critical network errors: {data.get('total_errors')} (RX: {data.get('rx_errors', 0)}, TX: {data.get('tx_errors', 0)}, Drops: {data.get('rx_drops', 0) + data.get('tx_drops', 0)})",
+        "recommendations": [
+          "Check NIC status: ethtool eth0",
+          "Check switch port statistics",
+          "Verify cable connections",
+          "Network errors cause message corruption/loss"
+        ]
+      }
+    ]
   },
   "warning_network_errors": {
-    "metric_keywords": ["prometheus_network_errors", "per_broker_network", "data"],
-    "data_conditions": [{"key": "total_errors", "exists": true}],
-    "rules": [{
-      "expression": "data.get('total_errors', 0) > 0 and data.get('total_errors', 0) < 100",
-      "level": "high",
-      "score": 8,
-      "reasoning": "Network errors detected on broker {data.get('node_id', 'unknown')[:8]}: {data.get('total_errors')}",
-      "recommendations": ["Monitor network health", "Check for intermittent issues", "Review network infrastructure"]
-    }]
+    "metric_keywords": [
+      "prometheus_network_errors",
+      "per_broker_network",
+      "data"
+    ],
+    "data_conditions": [
+      {
+        "key": "total_errors",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_errors', 0) > 0 and data.get('total_errors', 0) < 100",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Network errors detected on broker {data.get('node_id', 'unknown')[:8]}: {data.get('total_errors')}",
+        "recommendations": [
+          "Monitor network health",
+          "Check for intermittent issues",
+          "Review network infrastructure"
+        ]
+      }
+    ]
   }
 }

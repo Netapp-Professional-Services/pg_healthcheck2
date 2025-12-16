@@ -1,8 +1,19 @@
 {
   "critical_produce_latency": {
-    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "per_broker_latency",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "produce_latency_ms", "exists": true }
+      {
+        "key": "produce_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -21,11 +32,21 @@
       }
     ]
   },
-
   "warning_produce_latency": {
-    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "per_broker_latency",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "produce_latency_ms", "exists": true }
+      {
+        "key": "produce_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -43,11 +64,21 @@
       }
     ]
   },
-
   "critical_fetch_consumer_latency": {
-    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "per_broker_latency",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "fetch_consumer_latency_ms", "exists": true }
+      {
+        "key": "fetch_consumer_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -65,11 +96,21 @@
       }
     ]
   },
-
   "warning_fetch_consumer_latency": {
-    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "per_broker_latency",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "fetch_consumer_latency_ms", "exists": true }
+      {
+        "key": "fetch_consumer_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -86,11 +127,21 @@
       }
     ]
   },
-
   "critical_fetch_follower_latency": {
-    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "per_broker_latency",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "fetch_follower_latency_ms", "exists": true }
+      {
+        "key": "fetch_follower_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -108,11 +159,21 @@
       }
     ]
   },
-
   "warning_fetch_follower_latency": {
-    "metric_keywords": ["prometheus_request_latency", "per_broker_latency", "data"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "per_broker_latency",
+      "data"
+    ],
     "data_conditions": [
-      { "key": "fetch_follower_latency_ms", "exists": true }
+      {
+        "key": "fetch_follower_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "node_id",
+        "exists": true
+      }
     ],
     "rules": [
       {
@@ -129,9 +190,11 @@
       }
     ]
   },
-
   "cluster_latency_degradation": {
-    "metric_keywords": ["prometheus_request_latency", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_produce_latency_ms', 0) >= 300 or data.get('avg_fetch_consumer_latency_ms', 0) >= 300",
@@ -160,11 +223,23 @@
           "Consider performance tuning or capacity planning"
         ]
       }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_fetch_consumer_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "avg_produce_latency_ms",
+        "exists": true
+      }
     ]
   },
-
   "healthy_latency": {
-    "metric_keywords": ["prometheus_request_latency", "cluster_aggregate"],
+    "metric_keywords": [
+      "prometheus_request_latency",
+      "cluster_aggregate"
+    ],
     "rules": [
       {
         "expression": "data.get('avg_produce_latency_ms', 0) < 50 and data.get('avg_fetch_consumer_latency_ms', 0) < 50",
@@ -177,6 +252,16 @@
           "Consider documenting configuration for future reference",
           "Monitor p99 latencies for early warning of issues"
         ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "avg_fetch_consumer_latency_ms",
+        "exists": true
+      },
+      {
+        "key": "avg_produce_latency_ms",
+        "exists": true
       }
     ]
   }

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Cassandra Performance Upgrades{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-900">Cassandra Performance Upgrade Candidates</h2>
+            <p class="text-slate-600 mt-1">Clusters with high latency needing performance improvements</p>
+        </div>
+        <a href="{{ url_for('main.analysis_dashboard') }}"
+           class="px-4 py-2 text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+            ← Back to Analysis
+        </a>
+    </div>
+</div>
+
+{% if candidates %}
+<div class="bg-white border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Company</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Cluster</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">Read p99 (ms)</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">Write p99 (ms)</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-700 uppercase">Heap %</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Priority</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Recommendation</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase">Last Check</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-slate-100">
+                {% for candidate in candidates %}
+                <tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 text-sm font-medium text-slate-900">
+                        {{ candidate.company_name }}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-slate-700">
+                        {{ candidate.target_host }}:{{ candidate.target_port }}
+                        <div class="text-xs text-slate-500 mt-1">Run #{{ candidate.run_id }}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right font-mono">
+                        {% if candidate.read_p99_ms %}
+                        <span class="{% if candidate.read_p99_ms > 100 %}text-red-700 font-semibold{% elif candidate.read_p99_ms > 50 %}text-orange-700 font-semibold{% else %}text-slate-900{% endif %}">
+                            {{ "{:.1f}".format(candidate.read_p99_ms) }}
+                        </span>
+                        {% else %}
+                        <span class="text-slate-400">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right font-mono">
+                        {% if candidate.write_p99_ms %}
+                        <span class="{% if candidate.write_p99_ms > 100 %}text-red-700 font-semibold{% elif candidate.write_p99_ms > 50 %}text-orange-700 font-semibold{% else %}text-slate-700{% endif %}">
+                            {{ "{:.1f}".format(candidate.write_p99_ms) }}
+                        </span>
+                        {% else %}
+                        <span class="text-slate-400">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-right font-mono">
+                        {% if candidate.heap_used_percent %}
+                        <span class="{% if candidate.heap_used_percent > 70 %}text-orange-700 font-semibold{% else %}text-slate-700{% endif %}">
+                            {{ "{:.1f}".format(candidate.heap_used_percent) }}%
+                        </span>
+                        {% else %}
+                        <span class="text-slate-400">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                        {% if candidate.upgrade_priority == 'critical' %}
+                        <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800">CRITICAL</span>
+                        {% elif candidate.upgrade_priority == 'high' %}
+                        <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800">HIGH</span>
+                        {% elif candidate.upgrade_priority == 'medium' %}
+                        <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800">MEDIUM</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-medium bg-slate-100 text-slate-700">LOW</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-slate-700">{{ candidate.recommendation }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-600">
+                        {{ candidate.run_timestamp.strftime('%Y-%m-%d %H:%M') if candidate.run_timestamp else 'N/A' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-4 text-sm text-slate-600">
+    <strong>Found {{ candidates|length }} Cassandra performance upgrade opportunities</strong>
+</div>
+{% else %}
+<div class="bg-slate-50 border border-slate-200 p-8 text-center">
+    <p class="text-slate-700">
+        <strong>No Performance Issues Found</strong><br>
+        <span class="text-sm text-slate-600 mt-2 block">
+            All Cassandra clusters are meeting latency SLAs.
+        </span>
+    </p>
+</div>
+{% endif %}
+
+<!-- Info Box -->
+<div class="mt-8 bg-blue-50 border border-blue-200 p-6">
+    <h3 class="text-sm font-semibold text-blue-900 mb-2">About Cassandra Performance Upgrades</h3>
+    <div class="text-sm text-blue-800 space-y-2">
+        <p><strong>Latency Thresholds (p99):</strong></p>
+        <ul class="list-disc list-inside ml-2">
+            <li>Critical (>100ms) → Urgent: Upgrade to faster storage (NVMe) or add nodes</li>
+            <li>High (>50ms) → Consider performance upgrade or horizontal scaling</li>
+            <li>Medium (>25ms) → Monitor trends and plan for upgrade</li>
+        </ul>
+        <p class="mt-3 pt-3 border-t border-blue-300">
+            <strong>Upgrade Options:</strong> NVMe SSDs (10x faster than standard), larger instance types (more RAM for caching), horizontal scaling (additional nodes).
+        </p>
+        <p>
+            <strong>Estimated Revenue:</strong> $800-2,000/month per upgrade depending on storage tier and node count.
+        </p>
+    </div>
+</div>
+{% endblock %}
