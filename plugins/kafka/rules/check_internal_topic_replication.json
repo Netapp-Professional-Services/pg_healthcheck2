@@ -1,0 +1,153 @@
+{
+  "critical_internal_topic_replication": {
+    "metric_keywords": [
+      "internal_topic_replication",
+      "kafka",
+      "replication"
+    ],
+    "rules": [
+      {
+        "expression": "data.get('replication_factor', 0) == 1",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Internal topic {data.get('topic')} has replication factor 1. NO FAULT TOLERANCE - broker failure causes permanent data loss for consumer offsets and transaction state!",
+        "recommendations": [
+          "URGENT: Increase replication factor to at least 3",
+          "Internal topics with RF=1 have no fault tolerance",
+          "Broker failure will cause permanent data loss",
+          "Consumer offsets and transaction state will be lost",
+          "Use kafka-reassign-partitions tool to increase replication",
+          "Plan maintenance window for replica addition"
+        ]
+      },
+      {
+        "expression": "data.get('under_replicated_partitions', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Internal topic {data.get('topic')} has {data.get('under_replicated_partitions')} under-replicated partition(s). Immediate risk of data unavailability!",
+        "recommendations": [
+          "URGENT: Check broker status and logs for failures",
+          "Restart or recover affected brokers to restore replication",
+          "Monitor the cluster controller and ISR status closely",
+          "Under-replicated internal topics can cause cluster-wide issues"
+        ]
+      },
+      {
+        "expression": "data.get('replication_factor', 0) < 3 and data.get('replication_factor', 0) > 1",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Internal topic {data.get('topic')} has replication factor {data.get('replication_factor')}. Limited fault tolerance for critical cluster operations.",
+        "recommendations": [
+          "Increase replication factor to 3 for internal topics",
+          "RF=2 provides minimal fault tolerance",
+          "RF=3 is recommended for production",
+          "Internal topics are critical for cluster operation",
+          "Low replication can impact consumer groups and transactional producers"
+        ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "replication_factor",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
+      },
+      {
+        "key": "under_replicated_partitions",
+        "exists": true
+      }
+    ]
+  },
+  "internal_topic_replication_warnings": {
+    "metric_keywords": [
+      "internal_topic_replication"
+    ],
+    "rules": [
+      {
+        "expression": "data.get('replication_factor', 0) == 2",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Internal topic {data.get('topic')} has replication factor 2. Limited fault tolerance - can only survive 1 broker failure.",
+        "recommendations": [
+          "Increase replication factor to 3 for internal topics",
+          "RF=2 provides minimal fault tolerance",
+          "RF=3 is industry standard for production",
+          "Internal topics are critical for cluster operation",
+          "Balance durability requirements vs storage costs"
+        ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "replication_factor",
+        "exists": true
+      },
+      {
+        "key": "topic",
+        "exists": true
+      }
+    ]
+  },
+  "multiple_internal_topics_with_issues": {
+    "metric_keywords": [
+      "internal_topic_replication",
+      "health_summary"
+    ],
+    "rules": [
+      {
+        "expression": "len(all_structured_findings.get('check_internal_topic_replication', {}).get('internal_topic_replication', {}).get('critical_topics', [])) >= 1",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Multiple internal topics ({len(all_structured_findings.get('check_internal_topic_replication', {}).get('internal_topic_replication', {}).get('critical_topics', []))}) have critical replication issues. Cluster-wide risk!",
+        "recommendations": [
+          "URGENT: Perform immediate cluster-wide replication audit",
+          "Internal topics with replication issues pose cluster-wide risks",
+          "Consumer offsets and transaction state are at risk",
+          "Review broker configuration and cluster health",
+          "Plan immediate maintenance to increase replication"
+        ]
+      }
+    ],
+    "data_conditions": [
+      {
+        "key": "critical_count",
+        "exists": true
+      }
+    ]
+  },
+  "internal_topic_replication_health": {
+    "metric_keywords": [
+      "internal_topic_replication"
+    ],
+    "data_conditions": [
+      {
+        "key": "topics_checked",
+        "exists": true
+      },
+      {
+        "key": "critical_count",
+        "exists": true
+      },
+      {
+        "key": "warning_count",
+        "exists": true
+      }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('critical_count', 0) == 0 and data.get('warning_count', 0) == 0 and data.get('topics_checked', 0) > 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "All {data.get('topics_checked')} internal topic(s) have adequate replication factor. Excellent cluster configuration!",
+        "recommendations": [
+          "Maintain replication standards as cluster grows",
+          "Monitor internal topic replication during maintenance",
+          "Document configuration decisions for future reference"
+        ]
+      }
+    ]
+  }
+}

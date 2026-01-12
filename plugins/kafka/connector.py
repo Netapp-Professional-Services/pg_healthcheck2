@@ -824,7 +824,8 @@ class KafkaConnector(SSHSupportMixin):
         Executes Kafka Admin API operations or shell commands via JSON dispatch.
         
         Supported operations:
-        - list_topics
+        - list_topics (user topics only, excludes internal topics)
+        - admin_list_topics (all topics including internal topics)
         - describe_topics
         - list_consumer_groups
         - describe_consumer_groups
@@ -853,6 +854,8 @@ class KafkaConnector(SSHSupportMixin):
                 return self._execute_shell_command(query_obj.get('command'), return_raw)
             elif operation == 'list_topics':
                 return self._list_topics(return_raw)
+            elif operation == 'admin_list_topics':
+                return self._list_all_topics(return_raw)
             elif operation == 'describe_topics':
                 return self._describe_topics_from_admin_client(query_obj.get('topics', []), return_raw)
             elif operation == 'list_consumer_groups':
@@ -1032,6 +1035,107 @@ class KafkaConnector(SSHSupportMixin):
                         formatted += "\n".join(f"  - {t}" for t in user_topics)
 
                     logger.info(f"✅ Successfully listed {len(user_topics)} topics via SSH on {host}")
+                    return (formatted, raw) if return_raw else formatted
+                else:
+                    logger.debug(f"SSH topic listing failed on {host}: exit {exit_code}")
+
+            # All SSH attempts failed
+            logger.warning("SSH topic listing failed on all hosts")
+            return None
+
+        except Exception as e:
+            logger.warning(f"SSH topic listing failed: {e}")
+            return None
+
+    def _list_all_topics(self, return_raw=False):
+        """
+        Lists ALL topics including internal topics (those starting with '__' or '_').
+        
+        This is used by checks that need to audit internal topics like __consumer_offsets.
+        For user-facing operations, use _list_topics() which filters out internal topics.
+        """
+        import time
+        from kafka.errors import KafkaError
+
+        # Retry logic for intermittent connection issues
+        max_retries = 3
+        retry_delay = 1
+
+        for attempt in range(max_retries):
+            try:
+                topics = self.admin_client.list_topics()
+                all_topics = sorted(list(topics))  # Include ALL topics, no filtering
+                raw = {'topics': all_topics, 'count': len(all_topics)}
+
+                if not all_topics:
+                    formatted = self.formatter.format_note("No topics found.")
+                else:
+                    formatted = f"All Topics ({len(all_topics)}):\n\n"
+                    formatted += "\n".join(f"  - {t}" for t in all_topics)
+
+                return (formatted, raw) if return_raw else formatted
+
+            except KafkaError as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Failed to list all topics (attempt {attempt + 1}/{max_retries}): {e}")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    # Final attempt failed - try SSH fallback if available
+                    logger.warning(f"Admin client failed to list all topics after {max_retries} attempts: {e}")
+
+                    if self.has_ssh_support():
+                        logger.info("Attempting SSH-based topic listing as fallback...")
+                        ssh_result = self._list_all_topics_via_ssh(return_raw=return_raw)
+                        if ssh_result:
+                            return ssh_result
+
+                    # No SSH or SSH also failed
+                    error_msg = f"Failed to list all topics after {max_retries} attempts: {e}"
+                    logger.error(error_msg)
+                    formatted = self.formatter.format_error(error_msg)
+                    raw = {'error': str(e), 'topics': [], 'count': 0}
+                    return (formatted, raw) if return_raw else formatted
+
+    def _list_all_topics_via_ssh(self, return_raw=False):
+        """
+        Lists ALL topics via SSH including internal topics.
+        
+        This is used as a fallback when admin client fails.
+        """
+        try:
+            # Try to get topics from first available broker
+            for host in self.get_ssh_hosts():
+                ssh_manager = self.get_ssh_manager(host)
+                if not ssh_manager:
+                    continue
+
+                # Get private listener for this host
+                private_listener = self.get_private_listener(host)
+                if not private_listener:
+                    logger.debug(f"No private listener detected for {host}, skipping")
+                    continue
+
+                # Run kafka-topics.sh via SSH
+                kafka_bin = self.settings.get('kafka_run_class_path', '/opt/kafka/bin/kafka-run-class.sh').replace('kafka-run-class.sh', 'kafka-topics.sh')
+                cmd = f"{kafka_bin} --bootstrap-server {private_listener} --list 2>/dev/null"
+
+                logger.debug(f"Listing all topics via SSH on {host} using {private_listener}")
+                stdout, stderr, exit_code = ssh_manager.execute_command(cmd, timeout=10)
+
+                if exit_code == 0 and stdout.strip():
+                    # Parse topic list - include ALL topics, no filtering
+                    topics = [line.strip() for line in stdout.strip().split('\n') if line.strip()]
+                    all_topics = sorted(topics)  # Include ALL topics including internal ones
+                    raw = {'topics': all_topics, 'count': len(all_topics), 'source': 'ssh'}
+
+                    if not all_topics:
+                        formatted = self.formatter.format_note("No topics found (via SSH).")
+                    else:
+                        formatted = f"All Topics ({len(all_topics)}) [via SSH]:\n\n"
+                        formatted += "\n".join(f"  - {t}" for t in all_topics)
+
+                    logger.info(f"✅ Successfully listed {len(all_topics)} topics via SSH on {host}")
                     return (formatted, raw) if return_raw else formatted
                 else:
                     logger.debug(f"SSH topic listing failed on {host}: exit {exit_code}")

@@ -94,6 +94,7 @@ REPORT_SECTIONS = [
 # No topics?
             {'type': 'module', 'module': 'plugins.kafka.checks.check_topic_count_and_naming', 'function': 'run_check_topic_count_and_naming'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_topic_configuration', 'function': 'run_topic_configuration_check'},
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_internal_topic_replication', 'function': 'run_internal_topic_replication_check'},
         ]
     },
     {
