@@ -18,7 +18,7 @@
 
 db_type: cassandra
 
-company_name: Instaclustr Cassandra
+company_name: NetApp Instaclustr 
 report_title: Cassandra Health Check Report
 
 # ============================================================================
