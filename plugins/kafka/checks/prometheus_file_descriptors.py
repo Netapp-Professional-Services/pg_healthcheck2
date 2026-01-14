@@ -23,7 +23,7 @@ CRITICAL IMPORTANCE:
 
 import logging
 from datetime import datetime
-from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.check_helpers import CheckContentBuilder, get_metric_collection_error_message
 from plugins.common.metric_collection_strategies import collect_metric_adaptive
 from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
@@ -75,17 +75,8 @@ def check_prometheus_file_descriptors(connector, settings):
         fd_result = collect_metric_adaptive(fd_metric_def, connector, settings)
 
         if not fd_result:
-            builder.warning(
-                "⚠️ Could not collect file descriptor metrics\n\n"
-                "*Tried collection methods:*\n"
-                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
-                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
-                "3. Standard JMX - Not available or SSH unavailable\n\n"
-                "*To enable monitoring, configure one of:*\n"
-                "• Instaclustr Prometheus: Set `instaclustr_prometheus_enabled: true`\n"
-                "• Local Prometheus exporter: Ensure JMX exporter running on brokers\n"
-                "• Standard JMX: Enable JMX on port 9999 and configure SSH access"
-            )
+            error_msg = get_metric_collection_error_message(connector, "file descriptor metrics")
+            builder.warning(error_msg)
             findings = {
                 'status': 'skipped',
                 'reason': 'Unable to collect file descriptor metrics using any method',

@@ -73,6 +73,79 @@ def require_ssh(connector, operation_name):
     return True, None, None
 
 
+def get_metric_collection_error_message(connector, metric_name: str = "metrics") -> str:
+    """
+    Generate an accurate error message when metric collection fails.
+    
+    This function checks what's actually available (SSH, Instaclustr Prometheus, etc.)
+    and generates a precise error message instead of the generic "SSH unavailable" message.
+    
+    Args:
+        connector: Database connector instance
+        metric_name: Name of the metric that failed to collect (for context)
+    
+    Returns:
+        Formatted error message string explaining what was tried and why it failed
+    """
+    # Check SSH availability
+    ssh_available, _, _ = require_ssh(connector, "metric collection")
+    
+    # Check Instaclustr Prometheus
+    instaclustr_enabled = getattr(connector, 'settings', {}).get('instaclustr_prometheus_enabled', False)
+    
+    # Check metric collection strategy
+    strategy = getattr(connector, 'metric_collection_strategy', None)
+    strategy_details = getattr(connector, 'metric_collection_details', {})
+    
+    # Build accurate error message
+    lines = [
+        f"⚠️ Could not collect {metric_name}\n",
+        "*Tried collection methods:*"
+    ]
+    
+    # Method 1: Instaclustr Prometheus
+    if instaclustr_enabled:
+        lines.append("1. Instaclustr Prometheus API - Configured but metric not available or query failed")
+    else:
+        lines.append("1. Instaclustr Prometheus API - Not configured (set `instaclustr_prometheus_enabled: true`)")
+    
+    # Method 2: Local Prometheus
+    if ssh_available:
+        if strategy == 'local_prometheus':
+            lines.append("2. Local Prometheus JMX exporter - Found but metric not exposed or query failed")
+        else:
+            lines.append("2. Local Prometheus JMX exporter - Not found (JMX exporter not running on port 7500)")
+    else:
+        lines.append("2. Local Prometheus JMX exporter - SSH unavailable (required for local Prometheus)")
+    
+    # Method 3: Standard JMX
+    if ssh_available:
+        if strategy == 'jmx':
+            lines.append("3. Standard JMX - Found but metric query failed")
+        elif strategy_details.get('reason') == 'JMX not enabled on port 9999':
+            lines.append("3. Standard JMX - Not enabled (JMX remote port 9999 not configured)")
+        else:
+            lines.append("3. Standard JMX - Not available (JMX remote port 9999 not configured)")
+    else:
+        lines.append("3. Standard JMX - SSH unavailable (required for JMX access)")
+    
+    lines.append("")
+    lines.append("*To enable monitoring, configure one of:*")
+    
+    if not instaclustr_enabled:
+        lines.append("• Instaclustr Prometheus: Set `instaclustr_prometheus_enabled: true`")
+    
+    if ssh_available:
+        if strategy != 'local_prometheus':
+            lines.append("• Local Prometheus exporter: Ensure JMX exporter running on brokers (port 7500)")
+        if strategy != 'jmx' and 'JMX not enabled' in str(strategy_details.get('reason', '')):
+            lines.append("• Standard JMX: Enable JMX on port 9999 (add JVM options to Kafka startup)")
+    else:
+        lines.append("• Configure SSH access: Set `ssh_hosts`, `ssh_user`, and `ssh_key_file`")
+        lines.append("• Then enable either Local Prometheus exporter or Standard JMX")
+    
+    return "\n".join(lines)
+
 
 def require_aws(connector: Any, operation_name: Optional[str] = None) -> Tuple[bool, str, Dict]:
     """
