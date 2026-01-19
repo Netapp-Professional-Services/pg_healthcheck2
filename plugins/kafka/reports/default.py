@@ -55,6 +55,7 @@ REPORT_SECTIONS = [
             {'type': 'module', 'module': 'plugins.kafka.checks.check_cpu_load', 'function': 'run_cpu_load_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_memory_usage', 'function': 'run_memory_usage_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_file_descriptors', 'function': 'run_file_descriptor_check'},
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_system_limits', 'function': 'run_system_limits_check'},
         ]
     },
     {
