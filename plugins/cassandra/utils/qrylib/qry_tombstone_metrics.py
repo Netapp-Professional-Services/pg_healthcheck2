@@ -22,7 +22,7 @@ def get_tombstone_metrics_query(connector):
         if major >= 4:
             return json.dumps({
                 "operation": "nodetool",
-                "command": "tablehistograms"
+                "command": "tablestats"
             })
         else:
             return json.dumps({
