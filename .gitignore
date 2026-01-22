@@ -226,3 +226,6 @@ config/certs/*
 
 # Instaclustr configs with credentials
 config/*_instaclustr.yaml
+tools/
+tests/
+debug_scripts/
