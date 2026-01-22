@@ -15,17 +15,17 @@ REPORT_SECTIONS = [
             {"type": "module", "module": "plugins.cassandra.checks.secondary_indexes", "function": "check_secondary_indexes"},
             {"type": "module", "module": "plugins.cassandra.checks.network_topology", "function": "check_network_topology"},
 
-            # Traditional nodetool-based checks (SSH-enabled clusters)
-            {"type": "module", "module": "plugins.cassandra.checks.check_compaction_pending_tasks", "function": "run_compaction_pending_tasks"},
-            {"type": "module", "module": "plugins.cassandra.checks.check_schema_version_consistency", "function": "run_schema_version_consistency_check"},
+            # CQL and nodetool-based checks
+            {"type": "module", "module": "plugins.cassandra.checks.compaction_pending_tasks", "function": "run_compaction_pending_tasks"},
+            {"type": "module", "module": "plugins.cassandra.checks.schema_version_consistency_check", "function": "run_schema_version_consistency_check"},
             {"type": "module", "module": "plugins.cassandra.checks.disk_space_per_keyspace", "function": "run_disk_space_per_keyspace_check"},
             {"type": "module", "module": "plugins.cassandra.checks.data_directory_disk_space_check", "function": "run_data_directory_disk_space_check"},
             {"type": "module", "module": "plugins.cassandra.checks.memory_usage_check", "function": "run_memory_usage_check"},
             {'type': 'module', 'module': 'plugins.cassandra.checks.check_jvm_stats', 'function': 'run_check_jvm_stats'},
             {'type': 'module', 'module': 'plugins.cassandra.checks.cpu_load_average_check', 'function': 'run_cpu_load_average_check'},
-            {'type': 'module', 'module': 'plugins.cassandra.checks.check_temporary_files', 'function': 'run_temporary_files_check'},
+            {'type': 'module', 'module': 'plugins.cassandra.checks.temporary_files_check', 'function': 'run_temporary_files_check'},
             {'type': 'module', 'module': 'plugins.cassandra.checks.gcstats_check', 'function': 'run_gcstats_check'},
-            {'type': 'module', 'module': 'plugins.cassandra.checks.check_tombstone_metrics', 'function': 'run_check_tombstone_metrics'},
+            {'type': 'module', 'module': 'plugins.cassandra.checks.tombstone_metrics_check', 'function': 'run_tombstone_metrics_check'},
 
             # NEW: Comprehensive cluster connectivity & gossip diagnostics (replaces old checks below)
             {'type': 'module', 'module': 'plugins.cassandra.checks.cluster_connectivity_diagnostics', 'function': 'run_cluster_connectivity_diagnostics'},
