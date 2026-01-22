@@ -128,7 +128,7 @@ def run_check_tombstone_metrics(connector, settings):
             "For high-delete tables, tune gc_grace_seconds to a lower value (e.g., 1-2 days)",
             "Run targeted compaction: `nodetool compact keyspace table`",
             "For time-series data, evaluate TimeWindowCompactionStrategy (TWCS)",
-            "Monitor regularly with `nodetool tablestats` or `nodetool tablehistograms`"
+            "Monitor regularly with `nodetool tablestats` "
         ])
         status = "warning"
     elif all_tables:
