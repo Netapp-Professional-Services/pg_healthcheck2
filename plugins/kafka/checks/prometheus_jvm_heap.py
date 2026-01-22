@@ -21,7 +21,7 @@ IMPORTANCE:
 
 import logging
 from datetime import datetime
-from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.check_helpers import CheckContentBuilder, get_metric_collection_error_message
 from plugins.common.metric_collection_strategies import collect_metric_adaptive
 from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
@@ -76,13 +76,8 @@ def check_prometheus_jvm_heap(connector, settings):
         max_result = collect_metric_adaptive(heap_max_def, connector, settings)
 
         if not used_result and not max_result:
-            builder.warning(
-                "⚠️ Could not collect JVM heap metrics\n\n"
-                "*Tried collection methods:*\n"
-                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
-                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
-                "3. Standard JMX - Not available or SSH unavailable"
-            )
+            error_msg = get_metric_collection_error_message(connector, "JVM heap metrics")
+            builder.warning(error_msg)
             findings = {
                 'status': 'skipped',
                 'reason': 'Unable to collect JVM heap metrics using any method',
