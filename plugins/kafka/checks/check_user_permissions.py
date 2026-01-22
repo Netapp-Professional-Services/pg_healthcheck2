@@ -270,32 +270,32 @@ def _build_report(builder, findings):
 
     # Topics
     builder.text("**Topics:**")
-    builder.text(f"• LIST: {_format_permission(permissions['topics']['list'])}")
+    builder.text(f"\n- LIST: {_format_permission(permissions['topics']['list'])}")
     if permissions['topics']['list']:
         builder.text(f"  - Found {permissions['topics'].get('topic_count', 0)} total topics "
                     f"({permissions['topics'].get('user_topic_count', 0)} user topics)")
 
-    builder.text(f"• DESCRIBE: {_format_permission(permissions['topics']['describe'])}")
+    builder.text(f"\n- DESCRIBE: {_format_permission(permissions['topics']['describe'])}")
     if permissions['topics']['describe']:
         builder.text(f"  - Can describe {permissions['topics'].get('described_topic_count', 0)} topics")
     elif permissions['topics']['list'] and permissions['topics'].get('topic_count', 0) > 0:
         builder.text(f"  - ⚠️ {permissions['topics'].get('topic_count', 0)} topics exist but cannot be described")
 
-    builder.text(f"• DESCRIBE_CONFIGS: {_format_permission(permissions['topics']['describe_configs'])}")
+    builder.text(f"\n- DESCRIBE_CONFIGS: {_format_permission(permissions['topics']['describe_configs'])}")
     builder.blank()
 
     # Consumer Groups
     builder.text("**Consumer Groups:**")
-    builder.text(f"• LIST: {_format_permission(permissions['consumer_groups']['list'])}")
+    builder.text(f"\n- LIST: {_format_permission(permissions['consumer_groups']['list'])}")
     if permissions['consumer_groups']['list']:
         builder.text(f"  - Found {permissions['consumer_groups'].get('group_count', 0)} consumer groups")
 
-    builder.text(f"• DESCRIBE: {_format_permission(permissions['consumer_groups']['describe'])}")
+    builder.text(f"\n- DESCRIBE: {_format_permission(permissions['consumer_groups']['describe'])}")
     builder.blank()
 
     # Cluster
     builder.text("**Cluster:**")
-    builder.text(f"• DESCRIBE: {_format_permission(permissions['cluster']['describe'])}")
+    builder.text(f"\n- DESCRIBE: {_format_permission(permissions['cluster']['describe'])}")
     if permissions['cluster']['describe']:
         builder.text(f"  - Can see {permissions['cluster'].get('broker_count', 0)} brokers")
     builder.blank()
@@ -332,30 +332,33 @@ def _build_report(builder, findings):
         builder.blank()
 
         if not permissions['topics']['describe']:
-            builder.text("```bash")
+            builder.text("[source,bash]")
+            builder.text("----")
             builder.text(f"# Grant DESCRIBE permission on all topics")
             builder.text(f"kafka-acls --bootstrap-server <broker> \\")
             builder.text(f"  --add --allow-principal User:{user} \\")
             builder.text(f"  --operation DESCRIBE --topic '*'")
-            builder.text("```")
+            builder.text("----")
             builder.blank()
 
         if not permissions['topics']['describe_configs']:
-            builder.text("```bash")
+            builder.text("[source,bash]")
+            builder.text("----")
             builder.text(f"# Grant DESCRIBE_CONFIGS permission on all topics")
             builder.text(f"kafka-acls --bootstrap-server <broker> \\")
             builder.text(f"  --add --allow-principal User:{user} \\")
             builder.text(f"  --operation DESCRIBE_CONFIGS --topic '*'")
-            builder.text("```")
+            builder.text("----")
             builder.blank()
 
         if not permissions['consumer_groups']['describe']:
-            builder.text("```bash")
+            builder.text("[source,bash]")
+            builder.text("----")
             builder.text(f"# Grant DESCRIBE permission on all consumer groups")
             builder.text(f"kafka-acls --bootstrap-server <broker> \\")
             builder.text(f"  --add --allow-principal User:{user} \\")
             builder.text(f"  --operation DESCRIBE --group '*'")
-            builder.text("```")
+            builder.text("----")
             builder.blank()
 
         builder.text("*Note:* For Instaclustr managed clusters, configure ACLs via the Instaclustr console → Access Control.")

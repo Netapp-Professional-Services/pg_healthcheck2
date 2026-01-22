@@ -26,7 +26,7 @@ CRITICAL IMPORTANCE:
 
 import logging
 from datetime import datetime
-from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.check_helpers import CheckContentBuilder, get_metric_collection_error_message
 from plugins.common.metric_collection_strategies import collect_metric_adaptive
 from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
@@ -80,13 +80,8 @@ def check_prometheus_broker_health(connector, settings):
         bytes_out_result = collect_metric_adaptive(bytes_out_def, connector, settings) if bytes_out_def else None
 
         if not any([cpu_result, disk_util_result, disk_avail_result, bytes_in_result, bytes_out_result]):
-            builder.warning(
-                "⚠️ Could not collect broker health metrics\n\n"
-                "*Tried collection methods:*\n"
-                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
-                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
-                "3. Standard JMX - Not available or SSH unavailable"
-            )
+            error_msg = get_metric_collection_error_message(connector, "broker health metrics")
+            builder.warning(error_msg)
             findings = {
                 'status': 'skipped',
                 'reason': 'Unable to collect broker health metrics using any method',

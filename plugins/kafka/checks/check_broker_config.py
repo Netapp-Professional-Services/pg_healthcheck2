@@ -5,7 +5,7 @@ Audits server.properties configuration for best practices and potential issues.
 """
 
 from plugins.common.check_helpers import require_ssh, CheckContentBuilder
-from plugins.kafka.utils.qrylib.broker_config_queries import get_server_properties_query
+from plugins.kafka.utils.qrylib.broker_config_queries import get_server_properties_from_env_query, get_server_properties_query
 import re
 import logging
 
@@ -73,8 +73,12 @@ def run_broker_config_check(connector, settings):
 
             try:
                 # Execute query via connector (uses qrylib)
-                query = get_server_properties_query(connector)
+                query = get_server_properties_from_env_query(connector)
                 formatted, raw = connector.execute_query(query, return_raw=True)
+
+                if "[ERROR]" in formatted or (isinstance(raw, dict) and 'error' in raw):
+                    query = get_server_properties_query(connector)
+                    formatted, raw = connector.execute_query(query, return_raw=True)
 
                 if "[ERROR]" in formatted or (isinstance(raw, dict) and 'error' in raw):
                     error_msg = raw.get('error', 'Unknown error') if isinstance(raw, dict) else formatted
