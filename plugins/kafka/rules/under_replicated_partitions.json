@@ -1,0 +1,18 @@
+{
+  "under_replicated_partitions_found": {
+    "metric_keywords": ["kafka", "replication", "availability", "ha", "data-loss-risk"],
+    "rules": [
+      {
+        "expression": "int(data.get('under_replicated_partitions', 0)) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Topic '{data.get('topic')}' has {data.get('under_replicated_partitions')} under-replicated partitions. This poses a direct risk of data loss and indicates a broker is down or unreachable.",
+        "recommendations": [
+          "IMMEDIATE ACTION REQUIRED: Check the status of all Kafka brokers in the cluster.",
+          "Investigate network connectivity between brokers to ensure they can communicate for replication.",
+          "Review broker logs for errors that may have caused them to fail or shut down."
+        ]
+      }
+    ]
+  }
+}

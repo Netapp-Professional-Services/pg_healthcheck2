@@ -1,0 +1,27 @@
+{
+  "broker_availability": {
+    "metric_keywords": ["kafka", "brokers", "availability", "connectivity", "outage"],
+    "rules": [
+      {
+        "expression": "len(data.get('brokers', [])) == 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "No active brokers detected in the cluster. This indicates a complete outage or severe connectivity failure.",
+        "recommendations": [
+          "Immediately verify Kafka services on all broker nodes.",
+          "Check network connectivity and firewall rules between brokers."
+        ]
+      },
+      {
+        "expression": "len(data.get('brokers', [])) < 3",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Low number of active brokers ({len(data.get('brokers', []))}) detected, below recommended minimum of 3 for production HA.",
+        "recommendations": [
+          "Investigate status of offline brokers via logs and process monitoring.",
+          "Ensure replication factor is sufficient to maintain availability."
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "low_replication_factor": {
+    "metric_keywords": ["kafka", "topic", "replication", "configuration", "ha"],
+    "rules": [
+      {
+        "expression": "data.get('replication_factor', 0) < 3",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Topic '{data.get('topic')}' has a low replication factor of {data.get('replication_factor')}. This increases the risk of data loss in case of broker failure.",
+        "recommendations": [
+          "Alter the topic to increase the replication factor: kafka-topics.sh --bootstrap-server <brokers> --alter --topic {data.get('topic')} --partitions {data.get('partitions')} --replication-factor 3",
+          "For future topics, specify --replication-factor 3 during creation to ensure high availability."
+        ]
+      }
+    ]
+  },
+  "under_replicated_partitions": {
+    "metric_keywords": ["kafka", "topic", "under_replicated", "availability", "data_loss"],
+    "rules": [
+      {
+        "expression": "data.get('under_replicated_partitions', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Topic '{data.get('topic')}' has {data.get('under_replicated_partitions')} under-replicated partitions, posing an immediate risk of data unavailability or loss.",
+        "recommendations": [
+          "Urgently check broker status and logs for failures or network issues.",
+          "Restart or recover affected brokers to restore replication.",
+          "Monitor the cluster controller and ISR status closely."
+        ]
+      }
+    ]
+  },
+  "excessive_partitions": {
+    "metric_keywords": ["kafka", "topic", "partitions", "performance", "scalability"],
+    "rules": [
+      {
+        "expression": "data.get('partitions', 0) > 200",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Topic '{data.get('topic')}' has {data.get('partitions')} partitions, which can lead to increased resource consumption and coordination overhead.",
+        "recommendations": [
+          "Evaluate if fewer partitions suffice for your parallelism needs and alter accordingly.",
+          "Ensure the number of partitions aligns with consumer instances to avoid uneven load."
+        ]
+      }
+    ]
+  },
+  "insufficient_retention": {
+    "metric_keywords": ["kafka", "topic", "retention", "durability", "data_expiry"],
+    "rules": [
+      {
+        "expression": "data.get('retention_hours', 0) < 168 and data.get('retention_hours', 0) != float('inf')",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Topic '{data.get('topic')}' has a short retention period of {data.get('retention_hours'):.1f} hours, risking premature data deletion before consumption.",
+        "recommendations": [
+          "Increase retention using: kafka-configs.sh --bootstrap-server <brokers> --entity-type topics --entity-name {data.get('topic')} --alter --add-config retention.ms=604800000",
+          "Set retention policies based on your data durability and storage requirements."
+        ]
+      }
+    ]
+  }
+}
