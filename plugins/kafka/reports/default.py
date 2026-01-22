@@ -19,6 +19,7 @@ REPORT_SECTIONS = [
             # ========== CRITICAL: Data Loss & Availability (Priority 10) ==========
             # Unified adaptive checks (work with Instaclustr Prometheus, Local Prometheus, or JMX)
 # OK, ZK only
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_rack_awareness', 'function': 'run_rack_awareness_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_unclean_elections', 'function': 'run_unclean_elections_check'},
 # OK
             {'type': 'module', 'module': 'plugins.kafka.checks.check_offline_partitions', 'function': 'run_offline_partitions_check'},
@@ -60,6 +61,7 @@ REPORT_SECTIONS = [
             {'type': 'module', 'module': 'plugins.kafka.checks.check_cpu_load', 'function': 'run_cpu_load_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_memory_usage', 'function': 'run_memory_usage_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_file_descriptors', 'function': 'run_file_descriptor_check'},
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_system_limits', 'function': 'run_system_limits_check'},
         ]
     },
     {
@@ -99,6 +101,7 @@ REPORT_SECTIONS = [
 # No topics?
             {'type': 'module', 'module': 'plugins.kafka.checks.check_topic_count_and_naming', 'function': 'run_check_topic_count_and_naming'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_topic_configuration', 'function': 'run_topic_configuration_check'},
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_internal_topic_replication', 'function': 'run_internal_topic_replication_check'},
         ]
     },
     {

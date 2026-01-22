@@ -1,0 +1,20 @@
+{
+  "temp_files_found": {
+    "metric_keywords": ["cassandra", "temporary", "files", "data", "directory", "cleanup", "disk"],
+    "rules": [
+      {
+        "expression": "data.get('count', 0) > 0",
+        "level": "warning",
+        "score": 6,
+        "reasoning": "Detected {data.get('count')} temporary files in the Cassandra data directory at /var/lib/cassandra/data. Temporary files often result from interrupted operations like compactions, repairs, or streaming, and can accumulate to waste disk space, potentially leading to storage exhaustion and performance degradation.",
+        "recommendations": [
+          "List all temp files for review: 'find /var/lib/cassandra/data -name '*tmp*' -type f -ls'",
+          "Safely remove confirmed unnecessary files: 'rm -f <file_path>' (verify no active processes use them)",
+          "Examine Cassandra logs: 'tail -f /var/log/cassandra/system.log' for errors related to failed operations",
+          "Implement monitoring: Set up alerts for temp file count exceeding thresholds",
+          "Prevent accumulation: Tune compaction settings or investigate application write patterns if recurring"
+        ]
+      }
+    ]
+  }
+}

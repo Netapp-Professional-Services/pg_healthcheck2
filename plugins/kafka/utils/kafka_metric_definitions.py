@@ -114,7 +114,7 @@ KAFKA_METRICS = {
         'description': 'Average produce request latency in milliseconds',
         'priority': 8,
         'instaclustr_prometheus': 'ic_node_produce_request_time_milliseconds',
-        'local_prometheus': {'metric': 'kafka_network_requestmetrics_totaltimems{request="Produce"}', 'query_type': 'gauge'},
+        'local_prometheus': {'metric': 'kafka_network_requestmetrics_totaltimems{request="Produce",quantile="0.99"}', 'query_type': 'gauge'},
         'jmx': {
             'mbean': 'kafka.network:type=RequestMetrics,name=TotalTimeMs,request=Produce',
             'attribute': 'Mean'
@@ -129,7 +129,7 @@ KAFKA_METRICS = {
         'description': 'Average consumer fetch request latency in milliseconds',
         'priority': 8,
         'instaclustr_prometheus': 'ic_node_fetch_consumer_request_time_milliseconds',
-        'local_prometheus': {'metric': 'kafka_network_requestmetrics_totaltimems{request="FetchConsumer"}', 'query_type': 'gauge'},
+        'local_prometheus': {'metric': 'kafka_network_requestmetrics_totaltimems{request="FetchConsumer",quantile="0.99"}', 'query_type': 'gauge'},
         'jmx': {
             'mbean': 'kafka.network:type=RequestMetrics,name=TotalTimeMs,request=FetchConsumer',
             'attribute': 'Mean'
@@ -144,7 +144,7 @@ KAFKA_METRICS = {
         'description': 'Average follower fetch request latency in milliseconds',
         'priority': 8,
         'instaclustr_prometheus': 'ic_node_fetch_follower_request_time_milliseconds',
-        'local_prometheus': {'metric': 'kafka_network_requestmetrics_totaltimems{request="FetchFollower"}', 'query_type': 'gauge'},
+        'local_prometheus': {'metric': 'kafka_network_requestmetrics_totaltimems{request="FetchFollower",quantile="0.99"}', 'query_type': 'gauge'},
         'jmx': {
             'mbean': 'kafka.network:type=RequestMetrics,name=TotalTimeMs,request=FetchFollower',
             'attribute': 'Mean'

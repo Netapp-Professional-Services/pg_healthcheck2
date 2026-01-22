@@ -21,7 +21,7 @@ Replaces both:
 """
 
 from datetime import datetime
-from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.check_helpers import CheckContentBuilder, get_metric_collection_error_message
 from plugins.common.metric_collection_strategies import (
     collect_metric_adaptive,
     get_collection_method_description
@@ -85,19 +85,9 @@ def run_unclean_elections_check(connector, settings):
     data = collect_metric_adaptive(metric_def, connector, settings)
 
     if not data:
-        builder.warning("⚠️ Could not collect unclean leader elections metric")
-        builder.blank()
-        builder.text("*Tried collection methods:*")
-        builder.text("1. Instaclustr Prometheus API - Not configured or unavailable")
-        builder.text("2. Local Prometheus JMX exporter - Not found or SSH unavailable")
-        builder.text("3. Standard JMX - Not available or SSH unavailable")
-        builder.blank()
-        builder.text("*Note:* This is a controller-only metric - only the controller broker reports it.")
-        builder.blank()
-        builder.text("*To enable monitoring, configure one of:*")
-        builder.text("• Instaclustr Prometheus: Set `instaclustr_prometheus_enabled: true`")
-        builder.text("• Local Prometheus exporter: Ensure JMX exporter running on brokers")
-        builder.text("• Standard JMX: Enable JMX on port 9999 and configure SSH access")
+        error_msg = get_metric_collection_error_message(connector, "unclean leader elections metric")
+        error_msg += "\n\n*Note:* This is a controller-only metric - only the controller broker reports it."
+        builder.warning(error_msg)
 
         return builder.build(), {
             'status': 'skipped',

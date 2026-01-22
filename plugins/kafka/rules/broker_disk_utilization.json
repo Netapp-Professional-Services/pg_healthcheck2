@@ -1,0 +1,29 @@
+{
+  "high_disk_utilization": {
+    "metric_keywords": ["kafka", "disk", "storage", "utilization", "log_dirs", "capacity"],
+    "rules": [
+      {
+        "expression": "data.get('utilization_percent', 0) > 95",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "CRITICAL: Broker {data.get('broker_id')} log directory '{data.get('log_dir')}' is at {data.get('utilization_percent'):.1f}% utilization, risking imminent storage exhaustion and Kafka unavailability.",
+        "recommendations": [
+          "URGENT: Expand storage immediately on broker {data.get('broker_id')} or redistribute partitions.",
+          "Delete unnecessary data or adjust retention policies to free up space.",
+          "Failover partitions from the affected broker if possible."
+        ]
+      },
+      {
+        "expression": "data.get('utilization_percent', 0) > 80",
+        "level": "high",
+        "score": 8,
+        "reasoning": "HIGH: Broker {data.get('broker_id')} log directory '{data.get('log_dir')}' has elevated utilization of {data.get('utilization_percent'):.1f}%. Potential for future storage issues.",
+        "recommendations": [
+          "Schedule storage expansion or optimization within the next week.",
+          "Analyze topic data growth rates and adjust configurations accordingly.",
+          "Consider adding brokers to the cluster for better load distribution."
+        ]
+      }
+    ]
+  }
+}

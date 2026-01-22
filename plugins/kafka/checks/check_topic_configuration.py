@@ -152,7 +152,7 @@ def run_topic_configuration_check(connector, settings):
                 max_message_bytes = _safe_int(max_message_bytes_str, 1048588)
 
                 # Get replication factor and partition count from metadata
-                replication_factor = topic_metadata.get('replication_factor', 1)
+                replication_factor = topic_metadata.get('replication_factor',-1)
                 partition_count = topic_metadata.get('partitions', 0)
 
                 # Analyze configuration

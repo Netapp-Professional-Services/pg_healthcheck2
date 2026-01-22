@@ -1,0 +1,19 @@
+{
+  "high_tombstone_metrics": {
+    "metric_keywords": ["cassandra", "tombstones", "performance", "nodetool", "cfstats", "tablestats"],
+    "rules": [
+      {
+        "expression": "data.get('mean_tombstones', 0) > 1000 or data.get('max_tombstones_per_slice', 0) > 100000",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Table {data.get('table', data.get('cfname', 'unknown'))} in keyspace {data.get('keyspace', 'unknown')} shows high tombstone counts: mean={data.get('mean_tombstones', 0)}, max_per_slice={data.get('max_tombstones_per_slice', 0)}. High tombstones lead to increased read latency, memory pressure during reads, and potential OOM errors.",
+        "recommendations": [
+          "Enable tombstone compaction for this table: ALTER TABLE {data.get('keyspace')}.{data.get('table')} WITH compaction = {{'class': 'LeveledCompactionStrategy', 'tombstone_compaction_interval': '86400'}}",
+          "Review application logic to batch deletes or use TTLs instead of explicit deletes where possible",
+          "Run manual compaction: nodetool compact {data.get('keyspace')} {data.get('table')}",
+          "Consider TimeWindowCompactionStrategy (TWCS) for time-series data with deletes"
+        ]
+      }
+    ]
+  }
+}

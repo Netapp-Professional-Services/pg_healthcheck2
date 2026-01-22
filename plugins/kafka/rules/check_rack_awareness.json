@@ -1,0 +1,18 @@
+{
+    "rack_awareness": {
+        "metric_keywords": ["kafka", "brokers", "availability"],
+        "rules": [
+            {
+                "expression": "len(data.get('racks', [])) <= 1",
+                "level": "critical",
+                "score": 8,
+                "reasoning": "Rack_awareness is not configured for Kafka broker",
+                "recommendations": [
+                    "Configure racks in server.properties for each broker",
+                    "Only new topics will use the rack-awareness for old topics use `kafka-reassign-partitions.sh` ",
+                    "and reassign the replicas in rack-aware manner"
+                ]
+            }
+        ]
+    }
+}
