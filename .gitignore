@@ -229,3 +229,4 @@ config/*_instaclustr.yaml
 tools/
 tests/
 debug_scripts/
+trends_app/
