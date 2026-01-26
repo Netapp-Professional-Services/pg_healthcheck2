@@ -38,17 +38,8 @@ def run_keyspace_replication_strategy(connector, settings):
             structured_data["replication_strategy"] = {"status": "error", "data": raw}
             return "\n".join(adoc_content), structured_data
         
-<<<<<<< HEAD
-        # Filter out system keyspaces in Python
-        system_keyspaces = [ 'system', 'system_schema', 'system_traces', 'system_auth', 'system_distributed', 'system_views' ]
-        user_keyspaces = [
-            ks for ks in raw
-            if ks.get('keyspace_name') not in system_keyspaces
-        ]
-=======
         # Filter out system keyspaces using centralized filter
         user_keyspaces = filter_user_keyspaces(raw, settings)
->>>>>>> 87a65e712b19c03b22376f694e3b5380cc7f4641
         
         if not user_keyspaces:
             adoc_content.append("[NOTE]\n====\nNo user-defined keyspaces found.\n====\n")
