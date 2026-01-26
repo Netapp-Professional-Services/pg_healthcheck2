@@ -1,5 +1,11 @@
 REPORT_SECTIONS = [
     {
+        "title": "Security",
+        "actions": [
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_cve_vulnerabilities', 'function': 'run'},
+        ]
+    },
+    {
         "title": "Kafka Health Check",
         "actions": [
             # ========== CONNECTION & PERMISSIONS CHECK (Always First) ==========

@@ -60,16 +60,34 @@ def check_pgbouncer_health(connector, settings: Dict) -> Tuple[str, Dict]:
         health_data = _collect_health_metrics(settings)
 
         if not health_data.get('success'):
-            builder.error(f"Could not collect PgBouncer health metrics: {health_data.get('error')}")
+            error_msg = health_data.get('error', 'Unknown error')
+            error_str = str(error_msg).lower()
 
-            findings = {
-                'pgbouncer_health': {
-                    'status': 'error',
-                    'timestamp': timestamp,
-                    'error': health_data.get('error')
+            # Determine if this is an expected failure (connection issues)
+            is_connection_error = any(term in error_str for term in [
+                'connection refused', 'timeout', 'timed out', 'no route to host',
+                'network unreachable', 'connection reset', 'could not connect',
+                'authentication failed', 'password authentication failed'
+            ])
+
+            if is_connection_error:
+                builder.warning(
+                    f"**PgBouncer Not Accessible**\n\n"
+                    f"Could not collect health metrics: {error_msg}\n\n"
+                    f"This is normal if PgBouncer is not running or not accessible."
+                )
+            else:
+                builder.error(f"Could not collect PgBouncer health metrics: {error_msg}")
+
+            structured_data = {
+                'status': 'error',
+                'timestamp': timestamp,
+                'data': {
+                    'error': error_msg,
+                    'error_type': 'connection_error' if is_connection_error else 'collection_error'
                 }
             }
-            return builder.build(), findings
+            return builder.build(), structured_data
 
         # Analyze health
         analysis = _analyze_health(health_data)
@@ -126,37 +144,98 @@ def check_pgbouncer_health(connector, settings: Dict) -> Tuple[str, Dict]:
         # Build output with actionable advice
         _build_health_output(builder, health_data, analysis)
 
-        # Build findings for trend storage
-        findings = {
-            'pgbouncer_health': {
-                'status': 'success',
-                'data': {
-                    'timestamp': timestamp,
-                    'health_score': analysis['health_score'],
-                    'pools': health_data.get('pools', []),
-                    'stats': health_data.get('stats', []),
-                    'config': health_data.get('config', {}),
-                    'analysis': analysis,
-                    'version': health_data.get('version')
-                }
+        # Pre-compute scalar values for rules engine
+        # CRITICAL: Rules engine recurses if data contains ANY lists, preventing
+        # rule evaluation. All values in 'data' must be scalars or dicts with scalars.
+        pools = health_data.get('pools', [])
+        config = health_data.get('config', {})
+
+        # Compute pool-level metrics as scalars for rules
+        max_cl_waiting = max((int(p.get('cl_waiting', 0)) for p in pools), default=0)
+        total_cl_waiting = sum(int(p.get('cl_waiting', 0)) for p in pools)
+        pool_count = len(pools)
+
+        # Compute pool utilization (highest utilization across all pools)
+        max_pool_utilization = 0.0
+        default_pool_size = int(config.get('default_pool_size', 20)) if config else 20
+        for pool in pools:
+            sv_active = int(pool.get('sv_active', 0))
+            sv_idle = int(pool.get('sv_idle', 0))
+            sv_used = int(pool.get('sv_used', 0))
+            total_server = sv_active + sv_idle + sv_used
+            if default_pool_size > 0:
+                utilization = total_server / default_pool_size
+                max_pool_utilization = max(max_pool_utilization, utilization)
+
+        # Build findings for trend storage (no extra wrapper - report_builder adds module name)
+        # NOTE: 'data' contains ONLY scalars for rules engine. Full data in 'raw_data'.
+        structured_data = {
+            'status': 'success',
+            'timestamp': timestamp,
+            'data': {
+                # Scalar values for rules (NO LISTS - rules engine will evaluate these)
+                'health_score': analysis['health_score'],
+                'max_wait_time': analysis.get('max_wait_time', 0),
+                'total_waiting_clients': analysis.get('total_waiting_clients', 0),
+                'max_cl_waiting': max_cl_waiting,
+                'total_cl_waiting': total_cl_waiting,
+                'pool_count': pool_count,
+                'max_pool_utilization': max_pool_utilization,
+                'reconnection_count': analysis.get('reconnection_events', {}).get('count', 0),
+                'fallback_count': analysis.get('fallback_events', {}).get('count', 0),
+                'version': health_data.get('version'),
+                # Config values (scalars)
+                'pool_mode': config.get('pool_mode'),
+                'default_pool_size': config.get('default_pool_size'),
+                'reserve_pool_size': int(config.get('reserve_pool_size', 0)) if config else 0,
+                'max_client_conn': config.get('max_client_conn')
+            },
+            # Full data for trend storage (separate from 'data' to not affect rules)
+            'raw_data': {
+                'pools': pools,
+                'stats': health_data.get('stats', []),
+                'config': config,
+                'analysis': analysis
             }
         }
 
-        return builder.build(), findings
+        return builder.build(), structured_data
 
     except Exception as e:
-        logger.error(f"Failed to check PgBouncer health: {e}", exc_info=True)
-        builder.error(f"Health check failed: {str(e)}")
+        # Log for debugging but handle gracefully
+        logger.warning(f"PgBouncer health check encountered an error: {e}")
 
-        findings = {
-            'pgbouncer_health': {
-                'status': 'error',
-                'timestamp': timestamp,
-                'error': str(e)
+        error_str = str(e).lower()
+        is_connection_error = any(term in error_str for term in [
+            'connection refused', 'timeout', 'timed out', 'no route to host',
+            'network unreachable', 'connection reset', 'could not connect',
+            'authentication failed', 'password authentication failed'
+        ])
+
+        if is_connection_error:
+            builder.warning(
+                f"**PgBouncer Not Accessible**\n\n"
+                f"Health check failed: {str(e)}\n\n"
+                f"This is normal if PgBouncer is not running or not accessible."
+            )
+        else:
+            logger.error(f"Unexpected error during PgBouncer health check: {e}", exc_info=True)
+            builder.warning(
+                f"**PgBouncer Health Check Error**\n\n"
+                f"An unexpected error occurred: {str(e)}\n\n"
+                f"Check the logs for more details."
+            )
+
+        structured_data = {
+            'status': 'error',
+            'timestamp': timestamp,
+            'data': {
+                'error': str(e),
+                'error_type': 'connection_error' if is_connection_error else 'unexpected_error'
             }
         }
 
-        return builder.build(), findings
+        return builder.build(), structured_data
 
 
 # Removed _should_skip_health_check - now using skip_if_not_pgbouncer() from pgbouncer_helpers

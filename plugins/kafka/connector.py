@@ -7,11 +7,12 @@ from kafka import KafkaAdminClient, KafkaConsumer, TopicPartition
 from kafka.admin import NewTopic, ConfigResource, ConfigResourceType
 from plugins.common.ssh_mixin import SSHSupportMixin
 from plugins.common.output_formatters import AsciiDocFormatter
+from plugins.common.cve_mixin import CVECheckMixin
 
 logger = logging.getLogger(__name__)
 
 
-class KafkaConnector(SSHSupportMixin):
+class KafkaConnector(SSHSupportMixin, CVECheckMixin):
     """Connector for Kafka clusters with multi-broker SSH support."""
     
     def __init__(self, settings):
@@ -32,8 +33,14 @@ class KafkaConnector(SSHSupportMixin):
         self.metric_collection_strategy = None
         self.metric_collection_details = {}
 
+        # Technology name for CVE lookups
+        self.technology_name = 'kafka'
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
+
+        # Initialize CVE support (from mixin)
+        self.initialize_cve_support()
 
         logger.info(f"Kafka connector initialized")
     
@@ -593,8 +600,20 @@ class KafkaConnector(SSHSupportMixin):
                 logger.info(f"Using configured Kafka version: {configured_version}")
                 cluster_metadata = self.admin_client._client.cluster
                 brokers = cluster_metadata.brokers()
+
+                # Extract major version
+                major_version = 0
+                try:
+                    import re
+                    match = re.match(r'(\d+)', configured_version)
+                    if match:
+                        major_version = int(match.group(1))
+                except (ValueError, AttributeError):
+                    major_version = 0
+
                 return {
                     'version_string': configured_version,
+                    'major_version': major_version,
                     'broker_count': len(brokers) if brokers else 0,
                     'source': 'configured'
                 }
@@ -656,14 +675,28 @@ class KafkaConnector(SSHSupportMixin):
                 except Exception as e:
                     logger.debug(f"Could not detect version via SSH: {e}")
 
+            # Extract major version from version_string
+            major_version = 0
+            if version_string and version_string != 'Unknown':
+                try:
+                    # Handle versions like "3.9.1", "3.x+", "3.x"
+                    import re
+                    match = re.match(r'(\d+)', version_string)
+                    if match:
+                        major_version = int(match.group(1))
+                except (ValueError, AttributeError):
+                    logger.debug(f"Could not extract major version from: {version_string}")
+                    major_version = 0
+
             return {
                 'version_string': version_string,
+                'major_version': major_version,
                 'broker_count': broker_count,
                 'source': source
             }
         except Exception as e:
             logger.warning(f"Could not fetch version: {e}")
-            return {'version_string': 'Unknown', 'broker_count': 0, 'source': 'error'}
+            return {'version_string': 'Unknown', 'major_version': 0, 'broker_count': 0, 'source': 'error'}
 
     def _detect_kafka_mode(self):
         """
@@ -822,7 +855,7 @@ class KafkaConnector(SSHSupportMixin):
     def execute_query(self, query, params=None, return_raw=False):
         """
         Executes Kafka Admin API operations or shell commands via JSON dispatch.
-        
+
         Supported operations:
         - list_topics (user topics only, excludes internal topics)
         - admin_list_topics (all topics including internal topics)
@@ -1050,7 +1083,7 @@ class KafkaConnector(SSHSupportMixin):
     def _list_all_topics(self, return_raw=False):
         """
         Lists ALL topics including internal topics (those starting with '__' or '_').
-        
+
         This is used by checks that need to audit internal topics like __consumer_offsets.
         For user-facing operations, use _list_topics() which filters out internal topics.
         """
@@ -1100,7 +1133,7 @@ class KafkaConnector(SSHSupportMixin):
     def _list_all_topics_via_ssh(self, return_raw=False):
         """
         Lists ALL topics via SSH including internal topics.
-        
+
         This is used as a fallback when admin client fails.
         """
         try:
@@ -1484,7 +1517,7 @@ class KafkaConnector(SSHSupportMixin):
         try:
             config_resource = ConfigResource(ConfigResourceType.TOPIC, topic)
             configs = self.admin_client.describe_configs([config_resource])
-            
+
             config_dict = {}
             if type(configs) is dict:
                 for resource, future in configs.items():
@@ -1512,7 +1545,7 @@ class KafkaConnector(SSHSupportMixin):
             try:
                 cluster = self.admin_client._client.cluster
                 cluster.request_update()
-                
+
                 brokers = []
                 for broker in cluster.brokers():
                     brokers.append({

@@ -12,26 +12,28 @@ logger = logging.getLogger(__name__)
 
 
 
-def require_ssh(connector, operation_name):
+def require_ssh(connector, operation_name, verbose=False):
     """
     Check if SSH is available for the connector.
-    
+
     Works with both old (single ssh_manager) and new (multi-host mixin) patterns.
-    
+
     Args:
         connector: The database connector instance
         operation_name: Human-readable name of the operation requiring SSH
-    
+        verbose: If True, include full configuration instructions in skip message.
+                If False (default), return a concise skip message.
+
     Returns:
         tuple: (available: bool, skip_message: str, skip_data: dict)
             - If SSH is available: (True, None, None)
             - If SSH is not available: (False, adoc_skip_message, structured_data)
-    
+
     Example:
         available, skip_msg, skip_data = require_ssh(connector, "disk usage check")
         if not available:
             return skip_msg, skip_data
-        
+
         # Proceed with SSH operations...
     """
     # NEW PATTERN: Check if connector uses SSHSupportMixin
@@ -39,36 +41,42 @@ def require_ssh(connector, operation_name):
         if not connector.has_ssh_support():
             # Use mixin's skip message method if available
             if hasattr(connector, 'get_ssh_skip_message'):
-                return (False,) + connector.get_ssh_skip_message(operation_name)
+                return (False,) + connector.get_ssh_skip_message(operation_name, verbose=verbose)
             else:
                 # Fallback message
-                skip_msg = (
-                    f"[IMPORTANT]\n"
-                    f"====\n"
-                    f"{operation_name} requires SSH access, which is not configured.\n"
-                    f"====\n"
-                )
+                if verbose:
+                    skip_msg = (
+                        f"[IMPORTANT]\n"
+                        f"====\n"
+                        f"{operation_name} requires SSH access, which is not configured.\n"
+                        f"====\n"
+                    )
+                else:
+                    skip_msg = f"_Skipped: SSH not configured for {operation_name}._\n"
                 skip_data = {"status": "skipped", "reason": "SSH not configured"}
                 return False, skip_msg, skip_data
-        
+
         # SSH is available
         return True, None, None
-    
+
     # OLD PATTERN: Check for single ssh_manager (backward compatibility)
     if not hasattr(connector, 'ssh_manager') or connector.ssh_manager is None:
-        skip_msg = (
-            f"[IMPORTANT]\n"
-            f"====\n"
-            f"{operation_name} requires SSH access, which is not configured.\n\n"
-            f"Configure the following in your settings:\n\n"
-            f"* `ssh_host`: Hostname or IP address\n"
-            f"* `ssh_user`: SSH username\n"
-            f"* `ssh_key_file` OR `ssh_password`: Authentication method\n"
-            f"====\n"
-        )
+        if verbose:
+            skip_msg = (
+                f"[IMPORTANT]\n"
+                f"====\n"
+                f"{operation_name} requires SSH access, which is not configured.\n\n"
+                f"Configure the following in your settings:\n\n"
+                f"* `ssh_host`: Hostname or IP address\n"
+                f"* `ssh_user`: SSH username\n"
+                f"* `ssh_key_file` OR `ssh_password`: Authentication method\n"
+                f"====\n"
+            )
+        else:
+            skip_msg = f"_Skipped: SSH not configured for {operation_name}._\n"
         skip_data = {"status": "skipped", "reason": "SSH not configured"}
         return False, skip_msg, skip_data
-    
+
     # Old pattern SSH is available
     return True, None, None
 
@@ -76,39 +84,39 @@ def require_ssh(connector, operation_name):
 def get_metric_collection_error_message(connector, metric_name: str = "metrics") -> str:
     """
     Generate an accurate error message when metric collection fails.
-    
+
     This function checks what's actually available (SSH, Instaclustr Prometheus, etc.)
     and generates a precise error message instead of the generic "SSH unavailable" message.
-    
+
     Args:
         connector: Database connector instance
         metric_name: Name of the metric that failed to collect (for context)
-    
+
     Returns:
         Formatted error message string explaining what was tried and why it failed
     """
     # Check SSH availability
     ssh_available, _, _ = require_ssh(connector, "metric collection")
-    
+
     # Check Instaclustr Prometheus
     instaclustr_enabled = getattr(connector, 'settings', {}).get('instaclustr_prometheus_enabled', False)
-    
+
     # Check metric collection strategy
     strategy = getattr(connector, 'metric_collection_strategy', None)
     strategy_details = getattr(connector, 'metric_collection_details', {})
-    
+
     # Build accurate error message
     lines = [
         f"⚠️ Could not collect {metric_name}\n",
         "*Tried collection methods:*"
     ]
-    
+
     # Method 1: Instaclustr Prometheus
     if instaclustr_enabled:
         lines.append("1. Instaclustr Prometheus API - Configured but metric not available or query failed")
     else:
         lines.append("1. Instaclustr Prometheus API - Not configured (set `instaclustr_prometheus_enabled: true`)")
-    
+
     # Method 2: Local Prometheus
     if ssh_available:
         if strategy == 'local_prometheus':
@@ -117,7 +125,7 @@ def get_metric_collection_error_message(connector, metric_name: str = "metrics")
             lines.append("2. Local Prometheus JMX exporter - Not found (JMX exporter not running on port 7500)")
     else:
         lines.append("2. Local Prometheus JMX exporter - SSH unavailable (required for local Prometheus)")
-    
+
     # Method 3: Standard JMX
     if ssh_available:
         if strategy == 'jmx':
@@ -128,13 +136,13 @@ def get_metric_collection_error_message(connector, metric_name: str = "metrics")
             lines.append("3. Standard JMX - Not available (JMX remote port 9999 not configured)")
     else:
         lines.append("3. Standard JMX - SSH unavailable (required for JMX access)")
-    
+
     lines.append("")
     lines.append("*To enable monitoring, configure one of:*")
-    
+
     if not instaclustr_enabled:
         lines.append("• Instaclustr Prometheus: Set `instaclustr_prometheus_enabled: true`")
-    
+
     if ssh_available:
         if strategy != 'local_prometheus':
             lines.append("• Local Prometheus exporter: Ensure JMX exporter running on brokers (port 7500)")
@@ -143,7 +151,7 @@ def get_metric_collection_error_message(connector, metric_name: str = "metrics")
     else:
         lines.append("• Configure SSH access: Set `ssh_hosts`, `ssh_user`, and `ssh_key_file`")
         lines.append("• Then enable either Local Prometheus exporter or Standard JMX")
-    
+
     return "\n".join(lines)
 
 
@@ -240,14 +248,14 @@ def require_azure(connector: Any, operation_name: Optional[str] = None) -> Tuple
 def require_instaclustr(connector: Any, operation_name: Optional[str] = None) -> Tuple[bool, str, Dict]:
     """
     Check if Instaclustr support is available and return appropriate response if not.
-    
+
     Args:
         connector: Database connector with InstaclustrSupportMixin
         operation_name: Optional description of what Instaclustr is needed for
-    
+
     Returns:
         tuple: (instaclustr_available: bool, skip_message: str, skip_data: dict)
-        
+
     Example:
         ic_ok, skip_msg, skip_data = require_instaclustr(connector, "cluster metrics")
         if not ic_ok:
@@ -256,7 +264,7 @@ def require_instaclustr(connector: Any, operation_name: Optional[str] = None) ->
     """
     if hasattr(connector, 'has_instaclustr_support') and connector.has_instaclustr_support():
         return True, "", {}
-    
+
     # Instaclustr not available
     if hasattr(connector, 'get_instaclustr_skip_message'):
         skip_msg, skip_data = connector.get_instaclustr_skip_message(operation_name)
@@ -277,7 +285,68 @@ def require_instaclustr(connector: Any, operation_name: Optional[str] = None) ->
             "reason": "Instaclustr not configured",
             "required_settings": ["instaclustr_api_key", "instaclustr_cluster_id"]
         }
-    
+
+    return False, skip_msg, skip_data
+
+
+def require_prometheus(settings: Dict[str, Any], operation_name: Optional[str] = None,
+                       verbose: bool = False) -> Tuple[bool, str, Dict]:
+    """
+    Check if Prometheus/Instaclustr Prometheus is enabled and return appropriate response if not.
+
+    Args:
+        settings: Configuration dictionary with Prometheus settings
+        operation_name: Optional description of what Prometheus is needed for
+        verbose: If True, include full configuration instructions in skip message.
+                If False (default), return a concise skip message.
+
+    Returns:
+        tuple: (prometheus_available: bool, skip_message: str, skip_data: dict)
+
+    Example:
+        prom_ok, skip_msg, skip_data = require_prometheus(settings, "JVM heap metrics")
+        if not prom_ok:
+            builder.add(skip_msg)
+            return builder.build(), skip_data
+        # Continue with check...
+    """
+    # Check if Instaclustr Prometheus is enabled
+    if settings.get('instaclustr_prometheus_enabled'):
+        return True, "", {}
+
+    # Prometheus not enabled
+    op_text = f" for {operation_name}" if operation_name else ""
+
+    if verbose:
+        skip_msg = (
+            "[IMPORTANT]\n"
+            "====\n"
+            f"This check requires Prometheus access{op_text}.\n\n"
+            "Configure the following in your settings:\n\n"
+            "**Instaclustr Prometheus:**\n"
+            "* `instaclustr_prometheus_enabled`: true\n"
+            "* `instaclustr_cluster_id`: Your cluster ID\n"
+            "* `instaclustr_prometheus_username`: Prometheus username\n"
+            "* `instaclustr_prometheus_api_key`: Prometheus API key\n"
+            "* `instaclustr_prometheus_base_url`: Prometheus endpoint URL\n"
+            "====\n"
+        )
+    else:
+        # Concise message (default)
+        skip_msg = f"_Skipped: Prometheus not enabled{op_text}._\n"
+
+    skip_data = {
+        "status": "skipped",
+        "reason": "Prometheus not enabled",
+        "required_settings": [
+            "instaclustr_prometheus_enabled",
+            "instaclustr_cluster_id",
+            "instaclustr_prometheus_username",
+            "instaclustr_prometheus_api_key",
+            "instaclustr_prometheus_base_url"
+        ]
+    }
+
     return False, skip_msg, skip_data
 
 
@@ -335,33 +404,86 @@ def format_check_header(check_name: str, description: str,
 def format_recommendations(recommendations: List[str]) -> List[str]:
     """
     Format a list of recommendations in standard AsciiDoc format.
-    
+
     Args:
         recommendations: List of recommendation strings
-    
+
     Returns:
         list: Formatted AsciiDoc lines
     """
     if not recommendations:
         return []
-    
+
     output = [
         "",
         "==== Recommendations",
         "[TIP]",
         "===="
     ]
-    
+
     for rec in recommendations:
         # Ensure each recommendation is a bullet point
         if not rec.startswith('*'):
             rec = f"* {rec}"
         output.append(rec)
-    
+
     output.append("====")
     output.append("")
-    
+
     return output
+
+
+def format_data_as_table(data: List[Dict[str, Any]], columns: Optional[List[str]] = None) -> str:
+    """
+    Format a list of dictionaries as an AsciiDoc table.
+
+    This is useful when you need to display filtered data instead of raw query results.
+
+    Args:
+        data: List of dictionaries to format
+        columns: Optional list of column names to include (in order).
+                 If None, uses all keys from first row.
+
+    Returns:
+        str: Formatted AsciiDoc table string
+
+    Example:
+        >>> data = [{'keyspace_name': 'my_app', 'replication': '3'}]
+        >>> print(format_data_as_table(data))
+        |===
+        | keyspace_name | replication
+        | my_app | 3
+        |===
+    """
+    if not data:
+        return ""
+
+    # Determine columns
+    if columns is None:
+        columns = list(data[0].keys())
+
+    lines = []
+    lines.append("|===")
+
+    # Header row
+    header = "| " + " | ".join(str(col) for col in columns)
+    lines.append(header)
+    lines.append("")  # Blank line after header for AsciiDoc
+
+    # Data rows
+    for row in data:
+        values = []
+        for col in columns:
+            val = row.get(col, "")
+            # Handle complex types (dicts, lists)
+            if isinstance(val, (dict, list)):
+                val = str(val)
+            values.append(str(val) if val is not None else "")
+        lines.append("| " + " | ".join(values))
+
+    lines.append("|===")
+
+    return "\n".join(lines)
 
 
 def safe_execute_query(

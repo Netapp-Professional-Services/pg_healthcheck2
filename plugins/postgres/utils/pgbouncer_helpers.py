@@ -48,7 +48,10 @@ def skip_if_not_pgbouncer(settings: Dict) -> Optional[Tuple[str, Dict]]:
         builder.text("⏭️  Skipped - PgBouncer not available on Aurora")
         return builder.build(), {
             'status': 'skipped',
-            'reason': 'Aurora environment (PgBouncer not supported)'
+            'data': {
+                'reason': 'Aurora environment (PgBouncer not supported)',
+                'detected': False
+            }
         }
 
     # No explicit config - try quick detection
@@ -66,7 +69,10 @@ def skip_if_not_pgbouncer(settings: Dict) -> Optional[Tuple[str, Dict]]:
 
     return builder.build(), {
         'status': 'skipped',
-        'reason': 'PgBouncer not detected and no configuration provided'
+        'data': {
+            'reason': 'PgBouncer not detected and no configuration provided',
+            'detected': False
+        }
     }
 
 

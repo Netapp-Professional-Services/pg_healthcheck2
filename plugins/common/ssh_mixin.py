@@ -222,42 +222,51 @@ class SSHSupportMixin:
                 except Exception as e:
                     logger.warning(f"Mapper callback failed for {ssh_host}: {e}")
     
-    def get_ssh_skip_message(self, operation_name: Optional[str] = None) -> tuple:
+    def get_ssh_skip_message(self, operation_name: Optional[str] = None, verbose: bool = False) -> tuple:
         """
         Generate a standard skip message for checks that require SSH.
-        
+
         Args:
             operation_name: Optional name of the operation (e.g., 'disk usage check')
-        
+            verbose: If True, include full configuration instructions.
+                    If False (default), just note that SSH is not configured.
+
         Returns:
             tuple: (adoc_message, structured_data_dict) suitable for returning from a check
         """
         op_text = f" for {operation_name}" if operation_name else ""
-        
-        adoc_message = (
-            "[IMPORTANT]\n"
-            "====\n"
-            f"This check requires SSH access{op_text}.\n\n"
-            "Configure the following in your settings:\n\n"
-            "**For single host:**\n"
-            "* `ssh_host`: Hostname or IP address\n\n"
-            "**For multiple hosts (recommended for clusters):**\n"
-            "* `ssh_hosts`: List of hostnames/IPs\n\n"
-            "**Authentication (required):**\n"
-            "* `ssh_user`: SSH username\n"
-            "* `ssh_key_file` OR `ssh_password`: Authentication method\n\n"
-            "**Optional:**\n"
-            "* `ssh_port`: SSH port (default: 22)\n"
-            "* `ssh_timeout`: Connection timeout in seconds (default: 10)\n"
-            "====\n"
-        )
-        
+
+        if verbose:
+            # Full configuration instructions (use sparingly - once per report)
+            adoc_message = (
+                "[IMPORTANT]\n"
+                "====\n"
+                f"This check requires SSH access{op_text}.\n\n"
+                "Configure the following in your settings:\n\n"
+                "**For single host:**\n"
+                "* `ssh_host`: Hostname or IP address\n\n"
+                "**For multiple hosts (recommended for clusters):**\n"
+                "* `ssh_hosts`: List of hostnames/IPs\n\n"
+                "**Authentication (required):**\n"
+                "* `ssh_user`: SSH username\n"
+                "* `ssh_key_file` OR `ssh_password`: Authentication method\n\n"
+                "**Optional:**\n"
+                "* `ssh_port`: SSH port (default: 22)\n"
+                "* `ssh_timeout`: Connection timeout in seconds (default: 10)\n"
+                "====\n"
+            )
+        else:
+            # Concise message (default - suitable for per-check skip messages)
+            adoc_message = (
+                f"_Skipped: SSH not configured{op_text}._\n"
+            )
+
         structured_data = {
             "status": "skipped",
             "reason": "SSH not configured",
             "required_settings": ["ssh_host or ssh_hosts", "ssh_user", "ssh_key_file or ssh_password"]
         }
-        
+
         return adoc_message, structured_data
     
     def get_ssh_settings_info(self) -> dict:
