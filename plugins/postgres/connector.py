@@ -5,12 +5,13 @@ import re
 from datetime import datetime
 from plugins.base import BasePlugin
 from plugins.common.ssh_mixin import SSHSupportMixin
+from plugins.common.cve_mixin import CVECheckMixin
 from plugins.common.output_formatters import AsciiDocFormatter
 
 logger = logging.getLogger(__name__)
 
 
-class PostgresConnector(SSHSupportMixin):
+class PostgresConnector(SSHSupportMixin, CVECheckMixin):
     """
     Enhanced PostgreSQL connector with cross-node and multi-environment support.
 
@@ -63,8 +64,14 @@ class PostgresConnector(SSHSupportMixin):
         # Formatters
         self.formatter = AsciiDocFormatter()
 
+        # Technology identifier for CVE lookups
+        self.technology_name = 'postgres'
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
+
+        # Initialize CVE support (from mixin)
+        self.initialize_cve_support()
 
     def connect(self):
         """
@@ -1259,3 +1266,77 @@ class PostgresConnector(SSHSupportMixin):
             'last_reset': datetime.utcnow().isoformat() + 'Z'
         }
         logger.debug("Fallback stats reset")
+
+    def get_installed_extensions(self):
+        """
+        Get list of installed PostgreSQL extensions for CVE checking.
+
+        Only checks extensions that have good CPE coverage in NVD to reduce false positives.
+        Extensions checked: PostGIS, TimescaleDB, Citus, pgaudit, pg_partman, pg_stat_statements.
+
+        Returns:
+            List[Dict[str, str]]: [{'name': 'postgis', 'version': '3.4.0'}, ...]
+        """
+        # List of extensions with good CPE coverage in NVD
+        # These are major extensions that are worth checking for CVEs
+        checked_extensions = {
+            'postgis',         # PostGIS - widely used, has CVE history
+            'timescaledb',     # TimescaleDB - commercial support, tracked
+            'citus',           # Citus - Microsoft-backed, tracked
+            'pgaudit',         # pgAudit - security-focused, important
+            'pg_partman',      # Partition management - has CVE entries
+            'pg_stat_statements'  # Built-in but important for monitoring
+        }
+
+        try:
+            query = """
+                SELECT
+                    extname AS name,
+                    extversion AS version
+                FROM pg_extension
+                WHERE extname NOT IN ('plpgsql')  -- Exclude built-in procedural language
+                ORDER BY extname;
+            """
+            results = self.execute_query(query)
+
+            # Handle empty results
+            if not results:
+                logger.debug("No extensions found (only built-ins installed)")
+                return []
+
+            # Filter to only checked extensions
+            all_extensions = []
+            for row in results:
+                try:
+                    # Handle both tuple and list results
+                    if len(row) >= 2:
+                        ext_name = str(row[0]) if row[0] else ''
+                        ext_version = str(row[1]) if row[1] else ''
+                        if ext_name:  # Only add if we have a name
+                            all_extensions.append({'name': ext_name, 'version': ext_version})
+                except (IndexError, TypeError) as e:
+                    logger.debug(f"Skipping malformed extension row: {row} ({e})")
+                    continue
+
+            filtered_extensions = [
+                ext for ext in all_extensions
+                if ext['name'].lower() in checked_extensions
+            ]
+
+            if filtered_extensions:
+                logger.info(f"Found {len(filtered_extensions)} extensions for CVE checking (out of {len(all_extensions)} installed)")
+                for ext in filtered_extensions:
+                    logger.debug(f"  Will check CVEs for: {ext['name']} {ext['version']}")
+            else:
+                if all_extensions:
+                    logger.debug(f"No CVE-tracked extensions found ({len(all_extensions)} extensions installed, none in check list)")
+                else:
+                    logger.debug("No extensions found (only built-ins installed)")
+
+            return filtered_extensions
+
+        except Exception as e:
+            logger.warning(f"Could not retrieve installed extensions: {e}")
+            import traceback
+            logger.debug(f"Extension query traceback: {traceback.format_exc()}")
+            return []
