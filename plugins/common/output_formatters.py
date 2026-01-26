@@ -320,31 +320,115 @@ class AsciiDocFormatter:
         
         return '\n'.join(lines)
     
-    def format_dict_as_table(self, data: Dict[str, Any], 
-                            key_header: str = "Key", 
+    def format_dict_as_table(self, data: Dict[str, Any],
+                            key_header: str = "Key",
                             value_header: str = "Value") -> str:
         """
         Formats a dictionary as a two-column AsciiDoc table.
-        
+
         Args:
             data: Dictionary to format
             key_header: Header for key column
             value_header: Header for value column
-        
+
         Returns:
             AsciiDoc table string
         """
         if not data:
             return self.format_note("No data to display.")
-        
+
         table_lines = ['|===']
         table_lines.append(f'|{key_header}|{value_header}')
-        
+
         for key, value in data.items():
             key_str = self._escape_asciidoc(str(key))
             value_str = self._escape_asciidoc(str(value))
             table_lines.append(f'|{key_str}|{value_str}')
-        
+
         table_lines.append('|===')
-        
+
         return '\n'.join(table_lines)
+
+    def truncate_field(self, data: List[Dict[str, Any]],
+                      field_name: str,
+                      max_length: int = 120,
+                      suffix: str = '...') -> List[Dict[str, Any]]:
+        """
+        Truncates a specific field in a list of dictionaries for display.
+
+        Common use case: Truncating long query text, error messages, or descriptions
+        in tables while preserving full data in structured findings.
+
+        Args:
+            data: List of dictionaries
+            field_name: Name of the field to truncate
+            max_length: Maximum length before truncation (default: 120)
+            suffix: String to append when truncated (default: '...')
+
+        Returns:
+            New list with truncated field values (original data unchanged)
+
+        Example:
+            >>> data = [{'query': 'SELECT * FROM very_long_table_name...', 'time': 1.5}]
+            >>> truncated = formatter.truncate_field(data, 'query', max_length=50)
+            >>> # truncated[0]['query'] = 'SELECT * FROM very_long_table_name...'[:47] + '...'
+        """
+        if not data:
+            return []
+
+        truncated_data = []
+        for row in data:
+            truncated_row = row.copy()
+
+            if field_name in truncated_row and truncated_row[field_name] is not None:
+                field_value = str(truncated_row[field_name])
+
+                if len(field_value) > max_length:
+                    # Truncate and add suffix
+                    truncate_at = max_length - len(suffix)
+                    truncated_row[field_name] = field_value[:truncate_at] + suffix
+
+            truncated_data.append(truncated_row)
+
+        return truncated_data
+
+    def format_table_with_truncation(self, data: List[Dict[str, Any]],
+                                    truncate_fields: Dict[str, int] = None) -> str:
+        """
+        Formats a table with automatic field truncation.
+
+        Convenience method that combines truncation and table formatting
+        for common display scenarios (e.g., query result tables).
+
+        Args:
+            data: List of dictionaries to format
+            truncate_fields: Dict mapping field names to max lengths
+                           Example: {'query': 120, 'description': 80}
+                           If None, no truncation is performed
+
+        Returns:
+            AsciiDoc table string
+
+        Example:
+            >>> queries = [
+            ...     {'query': 'SELECT * FROM very_long...', 'time_ms': 1500},
+            ...     {'query': 'UPDATE users SET...', 'time_ms': 300}
+            ... ]
+            >>> table = formatter.format_table_with_truncation(
+            ...     queries,
+            ...     truncate_fields={'query': 50}
+            ... )
+        """
+        if not data:
+            return self.format_note("No data to display.")
+
+        # If no truncation specified, just format normally
+        if not truncate_fields:
+            return self.format_table(data)
+
+        # Apply truncation to each specified field
+        display_data = data
+        for field_name, max_length in truncate_fields.items():
+            display_data = self.truncate_field(display_data, field_name, max_length)
+
+        return self.format_table(display_data)
