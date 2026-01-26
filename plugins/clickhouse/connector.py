@@ -14,11 +14,12 @@ from typing import Dict, List, Optional, Any
 # Import shared utilities
 from plugins.common.ssh_mixin import SSHSupportMixin
 from plugins.common.output_formatters import AsciiDocFormatter
+from plugins.common.cve_mixin import CVECheckMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ClickHouseConnector(SSHSupportMixin):
+class ClickHouseConnector(SSHSupportMixin, CVECheckMixin):
     """
     Connector for ClickHouse clusters with multi-node SSH support.
 
@@ -61,8 +62,14 @@ class ClickHouseConnector(SSHSupportMixin):
         self.environment = None  # 'self_hosted', 'cloud', etc.
         self.environment_details = {}
 
+        # Technology name for CVE lookups
+        self.technology_name = 'clickhouse'
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
+
+        # Initialize CVE support (from mixin)
+        self.initialize_cve_support()
 
         logger.info("ClickHouse connector initialized")
 
