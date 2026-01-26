@@ -1,2 +1,0 @@
-# Backup and cleanup report versions daily at 2 AM
-0 2 * * * /path/to/backup_versions.sh && cd /path/to/your/app && /path/to/your/venv/bin/python /path/to/your/app/cleanup_versions.py >> /var/log/healthcheck-cleanup.log 2>&1
