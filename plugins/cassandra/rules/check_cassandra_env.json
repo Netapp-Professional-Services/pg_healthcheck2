@@ -1,0 +1,79 @@
+{
+  "remote_jmx_enabled": {
+    "metric_keywords": ["check_cassandra_env"],
+    "data_conditions": [
+      { "key": "remote_jmx_enabled", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('remote_jmx_enabled', False) == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "JMX is accessible remotely, which is a security risk. JMX can be used to execute arbitrary code if not properly secured.",
+        "recommendations": [
+          "Set LOCAL_JMX=yes in cassandra-env.sh",
+          "If remote JMX is required, ensure proper authentication and SSL",
+          "Use SSH tunneling for remote JMX access instead",
+          "Review JMX authentication settings"
+        ]
+      }
+    ]
+  },
+  "heap_too_large": {
+    "metric_keywords": ["check_cassandra_env"],
+    "data_conditions": [
+      { "key": "heap_mb", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('heap_mb', 0) > 32768",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Heap size exceeds 32GB. This disables compressed ordinary object pointers (oops), increasing memory overhead and potentially causing longer GC pauses.",
+        "recommendations": [
+          "Reduce MAX_HEAP_SIZE to 31GB or less to enable compressed oops",
+          "Use off-heap memory for caches instead of increasing heap",
+          "Consider memtable_allocation_type: offheap_buffers"
+        ]
+      }
+    ]
+  },
+  "heap_too_small": {
+    "metric_keywords": ["check_cassandra_env"],
+    "data_conditions": [
+      { "key": "heap_mb", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('heap_mb', 0) < 4096 and data.get('heap_mb', 0) > 0",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Heap size is less than 4GB. This may cause frequent garbage collection and performance issues under load.",
+        "recommendations": [
+          "Increase MAX_HEAP_SIZE to at least 4GB for production",
+          "Recommended heap is 8-16GB for most workloads",
+          "Monitor GC frequency and adjust accordingly"
+        ]
+      }
+    ]
+  },
+  "heap_not_configured": {
+    "metric_keywords": ["check_cassandra_env"],
+    "data_conditions": [
+      { "key": "heap_explicitly_set", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('heap_explicitly_set', True) == False and data.get('uses_calculated_heap', False) == False",
+        "level": "medium",
+        "score": 3,
+        "reasoning": "Heap size is not explicitly configured. While Cassandra can auto-calculate heap, explicit settings provide more predictable behavior.",
+        "recommendations": [
+          "Set MAX_HEAP_SIZE explicitly in cassandra-env.sh",
+          "Recommended: 1/4 of system memory, max 31GB",
+          "Set HEAP_NEWSIZE to 100MB per CPU core (for CMS) or omit for G1GC"
+        ]
+      }
+    ]
+  }
+}

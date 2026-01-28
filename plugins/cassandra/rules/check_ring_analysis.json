@@ -1,0 +1,71 @@
+{
+  "token_imbalance_severe": {
+    "metric_keywords": ["check_ring_analysis"],
+    "data_conditions": [
+      { "key": "has_severe_imbalance", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_severe_imbalance', False) == True",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Severe token imbalance detected. Some nodes own significantly more data than others, causing uneven load distribution and potential hotspots.",
+        "recommendations": [
+          "Verify all nodes have the same num_tokens configuration",
+          "Check for failed bootstraps or incomplete streaming",
+          "Consider running nodetool cleanup on overloaded nodes",
+          "Review node hardware - imbalanced nodes may need more resources",
+          "Plan for rebalancing during maintenance window"
+        ]
+      }
+    ]
+  },
+  "token_imbalance_warning": {
+    "metric_keywords": ["check_ring_analysis"],
+    "data_conditions": [
+      { "key": "has_imbalance", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_imbalance', False) == True and data.get('has_severe_imbalance', False) == False",
+        "level": "high",
+        "score": 5,
+        "reasoning": "Token imbalance detected. This can lead to uneven read/write distribution across the cluster.",
+        "recommendations": [
+          "Monitor load distribution across nodes",
+          "Verify num_tokens is consistent across all nodes",
+          "Consider cleanup operations if recently added nodes"
+        ]
+      }
+    ]
+  },
+  "high_skew_ratio": {
+    "metric_keywords": ["check_ring_analysis"],
+    "data_conditions": [
+      { "key": "skew_ratio", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('skew_ratio', 1.0) > 2.0",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Token skew ratio exceeds 2.0, indicating severe data distribution imbalance.",
+        "recommendations": [
+          "Investigate why some nodes have significantly more tokens",
+          "Check for configuration inconsistencies",
+          "Consider decommissioning and re-adding problem nodes"
+        ]
+      },
+      {
+        "expression": "data.get('skew_ratio', 1.0) > 1.5",
+        "level": "high",
+        "score": 5,
+        "reasoning": "Token skew ratio exceeds 1.5, indicating moderate data distribution imbalance.",
+        "recommendations": [
+          "Monitor for increasing imbalance",
+          "Review node configurations for consistency"
+        ]
+      }
+    ]
+  }
+}
