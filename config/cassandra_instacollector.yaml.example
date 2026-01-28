@@ -1,0 +1,35 @@
+# Cassandra Instacollector Import Configuration
+#
+# Use this config file with:
+#   python -m plugins.cassandra.import_instacollector --config config/cassandra_instacollector.yaml
+#
+# Copy this file and customize for your needs:
+#   cp config/cassandra_instacollector.yaml.example config/cassandra_instacollector.yaml
+
+# Required: Company/client name for report identification
+company_name: "Customer Name"
+
+# Required: Path to Instacollector export
+# Can be a tarball (.tar.gz) or extracted directory
+# Can also be a directory containing multiple exports (most recent will be selected)
+diagnostic_path: "/path/to/InstaCollection_cluster.tar.gz"
+
+# Optional: Custom output directory (default: adoc_out/<company_name>/)
+# output_dir: "./reports/customer_name"
+
+# Optional: Custom report configuration
+# Use a different report definition for specialized analysis
+# report_config: "plugins/cassandra/reports/minimal.py"
+
+# ============================================================================
+# Security Analysis (Optional)
+# ============================================================================
+
+# NVD API key for CVE vulnerability checks
+# Get your key at: https://nvd.nist.gov/developers/request-an-api-key
+# Without a key: 5 requests per 30 seconds
+# With a key: 50 requests per 30 seconds
+# nvd_api_key: "your-nvd-api-key-here"
+
+# Limit rows in result tables
+row_limit: 100
