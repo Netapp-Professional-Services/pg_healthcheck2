@@ -102,6 +102,7 @@ def check_secondary_indexes(connector, settings):
         # Add explanation
         builder.blank()
         builder.text("*Why This Matters:*")
+        builder.blank()
         builder.text("Secondary indexes in Cassandra should be used sparingly. They work well for low-cardinality ")
         builder.text("columns (where <10% of values are unique) but can cause severe performance degradation on ")
         builder.text("high-cardinality columns. Each indexed read requires querying all nodes that own the data, ")
@@ -110,6 +111,7 @@ def check_secondary_indexes(connector, settings):
 
         # Add current configuration breakdown
         builder.text("*Current Configuration:*")
+        builder.blank()
         if standard_count > 0:
             builder.text(f"- *Standard Indexes ({standard_count})*: Traditional secondary indexes using COMPOSITES")
             # Show a few examples
@@ -134,6 +136,7 @@ def check_secondary_indexes(connector, settings):
 
         # Add recommendations
         builder.text("*Recommended Actions:*")
+        builder.blank()
         if standard_count > 0:
             builder.text("1. *Review Standard Indexes*: Verify indexed columns have low cardinality (<10% unique values)")
             builder.text("   - Use `SELECT COUNT(DISTINCT column) FROM table` to check cardinality")
@@ -156,6 +159,7 @@ def check_secondary_indexes(connector, settings):
         builder.blank()
 
         builder.text("*Alternatives to Consider*:")
+        builder.blank()
         builder.text("- *Materialized Views*: Automatically maintained query tables (better than indexes for many cases)")
         builder.text("- *Denormalization*: Create duplicate tables optimized for specific queries")
         builder.text("- *External Search*: Use Elasticsearch/Solr for complex search requirements")

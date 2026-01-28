@@ -1,0 +1,122 @@
+{
+  "critical_error_count": {
+    "metric_keywords": ["check_system_log"],
+    "data_conditions": [
+      { "key": "has_critical_errors", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_critical_errors', False) == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "High number of errors in system logs indicates serious operational issues requiring immediate attention.",
+        "recommendations": [
+          "Review recent errors in system.log immediately",
+          "Check for patterns in error types",
+          "Address root causes before they escalate",
+          "Consider enabling alerting on error rates"
+        ]
+      }
+    ]
+  },
+  "out_of_memory_errors": {
+    "metric_keywords": ["check_system_log"],
+    "data_conditions": [
+      { "key": "has_oom_errors", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_oom_errors', False) == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Out of memory errors detected. This causes severe performance issues and potential data loss.",
+        "recommendations": [
+          "Increase heap size (MAX_HEAP_SIZE)",
+          "Review memtable and cache settings",
+          "Consider offheap buffers for memtables",
+          "Monitor heap usage trends",
+          "Check for memory leaks in UDFs"
+        ]
+      }
+    ]
+  },
+  "timeout_issues": {
+    "metric_keywords": ["check_system_log"],
+    "data_conditions": [
+      { "key": "has_timeout_issues", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_timeout_issues', False) == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Timeout issues detected in logs. This indicates performance problems or network issues.",
+        "recommendations": [
+          "Review timeout settings in cassandra.yaml",
+          "Check network latency between nodes",
+          "Monitor node load and response times",
+          "Consider increasing timeout values temporarily while investigating"
+        ]
+      }
+    ]
+  },
+  "compaction_errors": {
+    "metric_keywords": ["check_system_log"],
+    "data_conditions": [
+      { "key": "has_compaction_errors", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_compaction_errors', False) == True",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Compaction errors detected. Failed compactions can lead to degraded read performance and disk space issues.",
+        "recommendations": [
+          "Check disk space on affected nodes",
+          "Review compaction throughput settings",
+          "Look for corrupt SSTables",
+          "Consider running nodetool scrub if corruption suspected"
+        ]
+      }
+    ]
+  },
+  "gossip_issues": {
+    "metric_keywords": ["check_system_log"],
+    "data_conditions": [
+      { "key": "has_gossip_issues", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_gossip_issues', False) == True",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Gossip communication issues detected. This can lead to cluster instability and data inconsistency.",
+        "recommendations": [
+          "Check network connectivity between all nodes",
+          "Review firewall rules for gossip ports",
+          "Check for clock skew between nodes",
+          "Verify seed node configuration"
+        ]
+      }
+    ]
+  },
+  "many_errors": {
+    "metric_keywords": ["check_system_log"],
+    "data_conditions": [
+      { "key": "total_errors", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_errors', 0) > 10 and data.get('total_errors', 0) <= 100",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Multiple errors found in system logs. While not critical, these should be investigated.",
+        "recommendations": [
+          "Review error patterns for common issues",
+          "Set up monitoring for error rate trends",
+          "Address recurring errors proactively"
+        ]
+      }
+    ]
+  }
+}

@@ -95,6 +95,7 @@ def run(connector, settings):
         builder.error(f"❌ Failed to retrieve CVE data from NVD: {error_msg}")
         builder.blank()
         builder.text("*Possible causes:*")
+        builder.blank()
         builder.text("- Network connectivity issues")
         builder.text("- NVD API service unavailable")
         builder.text("- Rate limit exceeded (consider adding nvd_api_key to config)")
@@ -134,6 +135,7 @@ def run(connector, settings):
 
         # Summary counts
         builder.text("*Severity Breakdown:*")
+        builder.blank()
         if critical_count > 0:
             builder.text(f"- 🔴 Critical: {critical_count}")
         if high_count > 0:
@@ -240,6 +242,7 @@ def run(connector, settings):
     builder.text("CVE data is updated continuously by NIST and the security community.")
     builder.blank()
     builder.text("*Rate Limits:*")
+    builder.blank()
     builder.text("- Without API key: 5 requests per 30 seconds")
     builder.text("- With API key: 50 requests per 30 seconds")
     builder.blank()

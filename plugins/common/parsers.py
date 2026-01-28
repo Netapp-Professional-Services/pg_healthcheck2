@@ -139,8 +139,12 @@ class NodetoolParser:
             'gcstats': self._parse_gcstats,
             'describecluster': self._parse_describecluster,
             'tablestats': self._parse_tablestats,
+            'cfstats': self._parse_tablestats,  # Alias for older Cassandra versions
             'info': self._parse_info,
             'gossipinfo': self._parse_gossipinfo,
+            'version': self._parse_version,
+            'ring': self._parse_ring,
+            'tablehistograms': self._parse_tablehistograms,
         }
         
         parser = parsers.get(command)
@@ -684,8 +688,115 @@ class NodetoolParser:
         # Don't forget the last table
         if current_table and current_table_data:
             tables.append(current_table_data)
-        
+
         return tables
+
+    def _parse_version(self, output: str) -> Dict:
+        """
+        Parses 'nodetool version' output.
+
+        Example output:
+            ReleaseVersion: 3.11.2
+
+        Returns:
+            dict: Version information
+        """
+        if not output or not output.strip():
+            logger.warning("Empty nodetool version output")
+            return {}
+
+        version_info = {}
+        lines = output.strip().split('\n')
+
+        for line in lines:
+            if ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip().lower().replace(' ', '_')
+                value = value.strip()
+                version_info[key] = value
+
+        # Also provide a simple 'version' key
+        if 'releaseversion' in version_info:
+            version_info['version'] = version_info['releaseversion']
+
+        return version_info
+
+    def _parse_ring(self, output: str) -> List[Dict]:
+        """
+        Parses 'nodetool ring' output.
+
+        Example output:
+            Datacenter: datacenter1
+            ==========
+            Address    Rack        Status State   Load            Owns                Token
+            10.0.0.1   rack1       Up     Normal  45.68 GiB       33.33%              -9223372036854775808
+            10.0.0.2   rack1       Up     Normal  42.12 GiB       33.33%              -3074457345618258603
+
+        Returns:
+            list[dict]: Token ring information
+        """
+        if not output or not output.strip():
+            logger.warning("Empty nodetool ring output")
+            return []
+
+        tokens = []
+        lines = output.strip().split('\n')
+        current_dc = 'unknown'
+
+        for line in lines:
+            stripped = line.strip()
+
+            # Skip empty lines
+            if not stripped:
+                continue
+
+            # Detect datacenter header
+            if stripped.startswith('Datacenter:'):
+                current_dc = stripped.split(':', 1)[1].strip()
+                continue
+
+            # Skip separator and header lines
+            if stripped.startswith('=') or 'Address' in stripped:
+                continue
+
+            # Parse token line
+            parts = stripped.split()
+            if len(parts) >= 7:
+                try:
+                    tokens.append({
+                        'datacenter': current_dc,
+                        'address': parts[0],
+                        'rack': parts[1],
+                        'status': parts[2],
+                        'state': parts[3],
+                        'load': f"{parts[4]} {parts[5]}" if len(parts) > 5 else parts[4],
+                        'owns': parts[6] if len(parts) > 6 else 'N/A',
+                        'token': parts[7] if len(parts) > 7 else 'N/A',
+                    })
+                except (IndexError, ValueError) as e:
+                    logger.debug(f"Could not parse ring line: {line} - {e}")
+
+        return tokens
+
+    def _parse_tablehistograms(self, output: str) -> Dict:
+        """
+        Parses 'nodetool tablehistograms' output.
+
+        This command often returns empty or requires specific table arguments.
+
+        Returns:
+            dict: Histogram information (may be empty)
+        """
+        if not output or not output.strip():
+            logger.debug("Empty nodetool tablehistograms output (expected if no table specified)")
+            return {}
+
+        # tablehistograms output is typically multi-section with latency percentiles
+        # For now, return raw content since format varies by version
+        return {
+            'raw': output,
+            'parsed': False,
+        }
 
 
 class ShellCommandParser:

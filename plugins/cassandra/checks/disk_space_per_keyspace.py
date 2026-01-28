@@ -165,8 +165,10 @@ def run_disk_space_per_keyspace_check(connector, settings):
     for t in user_tables:
         live_space_str = t.get('space_used_live', '0 bytes')
         bytes_size = _parse_size(live_space_str)
-        ks = t.get('keyspace', 'unknown')
-        keyspace_usage[ks] += bytes_size
+        ks = t.get('keyspace', '')
+        # Skip entries without a valid keyspace name
+        if ks and ks not in ('unknown', 'Unknown', ''):
+            keyspace_usage[ks] += bytes_size
     
     total_bytes = sum(keyspace_usage.values())
     if total_bytes == 0:
@@ -197,15 +199,24 @@ def run_disk_space_per_keyspace_check(connector, settings):
     usage_list.sort(key=lambda x: x['percent'], reverse=True)
     
     max_percent = usage_list[0]['percent'] if usage_list else 0
-    
-    if max_percent > 50:
+    top_keyspace = usage_list[0]['keyspace'] if usage_list else 'N/A'
+    top_keyspace_gb = usage_list[0]['live_gb'] if usage_list else 0
+    total_gb = total_bytes / (1024 ** 3)
+
+    if max_percent > 80:
         adoc_content.append(f"[WARNING]\n====\n"
-                          f"Keyspace(s) with high disk usage detected (>{max_percent:.1f}% for top keyspace). "
-                          f"This may indicate data skew or growth issues.\n====\n")
+                          f"**Data concentration:** Keyspace `{top_keyspace}` contains {max_percent:.1f}% of total user data ({top_keyspace_gb:.2f} GB of {total_gb:.2f} GB total).\n\n"
+                          f"This concentration may indicate:\n\n"
+                          f"* Data skew across keyspaces\n"
+                          f"* Unbalanced application workload\n"
+                          f"* Need for data modeling review\n====\n")
+    elif len(usage_list) == 1:
+        adoc_content.append(f"[NOTE]\n====\n"
+                          f"Single user keyspace `{top_keyspace}` using {total_gb:.2f} GB.\n====\n")
     else:
         adoc_content.append("[NOTE]\n====\n"
                           f"Disk usage distributed across {len(usage_list)} user keyspace(s). "
-                          f"Total live space: {total_bytes / (1024**3):.2f} GB.\n====\n")
+                          f"Total live space: {total_gb:.2f} GB.\n====\n")
 
     # Summary table (using filtered user keyspaces only)
     adoc_content.append("\n==== Keyspace Disk Usage Summary")
@@ -214,15 +225,24 @@ def run_disk_space_per_keyspace_check(connector, settings):
         adoc_content.append(f"| {u['keyspace']} | {u['live_gb']} | {u['percent']}")
     adoc_content.append("|===\n")
     
-    # Recommendations if high usage
-    if max_percent > 50:
-        recommendations = [
-            "Review data distribution and consider sharding large keyspaces.",
-            "Monitor keyspace growth and plan for capacity expansion.",
-            "Archive or delete old/unused data if applicable.",
-            "Evaluate adding nodes to the cluster for better load balancing."
-        ]
-        adoc_content.extend(format_recommendations(recommendations))
+    # Recommendations if high concentration
+    if max_percent > 80:
+        adoc_content.append("\n==== Recommendations\n")
+        adoc_content.append("[TIP]\n====\n")
+        adoc_content.append(f"**For keyspace `{top_keyspace}` ({top_keyspace_gb:.2f} GB):**\n\n")
+        adoc_content.append(f"1. **Review table sizes:** `nodetool tablestats {top_keyspace}`\n")
+        adoc_content.append(f"2. **Check compaction status:** `nodetool compactionstats`\n")
+        adoc_content.append(f"3. **Identify large tables:** Look for tables with high SSTable count or size\n")
+        adoc_content.append(f"4. **Consider TTL:** If data has natural expiration, set appropriate TTL values\n")
+        adoc_content.append(f"5. **Archive old data:** Move historical data to cold storage if not frequently accessed\n")
+        adoc_content.append("====\n")
+    elif len(usage_list) > 1:
+        adoc_content.append("\n==== Recommendations\n")
+        adoc_content.append("[TIP]\n====\n")
+        adoc_content.append("* Monitor keyspace growth trends over time\n")
+        adoc_content.append("* Set up alerts for disk usage thresholds (70%, 80%, 90%)\n")
+        adoc_content.append("* Plan capacity expansion before reaching 70% disk utilization\n")
+        adoc_content.append("====\n")
     
     structured_data["disk_usage"] = {
         "status": "success",

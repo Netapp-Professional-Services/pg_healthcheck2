@@ -1,0 +1,74 @@
+{
+  "compaction_backlog_severe": {
+    "metric_keywords": ["check_compaction_stats"],
+    "data_conditions": [
+      { "key": "has_severe_backlog", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_severe_backlog', False) == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Severe compaction backlog detected. This indicates compaction cannot keep up with writes, leading to increased disk usage, slower reads, and potential out-of-space conditions.",
+        "recommendations": [
+          "Increase compaction_throughput_mb_per_sec to 128-256 MB/s immediately",
+          "Increase concurrent_compactors if CPU allows",
+          "Monitor disk space closely - backlog increases disk usage",
+          "Consider temporarily reducing write load",
+          "Review compaction strategy - may need to switch strategies"
+        ]
+      }
+    ]
+  },
+  "compaction_backlog_warning": {
+    "metric_keywords": ["check_compaction_stats"],
+    "data_conditions": [
+      { "key": "has_backlog", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_backlog', False) == True and data.get('has_severe_backlog', False) == False",
+        "level": "high",
+        "score": 7,
+        "reasoning": "Compaction backlog is building. If left unchecked, this can lead to read performance degradation and increased disk usage.",
+        "recommendations": [
+          "Increase compaction_throughput_mb_per_sec to 64-128 MB/s",
+          "Monitor the trend - if growing, take action sooner",
+          "Review write patterns for spikes causing backlog",
+          "Ensure sufficient disk I/O bandwidth for compaction"
+        ]
+      }
+    ]
+  },
+  "high_pending_tasks": {
+    "metric_keywords": ["check_compaction_stats"],
+    "data_conditions": [
+      { "key": "total_pending_tasks", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_pending_tasks', 0) > 100",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Over 100 pending compaction tasks indicates severe compaction pressure. This will cause read latency to increase as more SSTables must be checked.",
+        "recommendations": [
+          "Increase compaction throughput immediately",
+          "Run nodetool compactionstats periodically to monitor progress",
+          "Check for nodes with disproportionate pending tasks",
+          "Consider running manual major compaction during maintenance window"
+        ]
+      },
+      {
+        "expression": "data.get('total_pending_tasks', 0) > 20",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Moderate compaction backlog detected. Compaction is falling behind the write rate.",
+        "recommendations": [
+          "Monitor compaction progress",
+          "Consider increasing compaction throughput",
+          "Review write patterns for optimization opportunities"
+        ]
+      }
+    ]
+  }
+}
