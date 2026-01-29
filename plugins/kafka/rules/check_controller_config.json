@@ -1,0 +1,77 @@
+{
+  "controller_config_critical": {
+    "metric_keywords": ["controller_config"],
+    "data_conditions": [
+      { "key": "has_critical_issues", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_critical_issues') == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Critical controller configuration issues detected. The KRaft cluster may not function correctly.",
+        "recommendations": [
+          "Review the detailed configuration analysis for specific missing settings",
+          "Ensure all required KRaft settings are configured",
+          "Verify process.roles includes 'controller' for controller nodes",
+          "Check controller.quorum.voters is properly configured"
+        ]
+      }
+    ]
+  },
+  "controller_config_warnings": {
+    "metric_keywords": ["controller_config"],
+    "data_conditions": [
+      { "key": "has_warnings", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_warnings') == True",
+        "level": "high",
+        "score": 5,
+        "reasoning": "Controller configuration warnings detected that should be reviewed.",
+        "recommendations": [
+          "Review timeout settings for your network conditions",
+          "Ensure configuration consistency across all controller nodes",
+          "Update suboptimal settings to recommended values"
+        ]
+      }
+    ]
+  },
+  "controller_config_consistency": {
+    "metric_keywords": ["controller_config"],
+    "data_conditions": [
+      { "key": "warnings", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any('inconsistent' in str(w.get('type', '')).lower() for w in data.get('warnings', []))",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Configuration inconsistencies detected between controller nodes. This can cause unexpected behavior.",
+        "recommendations": [
+          "Ensure controller.quorum.voters is identical on all nodes",
+          "Verify controller.listener.names matches across the cluster",
+          "Use configuration management to maintain consistency"
+        ]
+      }
+    ]
+  },
+  "controller_config_info": {
+    "metric_keywords": ["controller_config"],
+    "data_conditions": [
+      { "key": "nodes_checked", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('nodes_checked', 0) > 0 and not data.get('has_critical_issues') and not data.get('has_warnings')",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Controller configuration looks healthy.",
+        "recommendations": [
+          "Periodically review controller configuration during maintenance"
+        ]
+      }
+    ]
+  }
+}

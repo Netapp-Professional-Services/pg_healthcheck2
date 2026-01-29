@@ -80,6 +80,8 @@ def run_check_consumer_group_health(connector, settings):
         # Helper: Identify test/console consumers
         def is_test_consumer(group_id):
             """Returns True if this looks like a test/console consumer."""
+            if not group_id:
+                return False
             test_patterns = ['console-consumer-', 'test-consumer-', 'temp-']
             return any(pattern in group_id.lower() for pattern in test_patterns)
         

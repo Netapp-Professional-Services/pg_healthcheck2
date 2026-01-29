@@ -922,6 +922,12 @@ class KafkaConnector(SSHSupportMixin, CVECheckMixin):
                 if not group_id:
                     raise ValueError("'list_consumer_group_offsets' requires 'group_id'")
                 return self._list_consumer_group_offsets(group_id, return_raw)
+            elif operation == 'quorum_status':
+                return self._get_quorum_status(return_raw)
+            elif operation == 'quorum_replication':
+                return self._get_quorum_replication(return_raw)
+            elif operation == 'api_versions':
+                return self._get_api_versions(return_raw)
             else:
                 raise ValueError(f"Unsupported operation: {operation}")
 
@@ -1784,4 +1790,156 @@ class KafkaConnector(SSHSupportMixin, CVECheckMixin):
             
         except Exception as e:
             error_msg = self.formatter.format_error(f"Failed to list offsets: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+
+    def _get_quorum_status(self, return_raw=False):
+        """
+        Get KRaft quorum status via SSH command.
+
+        Returns quorum information including leader, voters, and high watermark.
+        Only available for KRaft mode clusters.
+        """
+        if self.kafka_mode != 'kraft':
+            msg = self.formatter.format_note("Quorum status not available - cluster is in ZooKeeper mode.")
+            return (msg, {'error': 'Not KRaft mode'}) if return_raw else msg
+
+        # Check SSH availability
+        ssh_hosts = self.get_ssh_hosts()
+        if not ssh_hosts:
+            msg = self.formatter.format_note("Quorum status requires SSH access to run kafka-metadata.sh")
+            return (msg, {'error': 'SSH not configured'}) if return_raw else msg
+
+        try:
+            # Try to execute kafka-metadata.sh quorum describe --status
+            command = "kafka-metadata.sh quorum describe --status 2>/dev/null || /opt/kafka/bin/kafka-metadata.sh quorum describe --status 2>/dev/null || echo 'Command not available'"
+
+            ssh_manager = self.get_ssh_manager(ssh_hosts[0])
+            if not ssh_manager:
+                msg = self.formatter.format_error("SSH manager not available")
+                return (msg, {'error': 'SSH not available'}) if return_raw else msg
+
+            stdout, stderr, exit_code = ssh_manager.execute_command(command)
+
+            if exit_code != 0 or 'not available' in stdout.lower():
+                msg = self.formatter.format_note("Quorum status command not available")
+                return (msg, {'error': 'Command not available'}) if return_raw else msg
+
+            # Parse the output
+            quorum_data = self._parse_quorum_status(stdout)
+            formatted = f"KRaft Quorum Status:\n\n{stdout}"
+
+            return (formatted, quorum_data) if return_raw else formatted
+
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to get quorum status: {e}")
+            logger.error(f"Quorum status failed: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+
+    def _parse_quorum_status(self, output):
+        """Parse kafka-metadata.sh quorum status output."""
+        result = {}
+
+        for line in output.strip().split('\n'):
+            if ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip().lower().replace(' ', '_')
+                value = value.strip()
+
+                # Parse JSON-like arrays
+                if value.startswith('[') and value.endswith(']'):
+                    try:
+                        value = json.loads(value)
+                    except:
+                        pass
+
+                # Parse integers
+                if isinstance(value, str) and value.isdigit():
+                    value = int(value)
+
+                result[key] = value
+
+        return result
+
+    def _get_quorum_replication(self, return_raw=False):
+        """
+        Get KRaft quorum replication status via SSH command.
+
+        Returns replication information including lag for each voter.
+        Only available for KRaft mode clusters.
+        """
+        if self.kafka_mode != 'kraft':
+            msg = self.formatter.format_note("Quorum replication not available - cluster is in ZooKeeper mode.")
+            return (msg, {'error': 'Not KRaft mode'}) if return_raw else msg
+
+        # Check SSH availability
+        ssh_hosts = self.get_ssh_hosts()
+        if not ssh_hosts:
+            msg = self.formatter.format_note("Quorum replication requires SSH access to run kafka-metadata.sh")
+            return (msg, {'error': 'SSH not configured'}) if return_raw else msg
+
+        try:
+            # Try to execute kafka-metadata.sh quorum describe --replication
+            command = "kafka-metadata.sh quorum describe --replication 2>/dev/null || /opt/kafka/bin/kafka-metadata.sh quorum describe --replication 2>/dev/null || echo 'Command not available'"
+
+            ssh_manager = self.get_ssh_manager(ssh_hosts[0])
+            if not ssh_manager:
+                msg = self.formatter.format_error("SSH manager not available")
+                return (msg, {'error': 'SSH not available'}) if return_raw else msg
+
+            stdout, stderr, exit_code = ssh_manager.execute_command(command)
+
+            if exit_code != 0 or 'not available' in stdout.lower():
+                msg = self.formatter.format_note("Quorum replication command not available")
+                return (msg, {'error': 'Command not available'}) if return_raw else msg
+
+            formatted = f"KRaft Quorum Replication:\n\n{stdout}"
+
+            return (formatted, {'raw': stdout}) if return_raw else formatted
+
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to get quorum replication: {e}")
+            logger.error(f"Quorum replication failed: {e}")
+            return (error_msg, {'error': str(e)}) if return_raw else error_msg
+
+    def _get_api_versions(self, return_raw=False):
+        """
+        Get Kafka broker API versions.
+
+        Returns supported API versions for the connected broker.
+        """
+        try:
+            # Try SSH-based approach first for detailed output
+            ssh_hosts = self.get_ssh_hosts()
+            if ssh_hosts:
+                try:
+                    command = "kafka-broker-api-versions.sh --bootstrap-server localhost:9092 2>/dev/null || /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 2>/dev/null || echo ''"
+
+                    ssh_manager = self.get_ssh_manager(ssh_hosts[0])
+                    if ssh_manager:
+                        stdout, stderr, exit_code = ssh_manager.execute_command(command, timeout=30)
+                        if exit_code == 0 and stdout.strip():
+                            formatted = f"Broker API Versions:\n\n{stdout}"
+                            return (formatted, {'raw': stdout}) if return_raw else formatted
+                except Exception as ssh_e:
+                    logger.debug(f"SSH API versions failed, trying Admin API: {ssh_e}")
+
+            # Fallback to Admin API metadata
+            try:
+                # Get API versions from admin client connection
+                cluster = self.admin_client._client.cluster
+                api_versions = {}
+
+                # The kafka-python library doesn't expose API versions directly,
+                # but we can get some info from the connection
+                formatted = "API Versions: Available via kafka-broker-api-versions.sh command"
+                return (formatted, {'raw': formatted}) if return_raw else formatted
+
+            except Exception as api_e:
+                logger.debug(f"Admin API versions failed: {api_e}")
+                msg = self.formatter.format_note("API versions information requires SSH access or direct broker query")
+                return (msg, {'error': 'Not available via Admin API'}) if return_raw else msg
+
+        except Exception as e:
+            error_msg = self.formatter.format_error(f"Failed to get API versions: {e}")
+            logger.error(f"API versions failed: {e}")
             return (error_msg, {'error': str(e)}) if return_raw else error_msg

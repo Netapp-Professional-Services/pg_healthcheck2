@@ -1,0 +1,93 @@
+{
+  "state_changes_excessive_leadership": {
+    "metric_keywords": ["state_changes"],
+    "data_conditions": [
+      { "key": "leadership_changes", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('leadership_changes', 0) >= 50",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Excessive leadership changes detected ({leadership_changes}). This indicates severe cluster instability that can cause client disruptions and data availability issues.",
+        "recommendations": [
+          "Immediately investigate broker health and logs",
+          "Check for network connectivity issues between brokers",
+          "Review broker resource utilization (CPU, memory, disk I/O)",
+          "Check for broker process crashes or restarts",
+          "Consider temporarily reducing write load if cluster is overwhelmed"
+        ]
+      },
+      {
+        "expression": "data.get('leadership_changes', 0) >= 10 and data.get('leadership_changes', 0) < 50",
+        "level": "high",
+        "score": 6,
+        "reasoning": "High number of leadership changes detected. This may indicate developing stability issues.",
+        "recommendations": [
+          "Monitor leadership change trends over time",
+          "Review broker logs for warnings or errors",
+          "Check network latency between brokers",
+          "Verify all brokers have adequate resources"
+        ]
+      }
+    ]
+  },
+  "state_changes_offline_partitions": {
+    "metric_keywords": ["state_changes"],
+    "data_conditions": [
+      { "key": "offline_events", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('offline_events', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Offline partition events detected. Partitions going offline cause immediate data unavailability.",
+        "recommendations": [
+          "Immediately investigate which partitions went offline",
+          "Check broker health for the affected partition leaders",
+          "Verify ISR members can be elected as leaders",
+          "Review unclean.leader.election.enable setting"
+        ]
+      }
+    ]
+  },
+  "state_changes_isr_churn": {
+    "metric_keywords": ["state_changes"],
+    "data_conditions": [
+      { "key": "isr_shrinks", "exists": true },
+      { "key": "isr_expands", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('isr_shrinks', 0) > data.get('isr_expands', 0) * 2 and data.get('isr_shrinks', 0) > 10",
+        "level": "high",
+        "score": 6,
+        "reasoning": "ISR shrinks significantly exceed expands, indicating replicas are struggling to keep up.",
+        "recommendations": [
+          "Review under-replicated partitions",
+          "Check network bandwidth between brokers",
+          "Consider increasing replica.lag.time.max.ms if network latency is high",
+          "Verify disk I/O performance on brokers"
+        ]
+      }
+    ]
+  },
+  "state_changes_info": {
+    "metric_keywords": ["state_changes"],
+    "data_conditions": [
+      { "key": "total_events", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_events', 0) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "No state change events found in logs. Cluster appears stable.",
+        "recommendations": [
+          "Continue monitoring state change logs for early warning signs"
+        ]
+      }
+    ]
+  }
+}

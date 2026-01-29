@@ -3,6 +3,8 @@ REPORT_SECTIONS = [
         "title": "Security",
         "actions": [
             {'type': 'module', 'module': 'plugins.kafka.checks.check_cve_vulnerabilities', 'function': 'run'},
+            # Authorization audit from kafka-authorizer.log (requires SSH)
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_authorization', 'function': 'run_authorization_check'},
         ]
     },
     {
@@ -70,14 +72,29 @@ REPORT_SECTIONS = [
         "actions": [
             # SSH-based configuration and log analysis
             {'type': 'module', 'module': 'plugins.kafka.checks.check_broker_config', 'function': 'run_broker_config_check'},
+            # Controller configuration (KRaft mode)
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_controller_config', 'function': 'run_controller_config_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_log_errors', 'function': 'run_log_errors_check'},
             {'type': 'module', 'module': 'plugins.kafka.checks.check_gc_pauses', 'function': 'run_gc_pauses_check'},
+            # State change log analysis
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_state_changes', 'function': 'run_state_changes_check'},
         ]
     },
     {
         "title": "Kafka Overview",
         "actions": [
             {'type': 'module', 'module': 'plugins.kafka.checks.kafka_overview', 'function': 'run_kafka_overview'},
+        ]
+    },
+    {
+        "title": "Cluster Health (KRaft)",
+        "actions": [
+            # KRaft quorum health
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_kraft_quorum', 'function': 'run_kraft_quorum_check'},
+            # API versions analysis
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_api_versions', 'function': 'run_api_versions_check'},
+            # Network configuration (hosts file)
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_network_config', 'function': 'run_network_config_check'},
         ]
     },
     {
@@ -148,6 +165,13 @@ REPORT_SECTIONS = [
         'actions': [
 # No consumer groups or lag data available.
             {'type': 'module', 'module': 'plugins.kafka.checks.check_consumer_lag', 'function': 'run_consumer_lag'},
+        ]
+    },
+    {
+        'title': 'Executive Summary',
+        'actions': [
+            # Aggregates all findings from previous checks - must run LAST
+            {'type': 'module', 'module': 'plugins.kafka.checks.check_executive_summary', 'function': 'run_executive_summary_check'},
         ]
     },
 ]

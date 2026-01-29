@@ -47,14 +47,18 @@
   },
   "insufficient_retention": {
     "metric_keywords": ["kafka", "topic", "retention", "durability", "data_expiry"],
+    "data_conditions": [
+      {"key": "retention_hours", "exists": true},
+      {"key": "topic", "exists": true}
+    ],
     "rules": [
       {
-        "expression": "data.get('retention_hours', 0) < 168 and data.get('retention_hours', 0) != float('inf')",
+        "expression": "data.get('retention_hours') is not None and data.get('retention_hours', 0) < 168 and data.get('retention_hours', 0) != float('inf')",
         "level": "high",
         "score": 7,
-        "reasoning": "Topic '{data.get('topic')}' has a short retention period of {data.get('retention_hours'):.1f} hours, risking premature data deletion before consumption.",
+        "reasoning": "Topic '{data.get('topic')}' has a short retention period of {data.get('retention_hours', 0)} hours, risking premature data deletion before consumption.",
         "recommendations": [
-          "Increase retention using: kafka-configs.sh --bootstrap-server <brokers> --entity-type topics --entity-name {data.get('topic')} --alter --add-config retention.ms=604800000",
+          "Increase retention using: kafka-configs.sh --bootstrap-server <brokers> --entity-type topics --entity-name <topic> --alter --add-config retention.ms=604800000",
           "Set retention policies based on your data durability and storage requirements."
         ]
       }

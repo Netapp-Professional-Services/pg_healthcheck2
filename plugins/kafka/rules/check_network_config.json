@@ -1,0 +1,57 @@
+{
+  "network_config_missing_entries": {
+    "metric_keywords": ["network_config"],
+    "data_conditions": [
+      { "key": "has_warnings", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_warnings') == True",
+        "level": "medium",
+        "score": 3,
+        "reasoning": "Network configuration issues detected. Some broker hosts files may be missing entries for other cluster nodes.",
+        "recommendations": [
+          "Add missing broker entries to /etc/hosts on affected nodes",
+          "Ensure all brokers can resolve all other broker hostnames",
+          "Consider using DNS for hostname resolution in production"
+        ]
+      }
+    ]
+  },
+  "network_config_hostname_inconsistency": {
+    "metric_keywords": ["network_config"],
+    "data_conditions": [
+      { "key": "warnings", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "any('inconsistent' in str(w.get('type', '')).lower() for w in data.get('warnings', []))",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Hostname inconsistencies detected across cluster nodes. This may cause connectivity issues.",
+        "recommendations": [
+          "Ensure consistent hostname entries across all nodes",
+          "Verify advertised.listeners uses resolvable hostnames",
+          "Consider standardizing on IP addresses or DNS names"
+        ]
+      }
+    ]
+  },
+  "network_config_info": {
+    "metric_keywords": ["network_config"],
+    "data_conditions": [
+      { "key": "nodes_checked", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('nodes_checked', 0) > 0 and not data.get('has_warnings')",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Network configuration analyzed. No issues detected.",
+        "recommendations": [
+          "Review network configuration when adding or replacing brokers"
+        ]
+      }
+    ]
+  }
+}

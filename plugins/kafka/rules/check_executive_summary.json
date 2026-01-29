@@ -1,0 +1,81 @@
+{
+  "kafka_health_score_critical": {
+    "metric_keywords": ["executive_summary"],
+    "data_conditions": [
+      { "key": "health_score", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('health_score', 100) < 50",
+        "level": "critical",
+        "score": 25,
+        "reasoning": "Cluster health score is critically low, indicating multiple serious issues that require immediate attention.",
+        "recommendations": [
+          "Review all critical and high priority concerns listed in the executive summary",
+          "Address offline partitions and under-replicated topics first",
+          "Investigate consumer lag and dead consumer groups",
+          "Check for GC issues and resource exhaustion"
+        ]
+      },
+      {
+        "expression": "data.get('health_score', 100) < 70",
+        "level": "high",
+        "score": 15,
+        "reasoning": "Cluster health score is poor, indicating significant issues that should be addressed promptly.",
+        "recommendations": [
+          "Review high priority concerns and create action plan",
+          "Monitor cluster closely for further degradation",
+          "Address configuration and performance issues"
+        ]
+      }
+    ]
+  },
+  "kafka_critical_concerns": {
+    "metric_keywords": ["executive_summary"],
+    "data_conditions": [
+      { "key": "critical_concerns", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('critical_concerns', 0) >= 3",
+        "level": "critical",
+        "score": 20,
+        "reasoning": "Multiple critical concerns detected across the cluster requiring immediate action.",
+        "recommendations": [
+          "Prioritize and address critical concerns immediately",
+          "Consider engaging additional support resources",
+          "Document and track resolution of each critical issue"
+        ]
+      },
+      {
+        "expression": "data.get('critical_concerns', 0) >= 1",
+        "level": "high",
+        "score": 15,
+        "reasoning": "Critical concern(s) detected that require prompt attention.",
+        "recommendations": [
+          "Review and address critical concerns as priority",
+          "Monitor cluster health while issues are resolved"
+        ]
+      }
+    ]
+  },
+  "kafka_high_priority_concerns": {
+    "metric_keywords": ["executive_summary"],
+    "data_conditions": [
+      { "key": "high_concerns", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('high_concerns', 0) >= 5",
+        "level": "high",
+        "score": 12,
+        "reasoning": "Multiple high priority issues indicate systemic problems requiring comprehensive review.",
+        "recommendations": [
+          "Create prioritized action plan for all high priority items",
+          "Review cluster architecture and capacity planning",
+          "Consider scheduled maintenance window for remediation"
+        ]
+      }
+    ]
+  }
+}
