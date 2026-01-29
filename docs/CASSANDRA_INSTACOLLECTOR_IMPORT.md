@@ -14,17 +14,17 @@ The Instacollector importer allows you to analyze Cassandra cluster health from 
 ## Quick Start
 
 ```bash
-# From a tarball
-python -m plugins.cassandra.import_instacollector /path/to/InstaCollection_192.168.1.10.tar.gz
+# From a tarball (recommended entry point)
+python import_cassandra_diagnostic.py --diagnostic ./InstaCollection.tar.gz --config config/cassandra.yaml
 
 # From an extracted directory
-python -m plugins.cassandra.import_instacollector /path/to/instacollector_export/
+python import_cassandra_diagnostic.py --diagnostic ./instacollector_export/ --config config/cassandra.yaml
 
 # Auto-detect most recent export in a directory
-python -m plugins.cassandra.import_instacollector /path/to/uploads/
+python import_cassandra_diagnostic.py --diagnostic /path/to/uploads/ --config config/cassandra.yaml
 
-# With company name for identification
-python -m plugins.cassandra.import_instacollector ./export.tar.gz --company "Acme Corp"
+# With company name override
+python import_cassandra_diagnostic.py --diagnostic ./export.tar.gz --config config/cassandra.yaml --company "Acme Corp"
 ```
 
 ## Installation
@@ -33,61 +33,89 @@ No additional dependencies required beyond the main health check tool requiremen
 
 ## Usage
 
-### Basic Usage
+### Root-Level Entry Point (Recommended)
+
+The `import_cassandra_diagnostic.py` script at the project root provides a simple interface:
 
 ```bash
-# Analyze a tarball
-python -m plugins.cassandra.import_instacollector ./InstaCollection_cluster.tar.gz
+# Basic usage
+python import_cassandra_diagnostic.py --diagnostic ./InstaCollection.tar.gz --config config/cassandra.yaml
 
-# Analyze an extracted directory
-python -m plugins.cassandra.import_instacollector ./instacollector_data/
+# With custom output filename
+python import_cassandra_diagnostic.py --diagnostic ./export.tar.gz --config config/cassandra.yaml --output client_report.adoc
+
+# Skip report generation (JSON only)
+python import_cassandra_diagnostic.py --diagnostic ./export.tar.gz --config config/cassandra.yaml --no-report
+
+# Verbose logging
+python import_cassandra_diagnostic.py --diagnostic ./export.tar.gz --config config/cassandra.yaml --verbose
 ```
 
-### Using a Config File (Recommended)
+### Programmatic Usage
 
-Create a YAML config file for repeatable analysis:
+```python
+from import_cassandra_diagnostic import CassandraDiagnosticImporter
 
-```yaml
-# config/cassandra_import.yaml
-company_name: "Customer ABC"
-diagnostic_path: "/path/to/InstaCollection.tar.gz"
+# Initialize and run import
+importer = CassandraDiagnosticImporter(
+    config_file='config/cassandra.yaml',
+    diagnostic_path='./InstaCollection.tar.gz',
+    company_override='Acme Corp'
+)
+importer.run_import()
+importer.write_adoc('health_check.adoc')
 
-# Optional: Custom output directory
-output_dir: "./reports/customer_abc"
-
-# Optional: Ship to trends database
-trend_storage_enabled: true
-trends_config: "config/trends.yaml"
-
-# Optional: NVD API key for CVE checks
-nvd_api_key: "your-nvd-api-key"
-
-# Optional: AI analysis
-ai_analyze: false
-# ai_provider: "openai"
-# ai_model: "gpt-4"
-# ai_api_key: "your-api-key"
+# Access findings programmatically
+findings = importer.all_structured_findings
+health_score = findings.get('check_executive_summary', {}).get('data', {}).get('health_score')
 ```
 
-Run with config:
+### Alternative: Module Invocation
+
+You can also run the importer as a Python module:
 
 ```bash
-python -m plugins.cassandra.import_instacollector --config config/cassandra_import.yaml
+python -m plugins.cassandra.import_instacollector /path/to/InstaCollection.tar.gz --company "Acme Corp"
 ```
 
 ### Command Line Options
 
 | Option | Description |
 |--------|-------------|
-| `diagnostic_path` | Path to Instacollector export (tarball or directory) |
-| `--config` | Path to YAML config file |
-| `--company`, `-c` | Company name for report identification |
-| `--output-dir`, `-o` | Output directory for reports |
-| `--report-config`, `-r` | Custom report definition file |
-| `--ship-trends` | Ship results to trends database |
-| `--trends-config` | Path to trends configuration file |
-| `--json-only` | Output only structured JSON (no AsciiDoc) |
-| `--quiet`, `-q` | Suppress progress output |
+| `--diagnostic`, `-d` | Path to Instacollector export (tarball or directory) - **required** |
+| `--config`, `-c` | Path to YAML config file - **required** |
+| `--company` | Company name override (takes precedence over config file) |
+| `--report-config` | Custom report definition file |
+| `--output`, `-o` | Output report filename (default: health_check.adoc) |
+| `--no-report` | Skip generating AsciiDoc report |
+| `--verbose`, `-v` | Enable verbose logging |
+
+### Configuration File
+
+Create a YAML config file for repeatable analysis:
+
+```yaml
+# config/cassandra_import.yaml
+company_name: "Customer ABC"
+db_type: cassandra
+
+# Optional: Report settings
+show_qry: false
+row_limit: 100
+
+# Optional: NVD API key for CVE checks
+nvd_api_key: "your-nvd-api-key"
+
+# Optional: Ship to trends database
+trend_storage_enabled: true
+
+# Optional: AI analysis
+ai_analyze: false
+ai_run_integrated: false
+# ai_provider: "openai"
+# ai_model: "gpt-4"
+# ai_api_key: "your-api-key"
+```
 
 ### Smart Path Detection
 
@@ -96,7 +124,7 @@ When given a directory path, the tool automatically finds the most recent Instac
 ```bash
 # If /uploads/ contains multiple InstaCollection_*.tar.gz files,
 # the most recent one is automatically selected
-python -m plugins.cassandra.import_instacollector /uploads/
+python import_cassandra_diagnostic.py --diagnostic /uploads/ --config config/cassandra.yaml
 ```
 
 The tool looks for:
@@ -190,7 +218,9 @@ The Instacollector import runs these health checks:
 - **CVE Vulnerability Check** - Known vulnerabilities for the Cassandra version
 
 ### Executive Summary
-- **Aggregated Health Score** - Cluster-wide health assessment (runs last)
+- **Aggregated Health Score** - Cluster-wide health assessment with letter grade (A-F)
+- **Key Concerns** - Critical and medium priority issues
+- **Resource Summary** - Node count, load distribution, dropped messages
 
 ## Output
 
@@ -226,52 +256,55 @@ The tool prints a summary showing:
 
 Example output:
 ```
+============================================================
+Cassandra Diagnostic Import Tool v2.1.0
+============================================================
+
+Importing: /path/to/InstaCollection_202512120223.tar.gz
+Company: cassandra test
 ✅ Successfully loaded Instacollector export
-   - Source: ./InstaCollection_cluster.tar.gz
-   - Collection Date: 2025-01-15T10:30:00
-   - Version: 4.1.3
-   - Cluster: production-cassandra
+   - Source: /path/to/InstaCollection_202512120223.tar.gz
+   - Collection Date: 2025-12-12T02:22:48
+   - Version: 3.11.2
+   - Cluster: SpectrumMVNO
    - Datacenter: dc1
    - Nodes: 6
 
-Generating health check report...
+Diagnostic Info:
+  Collection Date: 2025-12-12T02:22:48
+  Cassandra Version: 3.11.2
+  Datacenter: dc1
+  Nodes: 6
+
+--- Running Health Checks Against Imported Data ---
+
+--- Summary ---
+Checks executed: 23
+
+Rules Triggered: 5
 
 ============================================================
-REPORT SUMMARY
+Import Complete!
 ============================================================
-Cluster: production-cassandra
-Version: 4.1.3
-Datacenter: dc1
-Nodes: 6
-Checks executed: 19
-
-⚡ Rules Triggered: 104
-   🔴 CRITICAL: 2
-   🟠 HIGH: 8
-   🟡 MEDIUM: 35
-   🔵 LOW: 59
-
-✅ AsciiDoc report: adoc_out/customer_abc/health_check.adoc
-✅ Structured findings: adoc_out/customer_abc/structured_health_check_findings.json
-
-✅ Import complete!
+Report saved to: /path/to/adoc_out/cassandra_test/health_check.adoc
 ```
 
 ## Shipping to Trends Database
 
-To track health over time, ship results to the trends database:
+To track health over time, enable trend shipping in your config:
+
+```yaml
+# In config/cassandra.yaml
+trend_storage_enabled: true
+```
+
+Or use the module invocation with explicit flags:
 
 ```bash
 python -m plugins.cassandra.import_instacollector ./export.tar.gz \
     --company "Customer ABC" \
     --ship-trends \
     --trends-config config/trends.yaml
-```
-
-Or in config file:
-```yaml
-trend_storage_enabled: true
-trends_config: "config/trends.yaml"
 ```
 
 ## Troubleshooting
@@ -303,7 +336,9 @@ OuterArchive.tar.gz
 
 ```bash
 # Analyze and generate report
-python -m plugins.cassandra.import_instacollector ./customer_diagnostic.tar.gz \
+python import_cassandra_diagnostic.py \
+    --diagnostic ./customer_diagnostic.tar.gz \
+    --config config/cassandra.yaml \
     --company "Customer XYZ"
 
 # View the report
@@ -317,18 +352,20 @@ open adoc_out/customer_xyz/health_check.html
 # 1. Create config for the engagement
 cat > config/customer_engagement.yaml << EOF
 company_name: "Acme Corp - Q1 Review"
-diagnostic_path: "/diagnostics/acme/InstaCollection_2025-01-15.tar.gz"
-output_dir: "./reports/acme_q1"
-trend_storage_enabled: true
-trends_config: "config/trends.yaml"
+db_type: cassandra
 nvd_api_key: "your-nvd-api-key"
+trend_storage_enabled: false
+ai_analyze: false
 EOF
 
 # 2. Run analysis
-python -m plugins.cassandra.import_instacollector --config config/customer_engagement.yaml
+python import_cassandra_diagnostic.py \
+    --diagnostic /diagnostics/acme/InstaCollection_2025-01-15.tar.gz \
+    --config config/customer_engagement.yaml
 
 # 3. Generate PDF report for customer
-asciidoctor-pdf reports/acme_q1/health_check.adoc -o reports/acme_q1/health_check.pdf
+asciidoctor-pdf adoc_out/acme_corp_q1_review/health_check.adoc \
+    -o reports/acme_health_check.pdf
 ```
 
 ### Batch Processing
@@ -337,9 +374,10 @@ asciidoctor-pdf reports/acme_q1/health_check.adoc -o reports/acme_q1/health_chec
 # Process multiple diagnostics
 for tarball in /diagnostics/*.tar.gz; do
     name=$(basename "$tarball" .tar.gz)
-    python -m plugins.cassandra.import_instacollector "$tarball" \
-        --company "$name" \
-        --quiet
+    python import_cassandra_diagnostic.py \
+        --diagnostic "$tarball" \
+        --config config/cassandra.yaml \
+        --company "$name"
 done
 ```
 
@@ -355,7 +393,18 @@ done
 | Cluster load | Minimal | None |
 | Historical analysis | No | Yes |
 
+## Entry Point Comparison
+
+| Entry Point | Location | Best For |
+|-------------|----------|----------|
+| `import_cassandra_diagnostic.py` | Project root | Simple CLI usage, programmatic access |
+| `python -m plugins.cassandra.import_instacollector` | Module | Advanced options, config file workflows |
+
+Both entry points produce identical results and support the same features.
+
 ## Related Documentation
 
+- [Kafka Instacollector Import](./KAFKA_INSTACOLLECTOR_IMPORT.md) - Similar import process for Kafka
+- [OpenSearch Diagnostic Import](./OPENSEARCH_DIAGNOSTIC_IMPORT.md) - Import for OpenSearch diagnostics
 - [Instaclustr Instacollector](https://www.instaclustr.com/support/documentation/instacollector/) - Official Instacollector documentation
 - [NVD API Key Setup](./NVD_API_KEY_SETUP.md) - Configure NVD API key for CVE checks
