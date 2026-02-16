@@ -10,6 +10,17 @@ def get_report_definition():
     """
     return [
         {
+            'title': 'Security',
+            'description': 'Security vulnerability analysis',
+            'actions': [
+                {
+                    'type': 'module',
+                    'module': 'plugins.clickhouse.checks.check_cve_vulnerabilities',
+                    'function': 'run'
+                }
+            ]
+        },
+        {
             'title': 'Cluster Overview',
             'description': 'High-level cluster health and topology',
             'actions': [

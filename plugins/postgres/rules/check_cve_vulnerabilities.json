@@ -1,0 +1,179 @@
+{
+  "critical_cves_detected": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "core", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('core', {}).get('severity_counts', {}).get('critical', 0) > 0",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Critical CVEs found in PostgreSQL core that pose severe security risks requiring immediate attention.",
+        "recommendations": [
+          "Immediately review all critical CVEs for exploitability in your environment",
+          "Plan emergency upgrade to patch critical vulnerabilities",
+          "Implement temporary mitigations if immediate patching is not possible",
+          "Review security announcements: https://www.postgresql.org/support/security/",
+          "Consider isolating affected systems until patches are applied",
+          "Monitor for signs of exploitation in system logs"
+        ]
+      },
+      {
+        "expression": "data.get('core', {}).get('severity_counts', {}).get('high', 0) > 0",
+        "level": "high",
+        "score": 8,
+        "reasoning": "High severity CVEs found that should be addressed promptly to maintain security posture.",
+        "recommendations": [
+          "Review high severity CVEs and assess impact on your deployment",
+          "Schedule upgrade to latest minor version within next maintenance window",
+          "Check if CVEs are exploitable in your specific configuration",
+          "Implement defense-in-depth controls while planning upgrade",
+          "Review PostgreSQL release notes for fixed vulnerabilities"
+        ]
+      },
+      {
+        "expression": "data.get('core', {}).get('severity_counts', {}).get('medium', 0) > 5",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "Multiple medium severity CVEs detected. While not immediately critical, accumulated vulnerabilities increase attack surface.",
+        "recommendations": [
+          "Plan upgrade to latest minor version to address accumulated vulnerabilities",
+          "Review medium severity CVEs to identify those relevant to your deployment",
+          "Prioritize CVEs that affect features you actively use",
+          "Include security updates in regular maintenance schedule"
+        ]
+      }
+    ]
+  },
+  "extension_cves_detected": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "extensions", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "any(ext.get('severity_counts', {}).get('critical', 0) > 0 for ext in data.get('extensions', []) if ext.get('status') == 'success')",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Critical CVEs found in PostgreSQL extensions that could compromise database security.",
+        "recommendations": [
+          "Identify affected extensions and their usage patterns in production",
+          "Upgrade extensions to patched versions immediately if available",
+          "Consider temporarily disabling extension if not actively used",
+          "Review extension code if upgrades are not available",
+          "Monitor vendor security advisories for extension patches"
+        ]
+      },
+      {
+        "expression": "any(ext.get('severity_counts', {}).get('high', 0) > 0 for ext in data.get('extensions', []) if ext.get('status') == 'success')",
+        "level": "high",
+        "score": 7,
+        "reasoning": "High severity CVEs found in PostgreSQL extensions requiring attention.",
+        "recommendations": [
+          "Review affected extensions and their exposure to untrusted input",
+          "Check for available extension updates with security fixes",
+          "Evaluate if affected extensions are essential for operations",
+          "Consider alternative extensions if updates are unavailable",
+          "Document extension security status for audit purposes"
+        ]
+      },
+      {
+        "expression": "len([ext for ext in data.get('extensions', []) if ext.get('status') == 'success' and ext.get('total_cves', 0) > 0]) > 0",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "One or more extensions have known CVEs. Extensions should be kept updated for security.",
+        "recommendations": [
+          "Review CVEs for each affected extension",
+          "Plan extension upgrades during next maintenance window",
+          "Verify extension compatibility with current PostgreSQL version",
+          "Test extension upgrades in non-production environment",
+          "Maintain inventory of installed extensions and their versions"
+        ]
+      }
+    ]
+  },
+  "outdated_version_with_cves": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "core", "exists": true},
+      {"key": "postgres_version", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('core', {}).get('total_cves', 0) > 10 and data.get('core', {}).get('status') == 'success'",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Large number of CVEs detected, indicating PostgreSQL version is significantly outdated and requires upgrade.",
+        "recommendations": [
+          "Current version has accumulated significant security vulnerabilities",
+          "Prioritize upgrade to latest minor version in release series",
+          "Review all CVEs to understand accumulated security debt",
+          "Consider this a high priority security upgrade",
+          "Plan comprehensive testing before production upgrade",
+          "Review deprecation notices and breaking changes if considering major version upgrade"
+        ]
+      }
+    ]
+  },
+  "aurora_rds_cve_management": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "environment", "exists": true},
+      {"key": "core", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('environment', '').upper() in ['AURORA', 'RDS'] and data.get('core', {}).get('severity_counts', {}).get('critical', 0) > 0",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Critical CVEs detected in AWS-managed PostgreSQL. AWS may force patching during maintenance windows.",
+        "recommendations": [
+          "Check AWS Security Bulletins for PostgreSQL: https://aws.amazon.com/security/security-bulletins/",
+          "Review RDS/Aurora maintenance window configuration",
+          "Contact AWS Support for emergency patching if available",
+          "Plan for forced patching during next maintenance window",
+          "Consider enabling automatic minor version upgrades in RDS/Aurora",
+          "Test application compatibility with patched version before maintenance window"
+        ]
+      },
+      {
+        "expression": "data.get('environment', '').upper() in ['AURORA', 'RDS'] and data.get('core', {}).get('total_cves', 0) > 0",
+        "level": "medium",
+        "score": 5,
+        "reasoning": "CVEs detected in AWS-managed PostgreSQL. Review AWS patching schedule and available versions.",
+        "recommendations": [
+          "Review available PostgreSQL versions in AWS Console",
+          "Check if patched version is available in your AWS region",
+          "Plan upgrade during maintenance window",
+          "Enable automatic minor version upgrades if not already enabled",
+          "Subscribe to AWS security notifications for PostgreSQL"
+        ]
+      }
+    ]
+  },
+  "patroni_cluster_cve_management": {
+    "metric_keywords": ["cve_vulnerabilities"],
+    "data_conditions": [
+      {"key": "environment", "exists": true},
+      {"key": "core", "exists": true}
+    ],
+    "rules": [
+      {
+        "expression": "data.get('environment', '').upper() == 'PATRONI' and (data.get('core', {}).get('severity_counts', {}).get('critical', 0) > 0 or data.get('core', {}).get('severity_counts', {}).get('high', 0) > 0)",
+        "level": "high",
+        "score": 8,
+        "reasoning": "Critical or high severity CVEs detected in Patroni-managed cluster. Rolling upgrade strategy required.",
+        "recommendations": [
+          "Plan rolling upgrade across Patroni cluster to minimize downtime",
+          "Test upgrade on standby replica first in staging environment",
+          "Verify Patroni configuration for automated failover during upgrade",
+          "Ensure backup is taken before upgrade process",
+          "Review Patroni upgrade documentation: https://patroni.readthedocs.io/",
+          "Monitor cluster health during rolling upgrade process",
+          "Plan rollback strategy in case of upgrade issues"
+        ]
+      }
+    ]
+  }
+}

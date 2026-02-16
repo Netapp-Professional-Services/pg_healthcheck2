@@ -6,7 +6,7 @@ report_title: "Kafka Health Check Report - Instaclustr"
 logo_image: MyLogo.svg[900,900]
 
 # Kafka Configuration
-# kafka_version: "Apache Kafka 3.9.1"  # Optional - will auto-detect version
+# kafka_version: "3.9.1"  # Optional - will auto-detect version
 # API version tuple for kafka-python library (major, minor, patch)
 # Match your Kafka version: [3, 9, 1] for Kafka 3.9.x, [4, 0, 0] for Kafka 4.x
 # Comment out to auto-detect

@@ -1,22 +1,20 @@
-import json
-
-"""Nodetool queries for compaction pending tasks in Cassandra."""
+"""CQL queries for compaction pending tasks in Cassandra."""
 
 __all__ = [
-    'get_nodetool_compactionstats_query'
+    'get_compaction_pending_tasks_query'
 ]
 
-def get_nodetool_compactionstats_query(connector):
+
+def get_compaction_pending_tasks_query(connector):
     """
-    Returns query of system_view.thread_pools for CompactionExecutor Pending tasks.
-    
+    Returns CQL query for CompactionExecutor pending tasks from system_views.thread_pools.
+
     Args:
         connector: Cassandra connector instance
-    
+
     Returns:
-        str: JSON string with operation and command
+        str: CQL SELECT statement
     """
     return """
-	select pending_tasks  from system_views.thread_pools where name ='CompactionExecutor';
-    """ 
-    })
+    SELECT pending_tasks FROM system_views.thread_pools WHERE name = 'CompactionExecutor';
+    """

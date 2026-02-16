@@ -1,0 +1,84 @@
+{
+  "critical_system_limits": {
+    "metric_keywords": [
+      "system_limits",
+      "kafka",
+      "memlock",
+      "nofile",
+      "nproc",
+      "swappiness"
+    ],
+    "rules": [
+      {
+        "expression": "any(limit.get('status') == 'critical' for limit in data.get('limits', {}).values())",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has critical system limit misconfigurations. These limits directly impact Kafka performance and stability.",
+        "recommendations": [
+          "IMMEDIATE: Update /etc/security/limits.conf with proper limits for Kafka user",
+          "Set MEMLOCK, AS to unlimited, NOFILE >= 100000, NPROC >= 32768",
+          "Set vm.swappiness to 0 or 1 in /etc/sysctl.conf",
+          "Restart Kafka broker after making changes",
+          "Verify limits after restart: cat /proc/<kafka-pid>/limits"
+        ]
+      },
+      {
+        "expression": "data.get('swappiness') and data.get('swappiness') > 10",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has vm.swappiness={data.get('swappiness')}, which is too high. Kafka performance degrades significantly when swapping occurs.",
+        "recommendations": [
+          "Set vm.swappiness=1 in /etc/sysctl.conf",
+          "Apply immediately: sysctl -w vm.swappiness=1",
+          "Make permanent: echo 'vm.swappiness=1' >> /etc/sysctl.conf && sysctl -p",
+          "Monitor swap usage: free -h"
+        ]
+      },
+      {
+        "expression": "any(limit.get('status') == 'warning' for limit in data.get('limits', {}).values())",
+        "level": "warning",
+        "score": 7,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has system limit warnings. While not critical, these should be addressed to ensure optimal performance.",
+        "recommendations": [
+          "Review system limits configuration",
+          "Ensure soft limits match or are close to hard limits",
+          "Plan maintenance window to update limits if needed",
+          "Monitor for performance issues"
+        ]
+      },
+      {
+        "expression": "data.get('swappiness') and 1 < data.get('swappiness') <= 10",
+        "level": "warning",
+        "score": 6,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has vm.swappiness={data.get('swappiness')}. For optimal Kafka performance, this should be 0 or 1.",
+        "recommendations": [
+          "Set vm.swappiness=1 for optimal Kafka performance",
+          "Update /etc/sysctl.conf: vm.swappiness=1",
+          "Apply: sysctl -p"
+        ]
+      },
+      {
+        "expression": "data.get('limits', {}).get('NOFILE', {}).get('hard_value') and data.get('limits', {}).get('NOFILE', {}).get('hard_value') < 100000",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has NOFILE limit {data.get('limits', {}).get('NOFILE', {}).get('hard_value')}, which is below recommended minimum of 100000. Kafka uses many file descriptors.",
+        "recommendations": [
+          "Increase NOFILE limit to at least 100000",
+          "Edit /etc/security/limits.conf: kafka soft nofile 100000, kafka hard nofile 100000",
+          "Restart Kafka broker after changes"
+        ]
+      },
+      {
+        "expression": "data.get('limits', {}).get('NPROC', {}).get('hard_value') and data.get('limits', {}).get('NPROC', {}).get('hard_value') < 32768",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Broker {data.get('broker_id')} on {data.get('host')} has NPROC limit {data.get('limits', {}).get('NPROC', {}).get('hard_value')}, which is below recommended minimum of 32768.",
+        "recommendations": [
+          "Increase NPROC limit to at least 32768",
+          "Edit /etc/security/limits.conf: kafka soft nproc 32768, kafka hard nproc 32768",
+          "Restart Kafka broker after changes"
+        ]
+      }
+    ]
+  }
+}

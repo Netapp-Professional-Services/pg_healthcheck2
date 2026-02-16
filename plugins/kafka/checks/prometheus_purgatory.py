@@ -22,7 +22,7 @@ IMPORTANCE:
 
 import logging
 from datetime import datetime
-from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.check_helpers import CheckContentBuilder, get_metric_collection_error_message
 from plugins.common.metric_collection_strategies import collect_metric_adaptive
 from plugins.kafka.utils.kafka_metric_definitions import get_metric_definition
 
@@ -76,13 +76,8 @@ def check_prometheus_purgatory(connector, settings):
         fetch_result = collect_metric_adaptive(fetch_purg_def, connector, settings)
 
         if not produce_result and not fetch_result:
-            builder.warning(
-                "⚠️ Could not collect purgatory metrics\n\n"
-                "*Tried collection methods:*\n"
-                "1. Instaclustr Prometheus API - Not configured or unavailable\n"
-                "2. Local Prometheus JMX exporter - Not found or SSH unavailable\n"
-                "3. Standard JMX - Not available or SSH unavailable"
-            )
+            error_msg = get_metric_collection_error_message(connector, "purgatory metrics")
+            builder.warning(error_msg)
             findings = {
                 'status': 'skipped',
                 'reason': 'Unable to collect purgatory metrics using any method',
@@ -218,29 +213,27 @@ def check_prometheus_purgatory(connector, settings):
 
             recommendations = {
                 "high": [
-                    "Purgatory Size Issues:",
+                    " *High Produce Purgatory:*",
+                    "** Indicates producers waiting for acks (acks=all)",
+                    "** Check replication lag - slow replicas delay acks",
+                    "** Review min.insync.replicas setting",
+                    "** Consider reducing acks to 1 for lower latency (less durability)",
                     "",
-                    "High Produce Purgatory:",
-                    "  • Indicates producers waiting for acks (acks=all)",
-                    "  • Check replication lag - slow replicas delay acks",
-                    "  • Review min.insync.replicas setting",
-                    "  • Consider reducing acks to 1 for lower latency (less durability)",
+                    " *High Fetch Purgatory:*",
+                    "** Consumers/followers waiting for fetch.min.bytes",
+                    "** Reduce fetch.min.bytes on consumers (trade bandwidth for latency)",
+                    "** Check if brokers are low-traffic (normal for idle clusters)",
+                    "** Ensure fetch.max.wait.ms is reasonable (default: 500ms)",
                     "",
-                    "High Fetch Purgatory:",
-                    "  • Consumers/followers waiting for fetch.min.bytes",
-                    "  • Reduce fetch.min.bytes on consumers (trade bandwidth for latency)",
-                    "  • Check if brokers are low-traffic (normal for idle clusters)",
-                    "  • Ensure fetch.max.wait.ms is reasonable (default: 500ms)",
-                    "",
-                    "General Actions:",
-                    "  • Monitor purgatory growth rate over time",
-                    "  • Check for disk I/O bottlenecks causing delays",
-                    "  • Review network latency between brokers"
+                    " *General Actions:*",
+                    "** Monitor purgatory growth rate over time",
+                    "** Check for disk I/O bottlenecks causing delays",
+                    "** Review network latency between brokers"
                 ],
                 "general": [
-                    "Typical healthy values:",
-                    "  • Produce purgatory: < 100 requests",
-                    "  • Fetch purgatory: < 100 requests (can be higher on idle clusters)"
+                    " *Typical healthy values:*",
+                    "** Produce purgatory: < 100 requests",
+                    "** Fetch purgatory: < 100 requests (can be higher on idle clusters)"
                 ]
             }
             builder.recs(recommendations)

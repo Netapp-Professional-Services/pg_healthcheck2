@@ -59,11 +59,11 @@ def check_pgbouncer_detection(connector, settings: Dict) -> Tuple[str, Dict]:
         # Build output
         _build_detection_output(builder, detection_result, settings)
 
-        # Build findings for trend storage
-        findings = {
-            'pgbouncer_detection': {
-                'status': 'success',
-                'timestamp': timestamp,
+        # Build findings for trend storage (no extra wrapper - report_builder adds module name)
+        structured_data = {
+            'status': 'success',
+            'timestamp': timestamp,
+            'data': {
                 'detected': detection_result.get('detected', False),
                 'method': detection_result.get('method'),
                 'version': detection_result.get('version'),
@@ -74,25 +74,48 @@ def check_pgbouncer_detection(connector, settings: Dict) -> Tuple[str, Dict]:
             }
         }
 
-        return builder.build(), findings
+        return builder.build(), structured_data
 
     except Exception as e:
-        logger.error(f"Failed to detect PgBouncer: {e}", exc_info=True)
-        builder.critical_issue(
-            "PgBouncer Detection Failed",
-            [f"Detection failed: {str(e)}"]
-        )
+        # Log for debugging but handle gracefully - connection failures are expected
+        # when PgBouncer is not running or not accessible
+        logger.warning(f"PgBouncer detection encountered an error: {e}")
 
-        findings = {
-            'pgbouncer_detection': {
-                'status': 'error',
-                'timestamp': timestamp,
+        # Determine if this is an expected failure (connection issues) or unexpected
+        error_str = str(e).lower()
+        is_connection_error = any(term in error_str for term in [
+            'connection refused', 'timeout', 'timed out', 'no route to host',
+            'network unreachable', 'connection reset', 'could not connect',
+            'authentication failed', 'password authentication failed'
+        ])
+
+        if is_connection_error:
+            # Expected failure - PgBouncer not running or not accessible
+            builder.warning(
+                f"**PgBouncer Not Accessible**\n\n"
+                f"Could not connect to PgBouncer: {str(e)}\n\n"
+                f"This is normal if PgBouncer is not running or not configured."
+            )
+        else:
+            # Unexpected error - log with more detail
+            logger.error(f"Unexpected error during PgBouncer detection: {e}", exc_info=True)
+            builder.warning(
+                f"**PgBouncer Detection Error**\n\n"
+                f"An unexpected error occurred: {str(e)}\n\n"
+                f"Check the logs for more details."
+            )
+
+        structured_data = {
+            'status': 'error',
+            'timestamp': timestamp,
+            'data': {
                 'detected': False,
-                'error': str(e)
+                'error': str(e),
+                'error_type': 'connection_error' if is_connection_error else 'unexpected_error'
             }
         }
 
-        return builder.build(), findings
+        return builder.build(), structured_data
 
 
 def _detect_pgbouncer(connector, settings: Dict) -> Dict:

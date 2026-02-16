@@ -20,6 +20,7 @@ Use this check to:
 """
 
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.output_formatters import AsciiDocFormatter
 from plugins.postgres.utils.qrylib.comprehensive_query_analysis import (
     get_comprehensive_query_analysis_query
 )
@@ -125,19 +126,11 @@ def check_comprehensive_query_analysis(connector, settings):
 
         # Display results with truncated queries for readability
         # (Full queries are preserved in structured findings)
-        display_data = []
-        for row in raw_result:
-            display_row = row.copy()
-            # Truncate query text to 120 characters for AsciiDoc display
-            if 'query' in display_row and display_row['query']:
-                full_query = display_row['query']
-                if len(full_query) > 120:
-                    display_row['query'] = full_query[:117] + '...'
-            display_data.append(display_row)
-
-        # Format truncated data for display
-        from utils.asciidoc_formatter import format_table
-        truncated_display = format_table(display_data)
+        formatter = AsciiDocFormatter()
+        truncated_display = formatter.format_table_with_truncation(
+            raw_result,
+            truncate_fields={'query': 120}
+        )
         builder.text(truncated_display)
         builder.blank()
 

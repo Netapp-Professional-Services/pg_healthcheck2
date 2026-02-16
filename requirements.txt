@@ -29,3 +29,8 @@ boto3
 
 # --- trend analysis
 deepdiff
+
+# -- Could not create SSH manager for 3.77.114.205: Paramiko library is required for SSH support.
+# Install it with: pip install paramiko
+paramiko
+

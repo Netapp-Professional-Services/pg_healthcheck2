@@ -3,15 +3,16 @@
 import logging
 import json
 import socket
-from kafka import KafkaAdminClient, KafkaConsumer
+from kafka import KafkaAdminClient, KafkaConsumer, TopicPartition
 from kafka.admin import NewTopic, ConfigResource, ConfigResourceType
 from plugins.common.ssh_mixin import SSHSupportMixin
 from plugins.common.output_formatters import AsciiDocFormatter
+from plugins.common.cve_mixin import CVECheckMixin
 
 logger = logging.getLogger(__name__)
 
 
-class KafkaConnector(SSHSupportMixin):
+class KafkaConnector(SSHSupportMixin, CVECheckMixin):
     """Connector for Kafka clusters with multi-broker SSH support."""
     
     def __init__(self, settings):
@@ -32,8 +33,14 @@ class KafkaConnector(SSHSupportMixin):
         self.metric_collection_strategy = None
         self.metric_collection_details = {}
 
+        # Technology name for CVE lookups
+        self.technology_name = 'kafka'
+
         # Initialize SSH support (from mixin)
         self.initialize_ssh()
+
+        # Initialize CVE support (from mixin)
+        self.initialize_cve_support()
 
         logger.info(f"Kafka connector initialized")
     
@@ -593,8 +600,20 @@ class KafkaConnector(SSHSupportMixin):
                 logger.info(f"Using configured Kafka version: {configured_version}")
                 cluster_metadata = self.admin_client._client.cluster
                 brokers = cluster_metadata.brokers()
+
+                # Extract major version
+                major_version = 0
+                try:
+                    import re
+                    match = re.match(r'(\d+)', configured_version)
+                    if match:
+                        major_version = int(match.group(1))
+                except (ValueError, AttributeError):
+                    major_version = 0
+
                 return {
                     'version_string': configured_version,
+                    'major_version': major_version,
                     'broker_count': len(brokers) if brokers else 0,
                     'source': 'configured'
                 }
@@ -656,14 +675,28 @@ class KafkaConnector(SSHSupportMixin):
                 except Exception as e:
                     logger.debug(f"Could not detect version via SSH: {e}")
 
+            # Extract major version from version_string
+            major_version = 0
+            if version_string and version_string != 'Unknown':
+                try:
+                    # Handle versions like "3.9.1", "3.x+", "3.x"
+                    import re
+                    match = re.match(r'(\d+)', version_string)
+                    if match:
+                        major_version = int(match.group(1))
+                except (ValueError, AttributeError):
+                    logger.debug(f"Could not extract major version from: {version_string}")
+                    major_version = 0
+
             return {
                 'version_string': version_string,
+                'major_version': major_version,
                 'broker_count': broker_count,
                 'source': source
             }
         except Exception as e:
             logger.warning(f"Could not fetch version: {e}")
-            return {'version_string': 'Unknown', 'broker_count': 0, 'source': 'error'}
+            return {'version_string': 'Unknown', 'major_version': 0, 'broker_count': 0, 'source': 'error'}
 
     def _detect_kafka_mode(self):
         """
@@ -822,9 +855,10 @@ class KafkaConnector(SSHSupportMixin):
     def execute_query(self, query, params=None, return_raw=False):
         """
         Executes Kafka Admin API operations or shell commands via JSON dispatch.
-        
+
         Supported operations:
-        - list_topics
+        - list_topics (user topics only, excludes internal topics)
+        - admin_list_topics (all topics including internal topics)
         - describe_topics
         - list_consumer_groups
         - describe_consumer_groups
@@ -853,8 +887,10 @@ class KafkaConnector(SSHSupportMixin):
                 return self._execute_shell_command(query_obj.get('command'), return_raw)
             elif operation == 'list_topics':
                 return self._list_topics(return_raw)
+            elif operation == 'admin_list_topics':
+                return self._list_all_topics(return_raw)
             elif operation == 'describe_topics':
-                return self._describe_topics(query_obj.get('topics', []), return_raw)
+                return self._describe_topics_from_admin_client(query_obj.get('topics', []), return_raw)
             elif operation == 'list_consumer_groups':
                 return self._list_consumer_groups(return_raw)
             elif operation == 'describe_consumer_groups':
@@ -1043,6 +1079,133 @@ class KafkaConnector(SSHSupportMixin):
         except Exception as e:
             logger.warning(f"SSH topic listing failed: {e}")
             return None
+
+    def _list_all_topics(self, return_raw=False):
+        """
+        Lists ALL topics including internal topics (those starting with '__' or '_').
+
+        This is used by checks that need to audit internal topics like __consumer_offsets.
+        For user-facing operations, use _list_topics() which filters out internal topics.
+        """
+        import time
+        from kafka.errors import KafkaError
+
+        # Retry logic for intermittent connection issues
+        max_retries = 3
+        retry_delay = 1
+
+        for attempt in range(max_retries):
+            try:
+                topics = self.admin_client.list_topics()
+                all_topics = sorted(list(topics))  # Include ALL topics, no filtering
+                raw = {'topics': all_topics, 'count': len(all_topics)}
+
+                if not all_topics:
+                    formatted = self.formatter.format_note("No topics found.")
+                else:
+                    formatted = f"All Topics ({len(all_topics)}):\n\n"
+                    formatted += "\n".join(f"  - {t}" for t in all_topics)
+
+                return (formatted, raw) if return_raw else formatted
+
+            except KafkaError as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Failed to list all topics (attempt {attempt + 1}/{max_retries}): {e}")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    # Final attempt failed - try SSH fallback if available
+                    logger.warning(f"Admin client failed to list all topics after {max_retries} attempts: {e}")
+
+                    if self.has_ssh_support():
+                        logger.info("Attempting SSH-based topic listing as fallback...")
+                        ssh_result = self._list_all_topics_via_ssh(return_raw=return_raw)
+                        if ssh_result:
+                            return ssh_result
+
+                    # No SSH or SSH also failed
+                    error_msg = f"Failed to list all topics after {max_retries} attempts: {e}"
+                    logger.error(error_msg)
+                    formatted = self.formatter.format_error(error_msg)
+                    raw = {'error': str(e), 'topics': [], 'count': 0}
+                    return (formatted, raw) if return_raw else formatted
+
+    def _list_all_topics_via_ssh(self, return_raw=False):
+        """
+        Lists ALL topics via SSH including internal topics.
+
+        This is used as a fallback when admin client fails.
+        """
+        try:
+            # Try to get topics from first available broker
+            for host in self.get_ssh_hosts():
+                ssh_manager = self.get_ssh_manager(host)
+                if not ssh_manager:
+                    continue
+
+                # Get private listener for this host
+                private_listener = self.get_private_listener(host)
+                if not private_listener:
+                    logger.debug(f"No private listener detected for {host}, skipping")
+                    continue
+
+                # Run kafka-topics.sh via SSH
+                kafka_bin = self.settings.get('kafka_run_class_path', '/opt/kafka/bin/kafka-run-class.sh').replace('kafka-run-class.sh', 'kafka-topics.sh')
+                cmd = f"{kafka_bin} --bootstrap-server {private_listener} --list 2>/dev/null"
+
+                logger.debug(f"Listing all topics via SSH on {host} using {private_listener}")
+                stdout, stderr, exit_code = ssh_manager.execute_command(cmd, timeout=10)
+
+                if exit_code == 0 and stdout.strip():
+                    # Parse topic list - include ALL topics, no filtering
+                    topics = [line.strip() for line in stdout.strip().split('\n') if line.strip()]
+                    all_topics = sorted(topics)  # Include ALL topics including internal ones
+                    raw = {'topics': all_topics, 'count': len(all_topics), 'source': 'ssh'}
+
+                    if not all_topics:
+                        formatted = self.formatter.format_note("No topics found (via SSH).")
+                    else:
+                        formatted = f"All Topics ({len(all_topics)}) [via SSH]:\n\n"
+                        formatted += "\n".join(f"  - {t}" for t in all_topics)
+
+                    logger.info(f"✅ Successfully listed {len(all_topics)} topics via SSH on {host}")
+                    return (formatted, raw) if return_raw else formatted
+                else:
+                    logger.debug(f"SSH topic listing failed on {host}: exit {exit_code}")
+
+            # All SSH attempts failed
+            logger.warning("SSH topic listing failed on all hosts")
+            return None
+
+        except Exception as e:
+            logger.warning(f"SSH topic listing failed: {e}")
+            return None
+
+    def _describe_topics_from_admin_client(self, topics, return_raw=False):
+        """Gets detailed information about topics."""
+        topic_metadata = self.admin_client.describe_topics(topics)
+        raw_results = []
+
+        for topic_info in topic_metadata:
+            topic_name = topic_info['topic']
+            partitions = topic_info['partitions']
+            replication_factor = len(partitions[0]['replicas'])
+
+            raw_results.append({
+                'topic': topic_name,
+                'partitions': len(partitions),
+                'replication_factor': replication_factor
+            })
+
+        if not raw_results:
+            formatted = self.formatter.format_note("No topics found.")
+        else:
+            formatted = "|===\n|Topic|Partitions|Replication Factor\n"
+            for t in raw_results:
+                formatted += f"|{t['topic']}|{t['partitions']}|{t['replication_factor']}\n"
+            formatted += "|===\n"
+
+        return (formatted, raw_results) if return_raw else formatted
 
     def _describe_topics(self, topics, return_raw=False):
         """Gets detailed information about topics."""
@@ -1354,12 +1517,17 @@ class KafkaConnector(SSHSupportMixin):
         try:
             config_resource = ConfigResource(ConfigResourceType.TOPIC, topic)
             configs = self.admin_client.describe_configs([config_resource])
-            
+
             config_dict = {}
-            for resource, future in configs.items():
-                config = future.result()
-                for key, value in config.resources[0][4].items():
-                    config_dict[key] = value.value
+            if type(configs) is dict:
+                for resource, future in configs.items():
+                    config = future.result()
+                    for key, value in config.resources[0][4].items():
+                        config_dict[key] = value.value
+            elif type(configs) is list:
+                for config in configs:
+                    for item in config.resources[0][4]:
+                        config_dict[item[0]] = item[1]
             
             raw = {'name': topic, 'configs': config_dict}
             
@@ -1377,13 +1545,14 @@ class KafkaConnector(SSHSupportMixin):
             try:
                 cluster = self.admin_client._client.cluster
                 cluster.request_update()
-                
+
                 brokers = []
                 for broker in cluster.brokers():
                     brokers.append({
                         'id': broker.nodeId if hasattr(broker, 'nodeId') else broker.id,
                         'host': broker.host,
-                        'port': broker.port
+                        'port': broker.port,
+                        'rack': broker.rack
                     })
                 
                 # Get controller - it's an object, not a method

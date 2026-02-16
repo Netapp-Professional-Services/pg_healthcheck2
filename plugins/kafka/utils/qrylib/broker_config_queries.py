@@ -2,6 +2,7 @@
 
 __all__ = [
     'get_broker_config_query',
+    'get_server_properties_from_env_query',
     'get_server_properties_query',
     'get_kafka_env_query'
 ]
@@ -16,6 +17,27 @@ def get_broker_config_query(connector, broker_id: int):
         "broker_id": broker_id
     })
 
+def get_server_properties_from_env_query(connector):
+    """
+    Returns JSON request for reading server.properties configuration via SSH.
+
+    Tries to get path from Kafka process
+
+    Args:
+        connector: Kafka connector instance
+
+    Returns:
+        str: JSON string with operation and command
+    """
+    command = (
+        "path=$(ps aux | grep -i 'kafka.Kafka' | grep -v grep | head -1 | awk '{print $NF}');"
+        "if [ -f \"$path\" ]; then cat $path; else echo \"Error: server.properties not found\"; fi"
+    )
+
+    return json.dumps({
+        "operation": "shell",
+        "command": command
+    })
 
 def get_server_properties_query(connector):
     """
@@ -58,7 +80,7 @@ def get_kafka_env_query(connector):
     """
     # Get JVM settings from running Kafka process
     command = (
-        "ps aux | grep -i 'kafka\\.Kafka' | grep -v grep | head -1"
+        "ps aux | grep -i 'kafka.Kafka' | grep -v grep | head -1"
     )
 
     return json.dumps({

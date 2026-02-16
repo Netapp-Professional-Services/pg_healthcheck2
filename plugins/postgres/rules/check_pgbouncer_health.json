@@ -2,19 +2,19 @@
   "pgbouncer_pool_exhaustion_critical": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "pools", "exists": true }
+      { "key": "max_cl_waiting", "exists": true }
     ],
     "rules": [
       {
-        "expression": "any(int(pool.get('cl_waiting', 0)) > 10 for pool in data.get('pools', []))",
+        "expression": "data.get('max_cl_waiting', 0) > 10",
         "level": "critical",
         "score": 10,
-        "reasoning": "PgBouncer pool exhaustion detected - {max((int(pool.get('cl_waiting', 0)) for pool in data.get('pools', [])), default=0)} clients waiting for connections. This causes application failures and timeouts.",
+        "reasoning": "PgBouncer pool exhaustion detected - {data.get('max_cl_waiting', 0)} clients waiting for connections. This causes application failures and timeouts.",
         "recommendations": [
           "URGENT: Pool is severely exhausted - immediate action required.",
           "Clients are waiting for server connections, causing application delays/failures.",
           "Increase default_pool_size immediately in /etc/pgbouncer/pgbouncer.ini",
-          "Current default_pool_size: {data.get('config', {}).get('default_pool_size', 'unknown')}",
+          "Current default_pool_size: {data.get('default_pool_size', 'unknown')}",
           "Recommended: Increase by 50% or add 10-20 connections",
           "Also add reserve_pool_size for burst capacity",
           "After changing config: sudo systemctl reload pgbouncer",
@@ -26,14 +26,14 @@
   "pgbouncer_pool_exhaustion_high": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "pools", "exists": true }
+      { "key": "max_cl_waiting", "exists": true }
     ],
     "rules": [
       {
-        "expression": "any(int(pool.get('cl_waiting', 0)) > 5 for pool in data.get('pools', [])) and not any(int(pool.get('cl_waiting', 0)) > 10 for pool in data.get('pools', []))",
+        "expression": "data.get('max_cl_waiting', 0) > 5 and data.get('max_cl_waiting', 0) <= 10",
         "level": "high",
         "score": 8,
-        "reasoning": "{max((int(pool.get('cl_waiting', 0)) for pool in data.get('pools', [])), default=0)} clients waiting for connections. Pool is experiencing exhaustion.",
+        "reasoning": "{data.get('max_cl_waiting', 0)} clients waiting for connections. Pool is experiencing exhaustion.",
         "recommendations": [
           "Pool is exhausted - clients are queuing for connections.",
           "This degrades application performance and may cause timeouts.",
@@ -49,14 +49,14 @@
   "pgbouncer_pool_exhaustion_warning": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "pools", "exists": true }
+      { "key": "total_cl_waiting", "exists": true }
     ],
     "rules": [
       {
-        "expression": "any(int(pool.get('cl_waiting', 0)) > 0 for pool in data.get('pools', [])) and not any(int(pool.get('cl_waiting', 0)) > 5 for pool in data.get('pools', []))",
+        "expression": "data.get('total_cl_waiting', 0) > 0 and data.get('max_cl_waiting', 0) <= 5",
         "level": "warning",
         "score": 5,
-        "reasoning": "{sum(int(pool.get('cl_waiting', 0)) for pool in data.get('pools', []))} client(s) waiting for connections. Pool is beginning to experience pressure.",
+        "reasoning": "{data.get('total_cl_waiting', 0)} client(s) waiting for connections. Pool is beginning to experience pressure.",
         "recommendations": [
           "Some clients are waiting for connections - early sign of pool pressure.",
           "Monitor pool utilization closely.",
@@ -71,16 +71,16 @@
   "pgbouncer_high_wait_time": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "analysis", "exists": true }
+      { "key": "max_wait_time", "exists": true }
     ],
     "rules": [
       {
-        "expression": "data.get('analysis', {}).get('max_wait_time', 0) > 5.0",
+        "expression": "data.get('max_wait_time', 0) > 5.0",
         "level": "critical",
         "score": 9,
-        "reasoning": "Maximum client wait time is {data.get('analysis', {}).get('max_wait_time', 0):.2f} seconds. This causes severe application performance degradation.",
+        "reasoning": "Maximum client wait time is {data.get('max_wait_time', 0):.2f} seconds. This causes severe application performance degradation.",
         "recommendations": [
-          "URGENT: Clients are waiting {data.get('analysis', {}).get('max_wait_time', 0):.2f}s for connections.",
+          "URGENT: Clients are waiting {data.get('max_wait_time', 0):.2f}s for connections.",
           "This indicates either: (1) Pool too small, or (2) Slow queries holding connections",
           "Immediate actions:",
           "  1. Increase pool size: default_pool_size += 10-20",
@@ -91,10 +91,10 @@
         ]
       },
       {
-        "expression": "data.get('analysis', {}).get('max_wait_time', 0) > 1.0 and data.get('analysis', {}).get('max_wait_time', 0) <= 5.0",
+        "expression": "data.get('max_wait_time', 0) > 1.0 and data.get('max_wait_time', 0) <= 5.0",
         "level": "high",
         "score": 6,
-        "reasoning": "Maximum client wait time is {data.get('analysis', {}).get('max_wait_time', 0):.2f} seconds. This degrades application performance.",
+        "reasoning": "Maximum client wait time is {data.get('max_wait_time', 0):.2f} seconds. This degrades application performance.",
         "recommendations": [
           "Clients waiting over 1 second for connections - performance impact likely.",
           "Increase pool size or investigate slow query execution.",
@@ -107,18 +107,18 @@
   "pgbouncer_high_pool_utilization": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "pools", "exists": true }
+      { "key": "max_pool_utilization", "exists": true }
     ],
     "rules": [
       {
-        "expression": "any((int(pool.get('sv_active', 0)) + int(pool.get('sv_used', 0))) / max(int(pool.get('sv_active', 0)) + int(pool.get('sv_idle', 0)) + int(pool.get('sv_used', 0)), 1) > 0.9 for pool in data.get('pools', []))",
+        "expression": "data.get('max_pool_utilization', 0) > 0.9",
         "level": "warning",
         "score": 5,
-        "reasoning": "One or more pools are at >90% utilization. Pool is near capacity and at risk of exhaustion.",
+        "reasoning": "Pool utilization is at {data.get('max_pool_utilization', 0) * 100:.0f}%. Pool is near capacity and at risk of exhaustion.",
         "recommendations": [
           "Pool utilization is very high - approaching exhaustion.",
           "Proactively increase pool size before clients start waiting.",
-          "Add reserve_pool_size for burst capacity: reserve_pool_size = {max(5, int(data.get('config', {}).get('default_pool_size', 20)) // 4)}",
+          "Add reserve_pool_size for burst capacity",
           "Monitor pool status more frequently during peak hours.",
           "High sustained utilization may indicate undersized pool."
         ]
@@ -128,21 +128,21 @@
   "pgbouncer_no_reserve_pool": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "config", "exists": true }
+      { "key": "reserve_pool_size", "exists": true }
     ],
     "rules": [
       {
-        "expression": "int(data.get('config', {}).get('reserve_pool_size', 0)) == 0 and int(data.get('config', {}).get('max_client_conn', 100)) > int(data.get('config', {}).get('default_pool_size', 20)) * 5",
+        "expression": "data.get('reserve_pool_size', 0) == 0 and data.get('max_client_conn', 100) > data.get('default_pool_size', 20) * 5",
         "level": "warning",
         "score": 4,
         "reasoning": "No reserve pool configured. Burst traffic can cause pool exhaustion without a reserve pool buffer.",
         "recommendations": [
           "Configure reserve_pool_size to handle traffic bursts.",
-          "Recommended: reserve_pool_size = {max(5, int(data.get('config', {}).get('default_pool_size', 20)) // 2)}",
+          "Recommended: reserve_pool_size = 5-10",
           "Reserve pool provides extra connections when main pool is exhausted.",
           "Edit /etc/pgbouncer/pgbouncer.ini:",
           "  [pgbouncer]",
-          "  reserve_pool_size = {max(5, int(data.get('config', {}).get('default_pool_size', 20)) // 2)}",
+          "  reserve_pool_size = 5",
           "  reserve_pool_timeout = 5",
           "Reload: sudo systemctl reload pgbouncer"
         ]
@@ -166,10 +166,10 @@
           "Address pool exhaustion and high wait times immediately.",
           "PgBouncer issues directly cause application failures and performance problems.",
           "Common fixes:",
-          "  • Increase default_pool_size",
-          "  • Add reserve_pool_size",
-          "  • Investigate and optimize slow queries",
-          "  • Review application connection handling"
+          "  - Increase default_pool_size",
+          "  - Add reserve_pool_size",
+          "  - Investigate and optimize slow queries",
+          "  - Review application connection handling"
         ]
       },
       {
@@ -200,48 +200,27 @@
   "pgbouncer_session_mode_inefficient": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "config", "exists": true }
+      { "key": "pool_mode", "exists": true }
     ],
     "rules": [
       {
-        "expression": "data.get('config', {}).get('pool_mode') == 'session'",
+        "expression": "data.get('pool_mode') == 'session'",
         "level": "info",
         "score": 1,
         "reasoning": "PgBouncer is using 'session' pool mode - the least efficient but most compatible mode.",
         "recommendations": [
           "Session mode holds connections for entire client session - least efficient pooling.",
           "If your application is stateless (no prepared statements, temp tables, session variables):",
-          "  • Consider switching to 'transaction' mode for much better connection reuse",
-          "  • Transaction mode releases connection after each transaction",
-          "  • Can reduce required pool size significantly",
+          "  - Consider switching to 'transaction' mode for much better connection reuse",
+          "  - Transaction mode releases connection after each transaction",
+          "  - Can reduce required pool size significantly",
           "Incompatibilities with transaction mode:",
-          "  • Named prepared statements",
-          "  • TEMP tables",
-          "  • SET/RESET commands",
-          "  • Advisory locks",
-          "  • LISTEN/NOTIFY",
+          "  - Named prepared statements",
+          "  - TEMP tables",
+          "  - SET/RESET commands",
+          "  - Advisory locks",
+          "  - LISTEN/NOTIFY",
           "Test in non-production first before changing pool mode."
-        ]
-      }
-    ]
-  },
-  "pgbouncer_connection_imbalance": {
-    "metric_keywords": ["pgbouncer_health"],
-    "data_conditions": [
-      { "key": "pools", "exists": true }
-    ],
-    "rules": [
-      {
-        "expression": "any((int(pool.get('cl_active', 0)) + int(pool.get('cl_waiting', 0))) > (int(pool.get('sv_active', 0)) + int(pool.get('sv_idle', 0)) + int(pool.get('sv_used', 0))) * 20 for pool in data.get('pools', []) if (int(pool.get('sv_active', 0)) + int(pool.get('sv_idle', 0)) + int(pool.get('sv_used', 0))) > 0)",
-        "level": "info",
-        "score": 1,
-        "reasoning": "High client-to-server connection ratio detected. This is normal for transaction pooling but monitor for wait times.",
-        "recommendations": [
-          "Client-to-server ratio is very high (>20:1).",
-          "This is normal and expected for transaction mode pooling.",
-          "The benefit of pooling is that many clients share few server connections.",
-          "Monitor for client wait queues (cl_waiting) to ensure pool isn't undersized.",
-          "If wait times are observed, increase pool size rather than being concerned about ratio."
         ]
       }
     ]
@@ -249,14 +228,14 @@
   "pgbouncer_reconnection_severe": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "analysis", "exists": true }
+      { "key": "reconnection_count", "exists": true }
     ],
     "rules": [
       {
-        "expression": "data.get('analysis', {}).get('reconnection_events', {}).get('count', 0) >= 20",
+        "expression": "data.get('reconnection_count', 0) >= 20",
         "level": "critical",
         "score": 10,
-        "reasoning": "SEVERE PgBouncer connection instability: PgBouncer connection dropped {data.get('analysis', {}).get('reconnection_events', {}).get('count', 0)} times during health check execution. This indicates catastrophic infrastructure failure.",
+        "reasoning": "SEVERE PgBouncer connection instability: PgBouncer connection dropped {data.get('reconnection_count', 0)} times during health check execution. This indicates catastrophic infrastructure failure.",
         "recommendations": [
           "URGENT: PgBouncer connection is critically unstable - IMMEDIATE action required.",
           "Connection dropping this frequently WILL cause application failures.",
@@ -267,11 +246,11 @@
           "  4. Check for max_connections exhaustion on backend PostgreSQL",
           "  5. Investigate network stability between PgBouncer and PostgreSQL servers",
           "Common Causes:",
-          "  • SSL/TLS handshake failures between PgBouncer and PostgreSQL",
-          "  • Backend PostgreSQL closing connections (statement_timeout, idle_in_transaction_session_timeout)",
-          "  • max_connections exhaustion on PostgreSQL",
-          "  • Network instability or firewall dropping connections",
-          "  • Aggressive PgBouncer timeout settings (server_idle_timeout too low)"
+          "  - SSL/TLS handshake failures between PgBouncer and PostgreSQL",
+          "  - Backend PostgreSQL closing connections (statement_timeout, idle_in_transaction_session_timeout)",
+          "  - max_connections exhaustion on PostgreSQL",
+          "  - Network instability or firewall dropping connections",
+          "  - Aggressive PgBouncer timeout settings (server_idle_timeout too low)"
         ]
       }
     ]
@@ -279,14 +258,14 @@
   "pgbouncer_reconnection_critical": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "analysis", "exists": true }
+      { "key": "reconnection_count", "exists": true }
     ],
     "rules": [
       {
-        "expression": "data.get('analysis', {}).get('reconnection_events', {}).get('count', 0) >= 10 and data.get('analysis', {}).get('reconnection_events', {}).get('count', 0) < 20",
+        "expression": "data.get('reconnection_count', 0) >= 10 and data.get('reconnection_count', 0) < 20",
         "level": "critical",
         "score": 8,
-        "reasoning": "Critical PgBouncer connection instability: PgBouncer connection dropped {data.get('analysis', {}).get('reconnection_events', {}).get('count', 0)} times during health check execution. This indicates significant infrastructure problems.",
+        "reasoning": "Critical PgBouncer connection instability: PgBouncer connection dropped {data.get('reconnection_count', 0)} times during health check execution. This indicates significant infrastructure problems.",
         "recommendations": [
           "URGENT: PgBouncer connection is very unstable - requires immediate investigation.",
           "This level of instability will degrade application performance and may cause failures.",
@@ -298,10 +277,10 @@
           "  5. Review timeout settings: server_idle_timeout, query_timeout",
           "  6. Verify backend max_connections is not exhausted",
           "Immediate Actions:",
-          "  • If SSL errors: Fix certificate configuration or disable SSL temporarily to isolate",
-          "  • If timeout errors: Increase server_idle_timeout in pgbouncer.ini",
-          "  • If max_connections: Increase PostgreSQL max_connections",
-          "  • If network: Check firewall rules and TCP keep-alive settings"
+          "  - If SSL errors: Fix certificate configuration or disable SSL temporarily to isolate",
+          "  - If timeout errors: Increase server_idle_timeout in pgbouncer.ini",
+          "  - If max_connections: Increase PostgreSQL max_connections",
+          "  - If network: Check firewall rules and TCP keep-alive settings"
         ]
       }
     ]
@@ -309,14 +288,14 @@
   "pgbouncer_reconnection_high": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "analysis", "exists": true }
+      { "key": "reconnection_count", "exists": true }
     ],
     "rules": [
       {
-        "expression": "data.get('analysis', {}).get('reconnection_events', {}).get('count', 0) >= 5 and data.get('analysis', {}).get('reconnection_events', {}).get('count', 0) < 10",
+        "expression": "data.get('reconnection_count', 0) >= 5 and data.get('reconnection_count', 0) < 10",
         "level": "high",
         "score": 6,
-        "reasoning": "Significant PgBouncer connection instability: PgBouncer connection dropped {data.get('analysis', {}).get('reconnection_events', {}).get('count', 0)} times during health check execution.",
+        "reasoning": "Significant PgBouncer connection instability: PgBouncer connection dropped {data.get('reconnection_count', 0)} times during health check execution.",
         "recommendations": [
           "PgBouncer connection is experiencing notable instability.",
           "This should be investigated and resolved soon to prevent degradation.",
@@ -326,10 +305,10 @@
           "  3. Check SSL/TLS configuration",
           "  4. Monitor network between PgBouncer and PostgreSQL",
           "Common Fixes:",
-          "  • Increase server_idle_timeout if connections timing out",
-          "  • Fix SSL certificate issues if SSL errors present",
-          "  • Optimize slow queries if statement_timeout triggering",
-          "  • Check for intermittent network issues"
+          "  - Increase server_idle_timeout if connections timing out",
+          "  - Fix SSL certificate issues if SSL errors present",
+          "  - Optimize slow queries if statement_timeout triggering",
+          "  - Check for intermittent network issues"
         ]
       }
     ]
@@ -337,26 +316,26 @@
   "pgbouncer_reconnection_warning": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "analysis", "exists": true }
+      { "key": "reconnection_count", "exists": true }
     ],
     "rules": [
       {
-        "expression": "data.get('analysis', {}).get('reconnection_events', {}).get('count', 0) >= 1 and data.get('analysis', {}).get('reconnection_events', {}).get('count', 0) < 5",
+        "expression": "data.get('reconnection_count', 0) >= 1 and data.get('reconnection_count', 0) < 5",
         "level": "warning",
         "score": 3,
-        "reasoning": "Minor PgBouncer connection instability: PgBouncer connection dropped {data.get('analysis', {}).get('reconnection_events', {}).get('count', 0)} time(s) during health check execution.",
+        "reasoning": "Minor PgBouncer connection instability: PgBouncer connection dropped {data.get('reconnection_count', 0)} time(s) during health check execution.",
         "recommendations": [
           "PgBouncer experienced minor connection instability.",
           "Monitor for recurring issues - may indicate intermittent problems.",
           "Check Points:",
-          "  • Review PgBouncer logs for patterns",
-          "  • Check for transient network issues",
-          "  • Verify SSL certificate validity",
-          "  • Monitor if this becomes more frequent",
+          "  - Review PgBouncer logs for patterns",
+          "  - Check for transient network issues",
+          "  - Verify SSL certificate validity",
+          "  - Monitor if this becomes more frequent",
           "If reconnections continue or increase:",
-          "  • Investigate SSL/TLS configuration",
-          "  • Review timeout settings",
-          "  • Check backend PostgreSQL health"
+          "  - Investigate SSL/TLS configuration",
+          "  - Review timeout settings",
+          "  - Check backend PostgreSQL health"
         ]
       }
     ]
@@ -364,14 +343,14 @@
   "pgbouncer_query_fallback_critical": {
     "metric_keywords": ["pgbouncer_health"],
     "data_conditions": [
-      { "key": "analysis", "exists": true }
+      { "key": "fallback_count", "exists": true }
     ],
     "rules": [
       {
-        "expression": "data.get('analysis', {}).get('fallback_events', {}).get('count', 0) > 0",
+        "expression": "data.get('fallback_count', 0) > 0",
         "level": "critical",
         "score": 10,
-        "reasoning": "CRITICAL: {data.get('analysis', {}).get('fallback_events', {}).get('count', 0)} queries failed through PgBouncer but succeeded via direct connection. PgBouncer is NOT functioning correctly.",
+        "reasoning": "CRITICAL: {data.get('fallback_count', 0)} queries failed through PgBouncer but succeeded via direct connection. PgBouncer is NOT functioning correctly.",
         "recommendations": [
           "URGENT: PgBouncer is failing to execute queries correctly!",
           "Queries are only succeeding because direct fallback is configured.",
@@ -383,10 +362,10 @@
           "  3. Verify PgBouncer pool configuration and status",
           "  4. Check for query compatibility issues with PgBouncer pool mode",
           "Common Causes:",
-          "  • PgBouncer pool exhaustion preventing query execution",
-          "  • Query incompatible with current pool mode (transaction vs session)",
-          "  • PgBouncer configuration errors",
-          "  • Backend connection failures",
+          "  - PgBouncer pool exhaustion preventing query execution",
+          "  - Query incompatible with current pool mode (transaction vs session)",
+          "  - PgBouncer configuration errors",
+          "  - Backend connection failures",
           "IMMEDIATE ACTION: Review failed queries and fix PgBouncer configuration."
         ]
       }

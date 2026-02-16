@@ -17,6 +17,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Tuple
 from plugins.common.check_helpers import CheckContentBuilder
+from plugins.common.output_formatters import AsciiDocFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -148,15 +149,24 @@ def check_connection_stability(connector, settings: Dict) -> Tuple[str, Dict]:
             if failures:
                 builder.text("*Reconnection Failure Details*")
                 builder.blank()
+
+                # Prepare failure data with full error messages
                 failure_table = []
                 for failure in failures[:10]:  # Show up to 10 failures
                     failure_table.append({
                         'Attempt': failure['attempt'],
                         'Timestamp': failure['timestamp'],
-                        'Error': failure['error'][:80] + '...' if len(failure['error']) > 80 else failure['error']
+                        'Error': failure['error']
                     })
+
+                # Format with truncated error messages for display
                 if failure_table:
-                    builder.table(failure_table)
+                    formatter = AsciiDocFormatter()
+                    truncated_display = formatter.format_table_with_truncation(
+                        failure_table,
+                        truncate_fields={'Error': 80}
+                    )
+                    builder.text(truncated_display)
                     builder.blank()
 
         # Recommendations
