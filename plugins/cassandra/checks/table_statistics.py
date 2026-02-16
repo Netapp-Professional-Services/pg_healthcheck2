@@ -95,6 +95,7 @@ def check_table_statistics(connector, settings):
         # Add summary to builder
         total_tables = findings['table_counts']['total_tables']
         total_keyspaces = findings['table_counts']['total_keyspaces']
+        builder=check_table_counts(total_tables, builder)
         builder.success(f"✅ Analyzed {total_tables} table(s) across {total_keyspaces} keyspace(s)")
 
         return builder.build(), {'table_statistics': findings}
@@ -253,6 +254,7 @@ def _analyze_tables(tables: List[Dict], timestamp: str) -> Dict:
             'total_tables': total_tables,
             'total_keyspaces': len(keyspace_counts),
             'metadata': {
+
                 'query_timestamp': timestamp,
                 'source': 'system_schema.tables'
             }
@@ -282,3 +284,37 @@ check_metadata = {
     'requires_ssh': False,
     'requires_cql': True
 }
+
+
+def check_table_counts(total_tables, builder)
+
+ """
+ Checks the number of user tables in the cluster. 
+ Returns caution when count between 200 and 300
+ Return critical warning when count >= 1000
+ :param total_tables: 
+ :param builder: 
+ :return: builder
+ """
+
+table_count_caution = 200
+table_count_warn = 300
+table_count_critical=1000
+is_issue=0
+
+builder.h3("Number of User Tables")
+
+if table_count_warn <= total_tables < table_count_critical:
+    is_table_issue=1
+    builder.warning ("Number of tables exceeds recommended limit of " + {table_count_caution} +  " This may cause higher use of java heap. Monitor closely")
+elif total_tables > table_count_critical:
+    is_table_issue = 1
+    builder.critical("The number of tables greatly exceeds, " + {total_tables} + " This large number of tables  may cause performance issues on the node. Monitor closely")
+
+if is_table_issue == 1:
+    builder.h4 ("Technical Explanations")
+    builder.text ("Every Table requires memory, both  heap and non-heap , and storage.  Too many tables can impact performance by reducing the amount of memory needed for your work load. ")
+    builder.h4 ("Recommendations")
+    builder.recs("Do not create a separate table for each user or tenant", "Do use tables to partition data", "Instead use partition keys to order data within a single table")
+
+return builder.build(),
