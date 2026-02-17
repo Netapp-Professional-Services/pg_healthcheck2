@@ -22,6 +22,9 @@ db_type: kafka
 bootstrap_servers:
   - 'kafka1:9092' # A list of one or more broker addresses
 # security_protocol: SASL_SSL # Example for a secure cluster
+
+# When using SSH (ssh_hosts), you must set the path to server.properties on each broker:
+kafka_config_file_path: "/opt/kafka/config/server.properties"
 ----
 
 == Available Checks

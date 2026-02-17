@@ -123,6 +123,13 @@ class KafkaConnector(SSHSupportMixin, CVECheckMixin):
 
             self.admin_client = KafkaAdminClient(**connection_params)
 
+            # When SSH is used, server.properties path is required for broker config and OS-level checks
+            if self.get_ssh_hosts() and not self.settings.get('kafka_config_file_path'):
+                raise ConnectionError(
+                    "Kafka health check with SSH requires 'kafka_config_file_path' in config (path to server.properties on each broker). "
+                    "Add it under your Kafka settings, e.g.: kafka_config_file_path: \"/opt/kafka/config/server.properties\""
+                )
+
             # Connect all SSH hosts (from mixin) - do this early for version detection
             connected_ssh_hosts = self.connect_all_ssh()
 
@@ -288,6 +295,10 @@ class KafkaConnector(SSHSupportMixin, CVECheckMixin):
         if not self.has_ssh_support():
             return
 
+        config_file = self.settings.get('kafka_config_file_path')
+        if not config_file:
+            return
+
         self.private_listeners = {}
         additional_mappings = {}
 
@@ -297,17 +308,7 @@ class KafkaConnector(SSHSupportMixin, CVECheckMixin):
                 if not ssh_manager:
                     continue
 
-                # Find the Kafka config file
-                find_cmd = "find /opt/kafka/config -name 'server*.properties' 2>/dev/null | head -1"
-                stdout, stderr, exit_code = ssh_manager.execute_command(find_cmd, timeout=5)
-
-                if exit_code != 0 or not stdout.strip():
-                    logger.debug(f"Could not find Kafka config on {host}")
-                    continue
-
-                config_file = stdout.strip()
-
-                # Extract the listeners line
+                # Extract the listeners line using path from config
                 grep_cmd = f"grep '^listeners=' {config_file}"
                 stdout, stderr, exit_code = ssh_manager.execute_command(grep_cmd, timeout=5)
 
@@ -369,32 +370,29 @@ class KafkaConnector(SSHSupportMixin, CVECheckMixin):
                     # For now, use a heuristic: if we already have node info, use the controller ID
                     # Otherwise, try to match by attempting a connection test
 
-                    # Simple approach: Match by querying node.id from the config
+                    # Match by querying node.id from config (path from kafka_config_file_path)
                     try:
                         ssh_manager = self.get_ssh_manager(ssh_host)
                         if not ssh_manager:
                             continue
 
-                        # Find the config file and extract node.id
-                        find_cmd = "find /opt/kafka/config -name 'server*.properties' 2>/dev/null | head -1"
-                        stdout, stderr, exit_code = ssh_manager.execute_command(find_cmd, timeout=5)
+                        config_file = self.settings.get('kafka_config_file_path')
+                        if not config_file:
+                            continue
+                        grep_cmd = f"grep '^node.id=' {config_file} 2>/dev/null || grep '^broker.id=' {config_file}"
+                        stdout, stderr, exit_code = ssh_manager.execute_command(grep_cmd, timeout=5)
 
                         if exit_code == 0 and stdout.strip():
-                            config_file = stdout.strip()
-                            grep_cmd = f"grep '^node.id=' {config_file} 2>/dev/null || grep '^broker.id=' {config_file}"
-                            stdout, stderr, exit_code = ssh_manager.execute_command(grep_cmd, timeout=5)
+                            # Parse node.id=2 or broker.id=2
+                            node_line = stdout.strip()
+                            if '=' in node_line:
+                                node_id_str = node_line.split('=')[1].strip()
+                                detected_broker_id = int(node_id_str)
 
-                            if exit_code == 0 and stdout.strip():
-                                # Parse node.id=2 or broker.id=2
-                                node_line = stdout.strip()
-                                if '=' in node_line:
-                                    node_id_str = node_line.split('=')[1].strip()
-                                    detected_broker_id = int(node_id_str)
-
-                                    # Update the mapping
-                                    updated_mappings[ssh_host] = detected_broker_id
-                                    logger.info(f"✅ Mapped SSH host {ssh_host} to Broker ID {detected_broker_id} via private listener")
-                                    break
+                                # Update the mapping
+                                updated_mappings[ssh_host] = detected_broker_id
+                                logger.info(f"✅ Mapped SSH host {ssh_host} to Broker ID {detected_broker_id} via private listener")
+                                break
                     except Exception as e:
                         logger.debug(f"Could not extract broker ID from {ssh_host}: {e}")
                         continue
