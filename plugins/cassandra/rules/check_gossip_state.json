@@ -1,0 +1,94 @@
+{
+  "schema_mismatch": {
+    "metric_keywords": ["check_gossip_state"],
+    "data_conditions": [
+      { "key": "has_schema_mismatch", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_schema_mismatch', False) == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Schema version mismatch detected across cluster. This can cause query failures, data inconsistencies, and operational issues.",
+        "recommendations": [
+          "Run 'nodetool describecluster' to see schema distribution",
+          "Check for failed schema updates or network issues",
+          "Try running 'nodetool resetlocalschema' on nodes with old schema",
+          "Restart nodes with mismatched schema if resetlocalschema fails",
+          "Do NOT perform schema changes until resolved"
+        ]
+      }
+    ]
+  },
+  "nodes_not_normal": {
+    "metric_keywords": ["check_gossip_state"],
+    "data_conditions": [
+      { "key": "has_non_normal_nodes", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_non_normal_nodes', False) == True",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Nodes not in NORMAL state detected. This indicates nodes are leaving, joining, or in an unhealthy state.",
+        "recommendations": [
+          "Identify which nodes are not NORMAL and their state",
+          "LEAVING nodes: Wait for decommission to complete or investigate if stuck",
+          "JOINING nodes: Wait for bootstrap to complete or investigate if stuck",
+          "Do NOT perform other operations until cluster is stable"
+        ]
+      }
+    ]
+  },
+  "mixed_versions": {
+    "metric_keywords": ["check_gossip_state"],
+    "data_conditions": [
+      { "key": "has_mixed_versions", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_mixed_versions', False) == True",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Mixed Cassandra versions detected across the cluster. This should only be temporary during rolling upgrades.",
+        "recommendations": [
+          "Complete rolling upgrade to ensure all nodes are on same version",
+          "Review upgrade documentation for version-specific notes",
+          "Do not run repairs or major operations during upgrade",
+          "Verify inter-node protocol compatibility"
+        ]
+      }
+    ]
+  },
+  "high_load_skew": {
+    "metric_keywords": ["check_gossip_state"],
+    "data_conditions": [
+      { "key": "load_skew", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('load_skew', 1.0) > 2.0",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Significant load imbalance detected from gossip data. Some nodes have much more data than others.",
+        "recommendations": [
+          "Review token distribution across nodes",
+          "Check for hot partitions or uneven write patterns",
+          "Ensure num_tokens is consistent across all nodes",
+          "Consider running nodetool cleanup after topology changes"
+        ]
+      },
+      {
+        "expression": "data.get('load_skew', 1.0) > 1.5",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Moderate load imbalance detected. Monitor for trends.",
+        "recommendations": [
+          "Monitor load distribution over time",
+          "Review data model for potential hot spots",
+          "Check partition key distribution"
+        ]
+      }
+    ]
+  }
+}

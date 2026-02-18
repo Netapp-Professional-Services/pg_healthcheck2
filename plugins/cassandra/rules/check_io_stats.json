@@ -1,0 +1,74 @@
+{
+  "critical_disk_utilization": {
+    "metric_keywords": ["check_io_stats"],
+    "data_conditions": [
+      { "key": "has_critical_io", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_critical_io', False) == True",
+        "level": "critical",
+        "score": 9,
+        "reasoning": "Critical disk I/O utilization detected. Storage is a bottleneck causing severe performance degradation.",
+        "recommendations": [
+          "Investigate high I/O nodes immediately",
+          "Consider faster storage (NVMe SSDs)",
+          "Spread load across more nodes",
+          "Check for runaway compaction or repair operations",
+          "Review and optimize compaction throughput settings"
+        ]
+      }
+    ]
+  },
+  "high_disk_utilization": {
+    "metric_keywords": ["check_io_stats"],
+    "data_conditions": [
+      { "key": "nodes_with_high_util", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('nodes_with_high_util', 0) > 0 and data.get('has_critical_io', False) == False",
+        "level": "high",
+        "score": 6,
+        "reasoning": "High disk utilization detected on some nodes. This can lead to increased latency and timeouts.",
+        "recommendations": [
+          "Monitor disk utilization trends",
+          "Plan for storage upgrades if utilization is consistently high",
+          "Review compaction strategy and throughput",
+          "Check for hot spots causing uneven load"
+        ]
+      }
+    ]
+  },
+  "high_iowait": {
+    "metric_keywords": ["check_io_stats"],
+    "data_conditions": [
+      { "key": "max_iowait", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('max_iowait', 0) > 30",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Very high I/O wait detected. CPUs are spending significant time waiting for disk operations.",
+        "recommendations": [
+          "Storage is severely bottlenecking the system",
+          "Consider NVMe SSDs for dramatically better I/O performance",
+          "Check for failing or degraded disks",
+          "Review disk RAID configuration"
+        ]
+      },
+      {
+        "expression": "data.get('max_iowait', 0) > 10",
+        "level": "high",
+        "score": 5,
+        "reasoning": "Elevated I/O wait detected. This indicates storage is becoming a bottleneck.",
+        "recommendations": [
+          "Monitor I/O patterns for trends",
+          "Consider storage upgrade planning",
+          "Review write patterns and batch sizes"
+        ]
+      }
+    ]
+  }
+}

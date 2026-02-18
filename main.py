@@ -84,6 +84,14 @@ class HealthCheck:
         if not self.active_plugin:
             raise ValueError(f"Unsupported or missing db_type: '{active_tech}'. Available plugins: {list(self.available_plugins.keys())}")
 
+        # Kafka with SSH requires server.properties path for broker config and OS-level checks
+        if active_tech == 'kafka' and self.settings.get('ssh_hosts'):
+            if not self.settings.get('kafka_config_file_path'):
+                raise ValueError(
+                    "Kafka health check with SSH requires 'kafka_config_file_path' in config (path to server.properties on each broker). "
+                    "Add it under your Kafka settings, e.g.: kafka_config_file_path: \"/opt/kafka/config/server.properties\""
+                )
+
         self.report_sections = self.active_plugin.get_report_definition(report_config_file)
         self.connector = self.active_plugin.get_connector(self.settings)
         self.paths = self.get_paths()

@@ -201,18 +201,17 @@
   },
   "multiple_brokers_config_issues": {
     "metric_keywords": [
-      "broker_config",
-      "health_summary"
+      "broker_config"
     ],
     "data_conditions": [
-      {"key": "warning_count", "exists": true}
+      {"key": "warning_brokers", "exists": true}
     ],
     "rules": [
       {
-        "expression": "len(all_structured_findings.get('check_broker_config', {}).get('broker_config', {}).get('warning_brokers', [])) >= 2",
+        "expression": "len(data.get('warning_brokers', [])) >= 2",
         "level": "high",
         "score": 8,
-        "reasoning": "Multiple brokers ({len(all_structured_findings.get('check_broker_config', {}).get('broker_config', {}).get('warning_brokers', []))}) have configuration issues. Cluster-wide configuration review needed.",
+        "reasoning": "Multiple brokers ({len(data.get('warning_brokers', []))}) have configuration issues. Cluster-wide configuration review needed.",
         "recommendations": [
           "Perform cluster-wide configuration audit",
           "Standardize configurations across all brokers",

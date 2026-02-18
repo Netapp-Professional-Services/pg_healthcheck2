@@ -1,0 +1,89 @@
+{
+  "kraft_no_leader": {
+    "metric_keywords": ["kraft_quorum"],
+    "data_conditions": [
+      { "key": "leader_id", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('leader_id') == -1 or data.get('leader_id') is None",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "No KRaft quorum leader elected. The cluster cannot accept writes and is in a critical state.",
+        "recommendations": [
+          "Immediately check controller logs for election failures",
+          "Verify network connectivity between controller nodes",
+          "Check that controller.quorum.voters is correctly configured on all nodes",
+          "Ensure all controller nodes are running and accessible"
+        ]
+      }
+    ]
+  },
+  "kraft_insufficient_voters": {
+    "metric_keywords": ["kraft_quorum"],
+    "data_conditions": [
+      { "key": "voter_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('voter_count', 0) < 3",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Fewer than 3 voters configured. This provides no fault tolerance - a single voter failure will cause quorum loss.",
+        "recommendations": [
+          "Add additional controller nodes to reach at least 3 voters",
+          "Use odd numbers (3 or 5) for optimal quorum behavior",
+          "Place voters in different failure domains for resilience"
+        ]
+      },
+      {
+        "expression": "data.get('voter_count', 0) % 2 == 0 and data.get('voter_count', 0) >= 2",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Even number of voters configured. Odd numbers provide better availability guarantees.",
+        "recommendations": [
+          "Consider using 3 or 5 voters for optimal quorum semantics",
+          "Even voter counts require N/2+1 for quorum, same as N-1 voters"
+        ]
+      }
+    ]
+  },
+  "kraft_has_critical_issues": {
+    "metric_keywords": ["kraft_quorum"],
+    "data_conditions": [
+      { "key": "has_critical_issues", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_critical_issues') == True",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "KRaft quorum has critical issues detected that require immediate attention.",
+        "recommendations": [
+          "Review the detailed quorum health analysis for specific issues",
+          "Check controller logs for errors",
+          "Verify all voters are healthy and reachable"
+        ]
+      }
+    ]
+  },
+  "kraft_replication_lag": {
+    "metric_keywords": ["kraft_quorum"],
+    "data_conditions": [
+      { "key": "max_replication_lag", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('max_replication_lag', 0) > 10000",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Significant replication lag detected between KRaft voters. This may indicate network issues or an overloaded controller.",
+        "recommendations": [
+          "Check network latency between controller nodes",
+          "Review controller CPU and memory utilization",
+          "Consider increasing controller resources if consistently lagging"
+        ]
+      }
+    ]
+  }
+}

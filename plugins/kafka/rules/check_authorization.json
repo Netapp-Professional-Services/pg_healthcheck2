@@ -1,0 +1,88 @@
+{
+  "authorization_excessive_denied": {
+    "metric_keywords": ["authorization"],
+    "data_conditions": [
+      { "key": "denied_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('denied_count', 0) >= 100",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "High volume of access denied events ({denied_count}). This may indicate a security issue, misconfiguration, or attempted unauthorized access.",
+        "recommendations": [
+          "Immediately review denied access patterns for suspicious activity",
+          "Check if legitimate applications have incorrect credentials",
+          "Audit ACL configuration for the denied principals",
+          "Consider if this is a brute force or enumeration attack"
+        ]
+      },
+      {
+        "expression": "data.get('denied_count', 0) >= 10 and data.get('denied_count', 0) < 100",
+        "level": "high",
+        "score": 5,
+        "reasoning": "Multiple access denied events detected. Review to ensure these are expected.",
+        "recommendations": [
+          "Review the denied principals and their intended access",
+          "Update ACLs if denials are for legitimate access requests",
+          "Verify client configurations match expected permissions"
+        ]
+      }
+    ]
+  },
+  "authorization_principal_blocked": {
+    "metric_keywords": ["authorization"],
+    "data_conditions": [
+      { "key": "denied_principals", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "max(data.get('denied_principals', {}).values()) > 50 if data.get('denied_principals', {}) else False",
+        "level": "high",
+        "score": 6,
+        "reasoning": "A single principal has been denied access many times. This could indicate a misconfigured application or attempted breach.",
+        "recommendations": [
+          "Identify the frequently denied principal",
+          "Determine if this is a legitimate application needing ACL updates",
+          "Check for compromised credentials if principal is unknown",
+          "Consider blocking the source IP if malicious activity is confirmed"
+        ]
+      }
+    ]
+  },
+  "authorization_no_events": {
+    "metric_keywords": ["authorization"],
+    "data_conditions": [
+      { "key": "total_events", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_events', 0) == 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "No authorization events found. This may mean authorization logging is disabled or no ACLs are configured.",
+        "recommendations": [
+          "Consider enabling authorization logging for security auditing",
+          "If ACLs are in use, verify log4j configuration includes authorizer logging"
+        ]
+      }
+    ]
+  },
+  "authorization_healthy": {
+    "metric_keywords": ["authorization"],
+    "data_conditions": [
+      { "key": "denied_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('denied_count', 0) < 10 and data.get('denied_count', 0) >= 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "Authorization audit completed with minimal denied events.",
+        "recommendations": [
+          "Regularly review authorization logs for security monitoring"
+        ]
+      }
+    ]
+  }
+}

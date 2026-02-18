@@ -94,7 +94,14 @@ class ReportBuilder:
         try:
             module = importlib.import_module(module_name)
             func = getattr(module, function_name)
-            adoc_content, structured_data = func(self.connector, self.settings)
+
+            # Check if function accepts all_findings parameter (for executive summary)
+            sig = inspect.signature(func)
+            if 'all_findings' in sig.parameters:
+                adoc_content, structured_data = func(self.connector, self.settings, all_findings=self.all_structured_findings)
+            else:
+                adoc_content, structured_data = func(self.connector, self.settings)
+
             key = module_name.split('.')[-1]
             self.all_structured_findings[key] = structured_data
             return adoc_content

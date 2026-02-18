@@ -79,7 +79,7 @@ def run_file_descriptor_check(connector, settings):
 
                 fd_limit = _safe_int(limit_raw.strip() if isinstance(limit_raw, str) else str(limit_raw).strip())
 
-                if fd_limit == 0:
+                if fd_limit is None or fd_limit == 0:
                     errors.append({
                         'host': ssh_host,
                         'broker_id': broker_id,
@@ -103,7 +103,7 @@ def run_file_descriptor_check(connector, settings):
 
                 # Parse lsof output (includes header line, so subtract 1)
                 fd_used_raw = _safe_int(usage_raw.strip() if isinstance(usage_raw, str) else str(usage_raw).strip())
-                fd_used = max(0, fd_used_raw - 1) if fd_used_raw > 0 else 0
+                fd_used = max(0, fd_used_raw - 1) if fd_used_raw is not None and fd_used_raw > 0 else 0
 
                 # Calculate usage percentage
                 usage_pct = (fd_used / fd_limit * 100) if fd_limit > 0 else 0

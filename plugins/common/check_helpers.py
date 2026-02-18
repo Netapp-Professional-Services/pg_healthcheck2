@@ -14,9 +14,12 @@ logger = logging.getLogger(__name__)
 
 def require_ssh(connector, operation_name, verbose=False):
     """
-    Check if SSH is available for the connector.
+    Check if SSH is available for the connector, or if nodetool data is pre-loaded.
 
-    Works with both old (single ssh_manager) and new (multi-host mixin) patterns.
+    Works with:
+    - Old pattern: single ssh_manager
+    - New pattern: multi-host SSHSupportMixin
+    - Diagnostic imports: pre-loaded nodetool data (no SSH needed)
 
     Args:
         connector: The database connector instance
@@ -26,8 +29,8 @@ def require_ssh(connector, operation_name, verbose=False):
 
     Returns:
         tuple: (available: bool, skip_message: str, skip_data: dict)
-            - If SSH is available: (True, None, None)
-            - If SSH is not available: (False, adoc_skip_message, structured_data)
+            - If SSH or nodetool data is available: (True, None, None)
+            - If neither is available: (False, adoc_skip_message, structured_data)
 
     Example:
         available, skip_msg, skip_data = require_ssh(connector, "disk usage check")
@@ -36,6 +39,12 @@ def require_ssh(connector, operation_name, verbose=False):
 
         # Proceed with SSH operations...
     """
+    # CHECK FOR DIAGNOSTIC IMPORTS: If connector has pre-loaded nodetool data,
+    # we can proceed even without SSH (data comes from imported files)
+    if hasattr(connector, 'has_nodetool_data') and callable(connector.has_nodetool_data):
+        if connector.has_nodetool_data():
+            return True, None, None
+
     # NEW PATTERN: Check if connector uses SSHSupportMixin
     if hasattr(connector, 'has_ssh_support') and callable(connector.has_ssh_support):
         if not connector.has_ssh_support():

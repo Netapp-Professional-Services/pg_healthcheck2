@@ -1,0 +1,60 @@
+{
+  "deprecated_gc_algorithm": {
+    "metric_keywords": ["check_jvm_config"],
+    "data_conditions": [
+      { "key": "uses_cms", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('uses_cms', False) == True",
+        "level": "high",
+        "score": 6,
+        "reasoning": "CMS garbage collector is deprecated in Java 9+ and will be removed in future Java versions. This limits upgrade options and may cause issues.",
+        "recommendations": [
+          "Migrate from CMS to G1GC garbage collector",
+          "Test G1GC in non-production environment first",
+          "Update jvm.options to use -XX:+UseG1GC",
+          "Remove CMS-specific flags after migration"
+        ]
+      }
+    ]
+  },
+  "deprecated_jvm_flags": {
+    "metric_keywords": ["check_jvm_config"],
+    "data_conditions": [
+      { "key": "has_deprecated_flags", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_deprecated_flags', False) == True",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "Deprecated JVM flags detected. These may cause warnings or errors with newer Java versions.",
+        "recommendations": [
+          "Review and update deprecated JVM flags",
+          "Use modern equivalents (e.g., -Xlog:gc* instead of PrintGCDetails)",
+          "Test changes in non-production environment"
+        ]
+      }
+    ]
+  },
+  "many_deprecated_flags": {
+    "metric_keywords": ["check_jvm_config"],
+    "data_conditions": [
+      { "key": "deprecated_flag_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('deprecated_flag_count', 0) > 5",
+        "level": "high",
+        "score": 5,
+        "reasoning": "Many deprecated JVM flags detected. This indicates the JVM configuration needs significant updates.",
+        "recommendations": [
+          "Schedule time to update JVM configuration",
+          "Review Cassandra documentation for recommended JVM settings",
+          "Consider using default jvm.options as baseline"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "api_versions_missing_critical": {
+    "metric_keywords": ["api_versions"],
+    "data_conditions": [
+      { "key": "missing_key_apis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "'Produce' in data.get('missing_key_apis', []) or 'Fetch' in data.get('missing_key_apis', []) or 'Metadata' in data.get('missing_key_apis', [])",
+        "level": "critical",
+        "score": 8,
+        "reasoning": "Critical Kafka APIs (Produce, Fetch, or Metadata) are missing. This may indicate broker connectivity issues or incompatible client versions.",
+        "recommendations": [
+          "Verify broker connectivity and health",
+          "Check that the client is connecting to the correct broker version",
+          "Review firewall rules that may be blocking specific API calls"
+        ]
+      }
+    ]
+  },
+  "api_versions_has_issues": {
+    "metric_keywords": ["api_versions"],
+    "data_conditions": [
+      { "key": "has_critical_issues", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('has_critical_issues') == True",
+        "level": "high",
+        "score": 6,
+        "reasoning": "API version compatibility issues detected.",
+        "recommendations": [
+          "Review the detailed API versions report for specific issues",
+          "Ensure all brokers run the same Kafka version",
+          "Verify client library compatibility"
+        ]
+      }
+    ]
+  },
+  "api_versions_info": {
+    "metric_keywords": ["api_versions"],
+    "data_conditions": [
+      { "key": "total_apis", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_apis', 0) > 0",
+        "level": "info",
+        "score": 0,
+        "reasoning": "API versions information collected successfully.",
+        "recommendations": [
+          "Monitor API version compatibility when upgrading clients or brokers"
+        ]
+      }
+    ]
+  }
+}

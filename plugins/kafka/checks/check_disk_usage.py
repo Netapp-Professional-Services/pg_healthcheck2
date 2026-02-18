@@ -2,14 +2,42 @@
 Disk usage check for Kafka brokers.
 
 Queries Kafka for actual log directory paths, then checks disk usage
-for those directories via SSH.
+for those directories via SSH. If the Admin API does not return log dirs
+(e.g. restricted on managed clusters), reads log.dirs from server.properties
+using kafka_config_file_path; only falls back to /data/kafka if both fail.
 """
 
 from plugins.common.check_helpers import require_ssh, CheckContentBuilder
 from plugins.kafka.utils.qrylib.log_dirs_queries import get_describe_log_dirs_query
 import logging
+import shlex
 
 logger = logging.getLogger(__name__)
+
+
+def _get_log_dirs_from_server_properties(connector, ssh_host):
+    """
+    Read log.dirs from server.properties on the given SSH host.
+    Uses kafka_config_file_path from config. Returns list of paths, or None if unavailable.
+    """
+    path = connector.settings.get('kafka_config_file_path')
+    if not path:
+        return None
+    ssh_manager = connector.get_ssh_manager(ssh_host)
+    if not ssh_manager:
+        return None
+    path_quoted = shlex.quote(path)
+    # log.dirs= can be comma-separated; strip whitespace per path
+    cmd = f"grep -E '^log\\.dirs?=' {path_quoted} 2>/dev/null | cut -d= -f2- | tr ',' '\\n' | sed 's/^[ \\t]*//;s/[ \\t]*$//' | grep -v '^$'"
+    try:
+        stdout, stderr, exit_code = ssh_manager.execute_command(cmd, timeout=5)
+        if exit_code != 0 or not stdout or not stdout.strip():
+            return None
+        dirs = [d.strip() for d in stdout.strip().split('\n') if d.strip()]
+        return dirs if dirs else None
+    except Exception as e:
+        logger.debug(f"Could not read log.dirs from server.properties on {ssh_host}: {e}")
+        return None
 
 
 def get_weight():
@@ -50,12 +78,11 @@ def run_check_disk_usage(connector, settings):
         log_dirs_query = get_describe_log_dirs_query(connector)
         _, log_dirs_raw = connector.execute_query(log_dirs_query, return_raw=True)
         
-        if not log_dirs_raw or isinstance(log_dirs_raw, dict) and 'error' in log_dirs_raw:
+        if not log_dirs_raw or isinstance(log_dirs_raw, dict) and ('error' in log_dirs_raw or 'unavailable' in log_dirs_raw):
             builder.warning(
-                "Could not retrieve log directory information from Kafka.\n"
-                "Falling back to default path check."
+                "Could not retrieve log directory information from Kafka API.\n"
+                "Will use log.dirs from server.properties per broker when available."
             )
-            # Fallback to default
             broker_log_dirs = {}
         else:
             # Extract unique log directories per broker
@@ -97,11 +124,12 @@ def run_check_disk_usage(connector, settings):
         for ssh_host in connector.get_ssh_hosts():
             broker_id = ssh_host_to_broker.get(ssh_host, 'unknown')
             
-            # Get log directories for this broker
-            log_dirs = broker_log_dirs.get(broker_id, ['/data/kafka'])  # Fallback
-            
+            # Get log directories: from API first, then from server.properties (log.dirs), else default
+            log_dirs = broker_log_dirs.get(broker_id) or []
             if not log_dirs:
-                log_dirs = ['/data/kafka']  # Ultimate fallback
+                log_dirs = _get_log_dirs_from_server_properties(connector, ssh_host)
+            if not log_dirs:
+                log_dirs = ['/data/kafka']  # Last-resort fallback
             
             # Check each log directory
             for log_dir in log_dirs:

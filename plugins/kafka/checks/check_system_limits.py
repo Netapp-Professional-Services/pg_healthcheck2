@@ -366,7 +366,7 @@ def run_system_limits_check(connector, settings):
                     swappiness_val = _safe_int(swappiness_raw.strip() if isinstance(swappiness_raw, str) else str(swappiness_raw).strip())
                     broker_limits['swappiness'] = swappiness_val
                     
-                    if swappiness_val is None or swappiness_val > max_swappiness:
+                    if swappiness_val is not None and swappiness_val > max_swappiness:
                         issues_found = True
                         if broker_id not in critical_brokers:
                             if broker_id not in warning_brokers:
@@ -462,8 +462,9 @@ def run_system_limits_check(connector, settings):
                 nofile_status = "✅" if broker_data['limits'].get('NOFILE', {}).get('status') == 'ok' else "❌"
                 as_status = "✅" if broker_data['limits'].get('AS', {}).get('status') == 'ok' else "❌"
                 nproc_status = "✅" if broker_data['limits'].get('NPROC', {}).get('status') == 'ok' else "❌"
-                swappiness_val = broker_data.get('swappiness', 'N/A')
-                swappiness_status = "✅" if swappiness_val != 'N/A' and swappiness_val <= max_swappiness else "❌"
+                swappiness_val = broker_data.get('swappiness')
+                swappiness_display = swappiness_val if swappiness_val is not None else 'N/A'
+                swappiness_status = "✅" if swappiness_val is not None and swappiness_val <= max_swappiness else "❌"
                 
                 # Overall status
                 has_critical = any(i['level'] == 'critical' for i in broker_data['issues'])
@@ -477,7 +478,7 @@ def run_system_limits_check(connector, settings):
                     overall_status = "✅ OK"
                 
                 table_lines.append(
-                    f"|{broker_id}|{host}|{memlock_status}|{nofile_status}|{as_status}|{nproc_status}|{swappiness_val} {swappiness_status}|{overall_status}"
+                    f"|{broker_id}|{host}|{memlock_status}|{nofile_status}|{as_status}|{nproc_status}|{swappiness_display} {swappiness_status}|{overall_status}"
                 )
             
             table_lines.append("|===")

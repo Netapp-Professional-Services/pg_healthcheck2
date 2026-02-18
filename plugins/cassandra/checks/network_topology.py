@@ -148,6 +148,7 @@ def check_network_topology(connector, settings):
             # Add explanation
             builder.blank()
             builder.text("*Why This Matters:*")
+            builder.blank()
             builder.text("Cassandra's availability and fault tolerance depend heavily on proper topology configuration. ")
             builder.text("With NetworkTopologyStrategy and RF=3, Cassandra distributes replicas across racks to ensure ")
             builder.text("data remains available during rack or node failures. Single-rack deployments create a single ")
@@ -156,12 +157,14 @@ def check_network_topology(connector, settings):
 
             # Add datacenter distribution details
             builder.text("*Current Distribution:*")
+            builder.blank()
             for dc_info in findings['datacenter_summary']['data']:
                 builder.text(f"- *Datacenter '{dc_info['datacenter']}'*: {dc_info['node_count']} node(s) across {dc_info['rack_count']} rack(s)")
             builder.blank()
 
             # Show rack breakdown
             builder.text("*Rack Distribution:*")
+            builder.blank()
             for rack_info in findings['rack_distribution']['data']:
                 builder.text(f"- {rack_info['datacenter']}:{rack_info['rack']} → {rack_info['node_count']} node(s)")
             builder.blank()
@@ -170,6 +173,7 @@ def check_network_topology(connector, settings):
             topology_warnings = findings['topology_analysis']['warnings']
             if topology_warnings:
                 builder.text("*Identified Concerns:*")
+                builder.blank()
                 for idx, warning in enumerate(topology_warnings, 1):
                     severity_emoji = "🔴" if warning['severity'] == 'critical' else "⚠️" if warning['severity'] == 'warning' else "ℹ️"
                     builder.text(f"{idx}. {severity_emoji} *{warning['issue']}*")
@@ -230,6 +234,7 @@ def check_network_topology(connector, settings):
 
             if recommendations:
                 builder.text("*Recommended Actions:*")
+                builder.blank()
                 for idx, rec in enumerate(recommendations, 1):
                     builder.text(f"{idx}. *{rec['title']}*: {rec['summary']}")
                     for detail in rec['details']:
@@ -237,6 +242,7 @@ def check_network_topology(connector, settings):
                 builder.blank()
 
             builder.text("*Best Practices:*")
+            builder.blank()
             builder.text("- *Minimum Configuration*: 3 nodes per DC, distributed across 3+ racks, RF=3")
             builder.text("- *Rack Awareness*: Configure `endpoint_snitch` (GossipingPropertyFileSnitch recommended)")
             builder.text("- *Balanced Distribution*: Equal node counts across racks prevents hotspots")
