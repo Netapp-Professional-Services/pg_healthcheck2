@@ -78,7 +78,7 @@ def run_api_versions_check(connector, settings):
         if "[ERROR]" in formatted or (isinstance(raw, dict) and 'error' in raw):
             error_msg = raw.get('error', formatted) if isinstance(raw, dict) else formatted
             builder.error(f"Failed to get API versions: {error_msg}")
-            structured_data["api_versions"] = {
+            structured_data = {
                 "status": "error",
                 "details": error_msg
             }
@@ -95,7 +95,7 @@ def run_api_versions_check(connector, settings):
 
         if not api_versions:
             builder.note("No API version information available.")
-            structured_data["api_versions"] = {
+            structured_data = {
                 "status": "skipped",
                 "reason": "no_data"
             }
@@ -212,16 +212,14 @@ def run_api_versions_check(connector, settings):
             )
 
         # === Structured data ===
-        structured_data["api_versions"] = {
+        structured_data = {
             "status": "success",
-            "total_apis": total_apis,
-            "supported_key_apis": supported_key_apis,
-            "missing_key_apis": missing_key_apis,
-            "issues": issues,
-            "warnings": warnings,
-            "has_critical_issues": has_critical,
             "data": {
-                "api_versions": api_versions
+                "total_apis": total_apis,
+                "missing_key_apis_count": len(missing_key_apis),
+                "missing_key_apis": missing_key_apis,
+                "has_critical_issues": has_critical,
+                "has_warnings": bool(warnings),
             }
         }
 
@@ -229,7 +227,7 @@ def run_api_versions_check(connector, settings):
         import traceback
         logger.error(f"API versions check failed: {e}\n{traceback.format_exc()}")
         builder.error(f"Check failed: {e}")
-        structured_data["api_versions"] = {
+        structured_data = {
             "status": "error",
             "details": str(e)
         }

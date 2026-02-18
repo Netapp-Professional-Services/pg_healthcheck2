@@ -90,7 +90,7 @@ def run_network_config_check(connector, settings):
                 "* SSH access to /etc/hosts is restricted\n"
                 "* Hosts file data is not included in diagnostic export"
             )
-            structured_data["network_config"] = {
+            structured_data = {
                 "status": "skipped",
                 "reason": "no_data"
             }
@@ -212,17 +212,13 @@ def run_network_config_check(connector, settings):
             )
 
         # === Structured data ===
-        structured_data["network_config"] = {
+        structured_data = {
             "status": "success",
-            "nodes_checked": len(all_hosts_files),
-            "cluster_ips": list(cluster_ips),
-            "issues": issues,
-            "warnings": warnings,
-            "has_critical_issues": has_critical,
-            "has_warnings": has_warning,
-            "errors": errors,
             "data": {
-                "hosts_entry_counts": {k: len(v['entries']) for k, v in all_hosts_files.items()}
+                "nodes_checked": len(all_hosts_files),
+                "has_critical_issues": has_critical,
+                "has_warnings": has_warning,
+                "error_count": len(errors),
             }
         }
 
@@ -230,7 +226,7 @@ def run_network_config_check(connector, settings):
         import traceback
         logger.error(f"Network config check failed: {e}\n{traceback.format_exc()}")
         builder.error(f"Check failed: {e}")
-        structured_data["network_config"] = {
+        structured_data = {
             "status": "error",
             "details": str(e)
         }

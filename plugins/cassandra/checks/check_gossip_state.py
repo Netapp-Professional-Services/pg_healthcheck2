@@ -342,8 +342,6 @@ def run_check_gossip_state(connector, settings):
                 'min_load_gb': round(min(loads_gb), 2) if loads_gb else 0,
                 'max_load_gb': round(max(loads_gb), 2) if loads_gb else 0,
                 'load_skew': round(max(loads_gb) / min(loads_gb), 2) if loads_gb and min(loads_gb) > 0 else 1.0,
-                'datacenters': list(gossip_data['datacenters'].keys()),
-                'versions': list(gossip_data['versions'].keys())
             }
         }
 

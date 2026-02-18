@@ -94,10 +94,15 @@ def run_authorization_check(connector, settings):
                 "* No ACLs are configured (allow all)\n"
                 "* Log files are rotated or empty"
             )
-            structured_data["authorization"] = {
+            structured_data = {
                 "status": "success",
-                "total_events": 0,
-                "message": "No authorization events found"
+                "data": {
+                    "total_events": 0,
+                    "denied_count": 0,
+                    "allowed_count": 0,
+                    "has_critical_issues": False,
+                    "has_warnings": False,
+                }
             }
             return builder.build(), structured_data
 
@@ -251,26 +256,25 @@ def run_authorization_check(connector, settings):
             )
 
         # === Structured data ===
-        structured_data["authorization"] = {
+        structured_data = {
             "status": "success",
-            "total_events": total_events,
-            "allowed_count": allowed_events,
-            "denied_count": denied_events,
-            "denied_principals": dict(analysis['denied_principals']),
-            "denied_operations": dict(analysis['denied_operations']),
-            "denied_resources": dict(analysis['denied_resources']),
-            "issues": issues,
-            "warnings": warnings,
-            "has_critical_issues": has_critical,
-            "has_warnings": has_warning,
-            "errors": errors
+            "data": {
+                "total_events": total_events,
+                "allowed_count": allowed_events,
+                "denied_count": denied_events,
+                "denied_principal_count": len(analysis['denied_principals']),
+                "denied_operation_count": len(analysis['denied_operations']),
+                "has_critical_issues": has_critical,
+                "has_warnings": has_warning,
+                "denied_principals": dict(analysis['denied_principals']),
+            }
         }
 
     except Exception as e:
         import traceback
         logger.error(f"Authorization check failed: {e}\n{traceback.format_exc()}")
         builder.error(f"Check failed: {e}")
-        structured_data["authorization"] = {
+        structured_data = {
             "status": "error",
             "details": str(e)
         }

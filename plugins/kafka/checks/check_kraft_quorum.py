@@ -54,7 +54,7 @@ def run_kraft_quorum_check(connector, settings):
                 "This cluster is running in ZooKeeper mode. "
                 "KRaft quorum checks are not applicable."
             )
-            structured_data["kraft_quorum"] = {
+            structured_data = {
                 "status": "skipped",
                 "reason": "zookeeper_mode"
             }
@@ -72,14 +72,14 @@ def run_kraft_quorum_check(connector, settings):
                     "KRaft quorum information is not available. "
                     "This cluster may be running in ZooKeeper mode."
                 )
-                structured_data["kraft_quorum"] = {
+                structured_data = {
                     "status": "skipped",
                     "reason": "not_kraft_mode"
                 }
                 return builder.build(), structured_data
 
             builder.error(f"Failed to get quorum status: {error_msg}")
-            structured_data["kraft_quorum"] = {
+            structured_data = {
                 "status": "error",
                 "details": error_msg
             }
@@ -279,24 +279,18 @@ def run_kraft_quorum_check(connector, settings):
             )
 
         # === Structured data ===
-        structured_data["kraft_quorum"] = {
+        structured_data = {
             "status": "success",
-            "cluster_id": cluster_id,
-            "leader_id": leader_id,
-            "leader_epoch": leader_epoch,
-            "high_watermark": high_watermark,
-            "voter_count": voter_count,
-            "observer_count": observer_count,
-            "current_voters": current_voters,
-            "current_observers": current_observers,
-            "max_replication_lag": max_lag,
-            "issues": issues,
-            "warnings": warnings,
-            "has_critical_issues": has_critical,
-            "has_warnings": has_warning,
             "data": {
-                "quorum_status": quorum_status,
-                "replication_info": replication_info
+                "cluster_id": cluster_id,
+                "leader_id": leader_id,
+                "leader_epoch": leader_epoch,
+                "high_watermark": high_watermark,
+                "voter_count": voter_count,
+                "observer_count": observer_count,
+                "max_replication_lag": max_lag,
+                "has_critical_issues": has_critical,
+                "has_warnings": has_warning,
             }
         }
 
@@ -304,7 +298,7 @@ def run_kraft_quorum_check(connector, settings):
         import traceback
         logger.error(f"KRaft quorum check failed: {e}\n{traceback.format_exc()}")
         builder.error(f"Check failed: {e}")
-        structured_data["kraft_quorum"] = {
+        structured_data = {
             "status": "error",
             "details": str(e)
         }

@@ -94,10 +94,17 @@ def run_state_changes_check(connector, settings):
                 "* Log files are rotated or empty\n"
                 "* Cluster is very stable with no recent changes"
             )
-            structured_data["state_changes"] = {
+            structured_data = {
                 "status": "success",
-                "total_events": 0,
-                "message": "No state change events found"
+                "data": {
+                    "total_events": 0,
+                    "leadership_changes": 0,
+                    "isr_shrinks": 0,
+                    "isr_expands": 0,
+                    "offline_events": 0,
+                    "has_critical_issues": False,
+                    "has_warnings": False,
+                }
             }
             return builder.build(), structured_data
 
@@ -242,21 +249,16 @@ def run_state_changes_check(connector, settings):
             )
 
         # === Structured data ===
-        structured_data["state_changes"] = {
+        structured_data = {
             "status": "success",
-            "total_events": total_events,
-            "leadership_changes": leadership_changes,
-            "isr_shrinks": isr_shrinks,
-            "isr_expands": isr_expands,
-            "offline_events": offline_events,
-            "topic_changes": dict(analysis['topic_changes']),
-            "issues": issues,
-            "warnings": warnings,
-            "has_critical_issues": has_critical,
-            "has_warnings": has_warning,
-            "errors": errors,
             "data": {
-                "broker_event_counts": {k: len(v) for k, v in broker_events.items()}
+                "total_events": total_events,
+                "leadership_changes": leadership_changes,
+                "isr_shrinks": isr_shrinks,
+                "isr_expands": isr_expands,
+                "offline_events": offline_events,
+                "has_critical_issues": has_critical,
+                "has_warnings": has_warning,
             }
         }
 
@@ -264,7 +266,7 @@ def run_state_changes_check(connector, settings):
         import traceback
         logger.error(f"State changes check failed: {e}\n{traceback.format_exc()}")
         builder.error(f"Check failed: {e}")
-        structured_data["state_changes"] = {
+        structured_data = {
             "status": "error",
             "details": str(e)
         }

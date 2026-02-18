@@ -94,7 +94,7 @@ def run_controller_config_check(connector, settings):
             "This cluster is running in ZooKeeper mode. "
             "Controller configuration checks are only applicable to KRaft clusters."
         )
-        structured_data["controller_config"] = {
+        structured_data = {
             "status": "skipped",
             "reason": "zookeeper_mode"
         }
@@ -144,7 +144,7 @@ def run_controller_config_check(connector, settings):
                 "* Controller config is in a non-standard location\n"
                 "* SSH access to config files is restricted"
             )
-            structured_data["controller_config"] = {
+            structured_data = {
                 "status": "skipped",
                 "reason": "no_config_found"
             }
@@ -272,17 +272,13 @@ def run_controller_config_check(connector, settings):
             )
 
         # === Structured data ===
-        structured_data["controller_config"] = {
+        structured_data = {
             "status": "success",
-            "nodes_checked": len(all_configs),
-            "issues": issues,
-            "warnings": warnings,
-            "info": info,
-            "has_critical_issues": has_critical,
-            "has_warnings": has_warning,
-            "errors": errors,
             "data": {
-                "configs": {k: dict(v) for k, v in all_configs.items()}
+                "nodes_checked": len(all_configs),
+                "has_critical_issues": has_critical,
+                "has_warnings": has_warning,
+                "error_count": len(errors),
             }
         }
 
@@ -290,7 +286,7 @@ def run_controller_config_check(connector, settings):
         import traceback
         logger.error(f"Controller config check failed: {e}\n{traceback.format_exc()}")
         builder.error(f"Check failed: {e}")
-        structured_data["controller_config"] = {
+        structured_data = {
             "status": "error",
             "details": str(e)
         }
