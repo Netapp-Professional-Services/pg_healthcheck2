@@ -18,8 +18,6 @@ import logging
 
 from datetime import datetime
 from typing import Dict, List
-
-from table_count_checks import check_table_counts
 from plugins.common.check_helpers import CheckContentBuilder
 from plugins.cassandra.utils.keyspace_filter import KeyspaceFilter
 
@@ -98,8 +96,8 @@ def check_table_statistics(connector, settings):
         # Add summary to builder
         total_tables = findings['table_counts']['total_tables']
         total_keyspaces = findings['table_counts']['total_keyspaces']
-        builder.text(f"✅ Analyzed {total_tables} table(s) across {total_keyspaces} keyspace(s)")
-        builder=check_table_counts(total_tables, builder)
+
+        builder=check_table_counts(total_tables, builder, settings)
 
         builder.success(f"✅ Analyzed {total_tables} table(s) across {total_keyspaces} keyspace(s)")
 
@@ -291,3 +289,43 @@ check_metadata = {
 }
 
 
+def check_table_counts(total_tables, builder, settings):
+
+    table_count_caution=settings.get('cassandra_table_count_caution',200)
+    table_count_warn=settings.get('cassandra_table_count_warn',300)
+    table_count_critical=settings.get('cassandra_table_count_critical',1000)
+
+    status="OK"
+    message=""
+
+    builder.h4( "User Table Counts ")
+
+    builder.text("The tables count analysis counts the tables in the system_schema.table belonging user keyspaces.")
+
+    if total_tables < table_count_warn:
+        status="OK"
+        builder.success(f"The query found {total_tables} user table(s) across all user keyspaces" )
+    elif table_count_warn <= total_tables  < table_count_critical:
+        status="CAUTION"
+        builder.warning(f"The query found {total_tables} user tables. This number exceeds the recommended limit of {table_count_warn} user tables" )
+    elif total_tables > table_count_critical:
+        status="WARN"
+        builder.error(f"The query found str({total_tables}) user tables. This number exceeds the critical limit of {table_count_critical} user tables. You may experience performance issues on the node.")
+
+    builder.h4("Why the number of tables matters")
+    builder.para(  "Every Table requires on-heap and off-heap memory plus disk storage for the SSTables.  Too many tables can impact performance by"
+                   "reducing the amount of memory needed for your work load. "
+                    "Memtables are flushed prematurely which creates many small SSTables which require more cycles to compact. Repairs take longer" )
+
+    builder.tip(
+                 f"Instaclustr recommends keeping the number of tables between {table_count_caution} and {table_count_warn}. Do not create a separate table for each user or tenant or use tables to partition data. Instead, use partition keys to order data within a single table"
+                )
+
+    if status != "OK":
+        builder.recs([ "Drop unused tables.",
+                       "If you are experiencing Java Out of Memory (OOM) errors, increase the size of the Java heap",
+                      "If you are experiences rapid memtable flushes, increase the size of memtable_total_space",
+                      "Drop unused tables.",
+                      "The only long-term fix is to redesign your data model to use fewer tables"])
+
+    return builder
