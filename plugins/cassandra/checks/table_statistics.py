@@ -97,7 +97,7 @@ def check_table_statistics(connector, settings):
         total_tables = findings['table_counts']['total_tables']
         total_keyspaces = findings['table_counts']['total_keyspaces']
 
-        builder=check_table_counts(total_tables, builder, settings)
+       builder=check_table_counts(total_tables, builder, settings)
 
         builder.success(f"✅ Analyzed {total_tables} table(s) across {total_keyspaces} keyspace(s)")
 
@@ -304,13 +304,13 @@ def check_table_counts(total_tables, builder, settings):
 
     if total_tables < table_count_warn:
         status="OK"
-        builder.success(f"The query found {total_tables} user table(s) across all user keyspaces" )
+        builder.success(f"The query found *{total_tables}* user table(s) across all user keyspaces" )
     elif table_count_warn <= total_tables  < table_count_critical:
         status="CAUTION"
-        builder.warning(f"The query found {total_tables} user tables. This number exceeds the recommended limit of {table_count_warn} user tables" )
+        builder.warning(f"The query found *{total_tables}* user tables. This number exceeds the recommended limit of *{table_count_warn}* user tables" )
     elif total_tables > table_count_critical:
         status="WARN"
-        builder.error(f"The query found str({total_tables}) user tables. This number exceeds the critical limit of {table_count_critical} user tables. You may experience performance issues on the node.")
+        builder.error(f"The query found *{total_tables}* user tables. This number exceeds the critical limit of *{table_count_critical}* user tables. You may experience performance issues on the node.")
 
     builder.h4("Why the number of tables matters")
     builder.para(  "Every Table requires on-heap and off-heap memory plus disk storage for the SSTables.  Too many tables can impact performance by"
