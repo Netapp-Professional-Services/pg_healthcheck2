@@ -97,7 +97,7 @@ def check_table_statistics(connector, settings):
         total_tables = findings['table_counts']['total_tables']
         total_keyspaces = findings['table_counts']['total_keyspaces']
 
-       builder=check_table_counts(total_tables, builder, settings)
+        builder=check_table_counts(total_tables, builder, settings)
 
         builder.success(f"✅ Analyzed {total_tables} table(s) across {total_keyspaces} keyspace(s)")
 
@@ -298,9 +298,9 @@ def check_table_counts(total_tables, builder, settings):
     status="OK"
     message=""
 
-    builder.h4( "User Table Counts ")
+    builder.h4( "*User Table Counts*")
 
-    builder.text("The tables count analysis counts the tables in the system_schema.table belonging user keyspaces.")
+    builder.para("The tables count analysis counts the tables in the system_schema.table belonging user keyspaces.")
 
     if total_tables < table_count_warn:
         status="OK"
@@ -308,9 +308,9 @@ def check_table_counts(total_tables, builder, settings):
     elif table_count_warn <= total_tables  < table_count_critical:
         status="CAUTION"
         builder.warning(f"The query found *{total_tables}* user tables. This number exceeds the recommended limit of *{table_count_warn}* user tables" )
-    elif total_tables > table_count_critical:
+    elif total_tables >= table_count_critical:
         status="WARN"
-        builder.error(f"The query found *{total_tables}* user tables. This number exceeds the critical limit of *{table_count_critical}* user tables. You may experience performance issues on the node.")
+        builder.error(f"The query found *{total_tables}* user tables. This number is at or exceeds the critical limit of *{table_count_critical}* user tables. You may experience performance issues on the node.")
 
     builder.h4("Why the number of tables matters")
     builder.para(  "Every Table requires on-heap and off-heap memory plus disk storage for the SSTables.  Too many tables can impact performance by"
@@ -323,9 +323,9 @@ def check_table_counts(total_tables, builder, settings):
 
     if status != "OK":
         builder.recs([ "Drop unused tables.",
-                       "If you are experiencing Java Out of Memory (OOM) errors, increase the size of the Java heap",
-                      "If you are experiences rapid memtable flushes, increase the size of memtable_total_space",
+                       "If you are experiencing Java Out of Memory (OOM) errors, increase the size of the Java heap.",
+                      "If you are experiences rapid memtable flushes, increase the size of memtable_total_space.",
                       "Drop unused tables.",
-                      "The only long-term fix is to redesign your data model to use fewer tables"])
+                      "The only long-term fix is to redesign your data model to use fewer tables."])
 
     return builder
