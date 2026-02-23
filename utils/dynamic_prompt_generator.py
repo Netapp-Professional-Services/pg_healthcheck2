@@ -17,6 +17,21 @@ from pathlib import Path
 from utils.json_utils import convert_to_json_serializable
 
 
+# Metadata keys added by main.py that are NOT check modules
+# These should be skipped when processing findings for rule evaluation
+METADATA_KEYS = {
+    'summarized_findings',
+    'prompt_template_name',
+    'execution_context',
+    'db_metadata',
+    'critical_issues',
+    'high_priority_issues',
+    'medium_priority_issues',
+    'total_issues',
+    'rule_application_stats'
+}
+
+
 def analyze_metric_severity(metric_name, data_row, settings, all_findings, analysis_rules, rule_stats, verbose=False):
     """Analyzes a metric against rules and returns the highest severity finding.
 
@@ -221,6 +236,14 @@ def generate_dynamic_prompt(all_structured_findings, settings, analysis_rules, d
     module_weights = active_plugin.get_module_weights()
     all_modules_with_priority = []
     for module_name, module_data in findings_for_analysis.items():
+        # Skip metadata keys that are not check modules
+        if module_name in METADATA_KEYS:
+            continue
+
+        # Skip non-dict values (safety check for any unexpected data types)
+        if not isinstance(module_data, dict):
+            continue
+
         priority_score = module_weights.get(module_name, 1)
         if module_name in module_issue_map:
             if module_issue_map[module_name]['critical'] > 0:

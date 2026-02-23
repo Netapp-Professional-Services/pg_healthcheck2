@@ -16,6 +16,13 @@ try:
     BOTO3_AVAILABLE = True
 except ImportError:
     BOTO3_AVAILABLE = False
+    # Define placeholder exceptions so decorators can reference them
+    class ClientError(Exception):
+        """Placeholder when boto3 is not installed."""
+        pass
+    class BotoCoreError(Exception):
+        """Placeholder when boto3 is not installed."""
+        pass
 
 from .retry_utils import retry_on_failure
 

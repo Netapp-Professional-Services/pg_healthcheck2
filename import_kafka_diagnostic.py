@@ -91,6 +91,12 @@ class KafkaDiagnosticImporter:
         # Create diagnostic connector (instead of live connector)
         self.connector = KafkaInstacollectorConnector(self.settings, str(self.diagnostic_path))
 
+        # Update settings with cluster info for API submission
+        if hasattr(self.connector, 'cluster_nodes') and self.connector.cluster_nodes:
+            # Use first broker as host identifier
+            first_broker = self.connector.cluster_nodes[0]
+            self.settings['host'] = f"imported-{first_broker}"
+
         # Set up output paths
         self.paths = self.get_paths()
         self.adoc_content = ""
@@ -163,6 +169,12 @@ class KafkaDiagnosticImporter:
             settings.setdefault('company_name', 'Kafka Import')
             settings.setdefault('ai_analyze', False)
             settings.setdefault('generate_report', True)
+
+            # Required fields for API submission (imported data uses placeholder values)
+            settings.setdefault('db_type', 'kafka')
+            settings.setdefault('host', 'imported')  # Will be updated with cluster info
+            settings.setdefault('port', 9092)
+            settings.setdefault('database', 'kafka')
 
             return settings
         except (FileNotFoundError, yaml.YAMLError) as e:

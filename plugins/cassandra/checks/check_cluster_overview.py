@@ -179,6 +179,12 @@ def run_check_cluster_overview(connector, settings):
             "Get node info"
         )
 
+        # Get Cassandra version
+        version_results = connector.execute_ssh_on_all_hosts(
+            "nodetool version",
+            "Get Cassandra version"
+        )
+
         # Parse the first successful status output (cluster-wide view)
         cluster_status = None
         for result in status_results:
@@ -193,6 +199,18 @@ def run_check_cluster_overview(connector, settings):
                 node_ip = result['host']
                 node_infos[node_ip] = parse_nodetool_info(result['output'])
 
+        # Parse Cassandra version (same across cluster)
+        cassandra_version = None
+        for result in version_results:
+            if result.get('success') and result.get('output'):
+                version_output = result['output'].strip()
+                # Format is typically "ReleaseVersion: X.Y.Z" or just "X.Y.Z"
+                if ':' in version_output:
+                    cassandra_version = version_output.split(':')[-1].strip()
+                else:
+                    cassandra_version = version_output
+                break
+
         # Build output
         if cluster_status:
             total = cluster_status['total_nodes']
@@ -205,6 +223,11 @@ def run_check_cluster_overview(connector, settings):
             else:
                 builder.success(f"**Cluster Status:** All {total} nodes UP and healthy")
             builder.blank()
+
+            # Cassandra version
+            if cassandra_version:
+                builder.text(f"**Cassandra Version:** {cassandra_version}")
+                builder.blank()
 
             # Datacenter summary
             builder.h4("Datacenters")
@@ -238,12 +261,12 @@ def run_check_cluster_overview(connector, settings):
             builder.blank()
 
         # JVM and resource info per node
+        heap_warnings = []  # Initialize before conditional block
         if node_infos:
             builder.h4("Node Resources")
             builder.blank()
 
             resource_data = []
-            heap_warnings = []
 
             for node_ip, info in node_infos.items():
                 heap_used = info.get('heap_used_mb', 0)
@@ -309,22 +332,34 @@ def run_check_cluster_overview(connector, settings):
                 builder.text("4. **Monitor repair progress:** `nodetool netstats` during repair")
                 builder.blank()
 
-        # Cache statistics (from first node with info)
-        first_info = next(iter(node_infos.values()), {}) if node_infos else {}
-        if first_info.get('key_cache_hit_rate') is not None:
-            builder.h4("Cache Statistics (Sample Node)")
+        # Cache statistics for all nodes
+        cache_data = []
+        for node_ip, info in node_infos.items():
+            if info.get('key_cache_hit_rate') is not None:
+                hit_rate = info.get('key_cache_hit_rate', 0)
+                status_icon = "⚠️" if hit_rate < 0.5 else ""
+                cache_data.append({
+                    'Node': node_ip,
+                    'Key Cache Hit Rate': f"{status_icon} {hit_rate:.3f}",
+                })
+
+        if cache_data:
+            builder.h4("Cache Statistics")
             builder.blank()
-            hit_rate = first_info.get('key_cache_hit_rate', 0)
-            if hit_rate < 0.5:
-                builder.warning(f"Key Cache Hit Rate: {hit_rate:.3f} (Low - consider increasing key_cache_size)")
-            else:
-                builder.text(f"Key Cache Hit Rate: {hit_rate:.3f}")
+            builder.table(cache_data)
+
+            # Show warning if any node has low cache hit rate
+            low_cache_nodes = [node_ip for node_ip, info in node_infos.items()
+                              if info.get('key_cache_hit_rate', 1) < 0.5]
+            if low_cache_nodes:
+                builder.warning(f"Low key cache hit rate on {len(low_cache_nodes)} node(s) - consider increasing `key_cache_size_in_mb`")
             builder.blank()
 
         # Build structured data
         structured_data = {
             'status': 'success',
             'data': {
+                'cassandra_version': cassandra_version,
                 'total_nodes': cluster_status['total_nodes'] if cluster_status else 0,
                 'nodes_up': cluster_status['nodes_up'] if cluster_status else 0,
                 'nodes_down': cluster_status['nodes_down'] if cluster_status else 0,
