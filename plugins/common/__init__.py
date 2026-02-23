@@ -7,7 +7,7 @@ This module provides reusable components for:
 - Output formatting (AsciiDoc tables, etc.)
 - Common parsers (nodetool, df, ps, etc.)
 - Check helpers and utilities
-- Cloud platform integrations (AWS, Azure, Instaclustr)
+- Cloud platform integrations (AWS, Azure, Instaclustr) - optional
 - Retry logic for API calls
 """
 
@@ -28,10 +28,26 @@ from .check_helpers import (
     calculate_percentage,
     format_bytes
 )
-from .aws_handler import AWSConnectionManager, AWSSupportMixin
-from .azure_handler import AzureConnectionManager, AzureSupportMixin
-from .instaclustr_handler import InstaclustrConnectionManager, InstaclustrSupportMixin
 from .retry_utils import retry_on_failure, should_retry_error
+
+# Cloud integrations are optional (require boto3, azure-identity, etc.)
+try:
+    from .aws_handler import AWSConnectionManager, AWSSupportMixin
+except ImportError:
+    AWSConnectionManager = None
+    AWSSupportMixin = None
+
+try:
+    from .azure_handler import AzureConnectionManager, AzureSupportMixin
+except ImportError:
+    AzureConnectionManager = None
+    AzureSupportMixin = None
+
+try:
+    from .instaclustr_handler import InstaclustrConnectionManager, InstaclustrSupportMixin
+except ImportError:
+    InstaclustrConnectionManager = None
+    InstaclustrSupportMixin = None
 
 __all__ = [
     # SSH Infrastructure

@@ -190,10 +190,38 @@ def run_check_thread_pool_stats(connector, settings):
             builder.warning("No thread pool statistics available.")
             return builder.build(), {'status': 'no_data'}
 
-        # Show critical/warning summary
+        # Categorize issues for clearer breakdown
+        nodes_with_blocked = set()
+        nodes_with_high_pending = set()
+        nodes_with_high_drops = set()
+
+        for stats in all_node_stats:
+            node_ip = stats['node']
+            for pool in stats['thread_pools']:
+                if pool['blocked'] > 0:
+                    nodes_with_blocked.add(node_ip)
+                if pool['pending'] >= pending_critical:
+                    nodes_with_high_pending.add(node_ip)
+            total_dropped = sum(d['count'] for d in stats['dropped_messages'])
+            if total_dropped >= dropped_critical:
+                nodes_with_high_drops.add(node_ip)
+
+        # Show critical/warning summary with breakdown
         if critical_nodes:
             builder.critical(f"**{len(critical_nodes)} node(s) with critical thread pool issues**")
             builder.blank()
+            # Show breakdown of critical issues
+            breakdown = []
+            if nodes_with_blocked:
+                breakdown.append(f"• Blocked threads: {len(nodes_with_blocked)} node(s)")
+            if nodes_with_high_drops:
+                breakdown.append(f"• High dropped messages: {len(nodes_with_high_drops)} node(s)")
+            if nodes_with_high_pending:
+                breakdown.append(f"• Critical pending tasks: {len(nodes_with_high_pending)} node(s)")
+            if breakdown:
+                for b in breakdown:
+                    builder.text(b)
+                builder.blank()
         elif warning_nodes:
             builder.warning(f"**{len(warning_nodes)} node(s) with thread pool warnings**")
             builder.blank()

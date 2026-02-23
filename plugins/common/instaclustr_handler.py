@@ -16,6 +16,16 @@ try:
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
+    # Define placeholder exceptions so decorators can reference them
+    class RequestException(Exception):
+        """Placeholder when requests is not installed."""
+        pass
+    class HTTPError(Exception):
+        """Placeholder when requests is not installed."""
+        pass
+    class Timeout(Exception):
+        """Placeholder when requests is not installed."""
+        pass
 
 from .retry_utils import retry_on_failure
 
