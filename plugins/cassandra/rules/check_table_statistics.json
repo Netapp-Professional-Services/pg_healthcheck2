@@ -1,0 +1,108 @@
+{
+  "table_count_critical": {
+    "metric_keywords": ["check_table_statistics"],
+    "data_conditions": [
+      { "key": "total_tables", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('total_tables', 0) >= settings.get('cassandra_table_count_critical', 500)",
+        "level": "critical",
+        "score": 10,
+        "reasoning": "Table count is at or above {settings.get('cassandra_table_count_critical', 500)} ({data.get('total_tables')} found). Each table requires on-heap and off-heap memory plus disk storage for SSTables. This volume typically causes OOM errors, premature memtable flushes, many small SSTables, and significantly slower repairs.",
+        "recommendations": [
+          "Drop unused tables immediately",
+          "Redesign data model to consolidate tables using partition keys — do not create per-user or per-tenant tables",
+          "Increase Java heap size as a short-term mitigation for OOM errors",
+          "Increase memtable_total_space if experiencing rapid memtable flushes",
+          "The only long-term fix is a data model redesign"
+        ]
+      },
+      {
+        "expression": "data.get('total_tables', 0) >= settings.get('cassandra_table_count_warn', 200) and data.get('total_tables', 0) < settings.get('cassandra_table_count_critical', 500)",
+        "level": "high",
+        "score": 6,
+        "reasoning": "Table count ({data.get('total_tables')} found) exceeds the recommended ceiling of {settings.get('cassandra_table_count_warn', 200)}. Memory pressure and compaction overhead are increasing.",
+        "recommendations": [
+          "Review and drop unused tables",
+          "Avoid creating per-user or per-tenant tables — use partition keys instead",
+          "Monitor table count growth trend and plan data model improvements before reaching the critical threshold"
+        ]
+      }
+    ]
+  },
+  "high_bloom_filter_fp": {
+    "metric_keywords": ["check_table_statistics"],
+    "data_conditions": [
+      { "key": "high_bloom_fp_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('high_bloom_fp_count', 0) > 5",
+        "level": "high",
+        "score": 7,
+        "reasoning": "{data.get('high_bloom_fp_count')} tables have bloom_filter_fp_chance > 0.1. A high false positive rate causes unnecessary disk reads (partition lookups that find nothing), increasing read latency and I/O load across multiple tables.",
+        "recommendations": [
+          "Set bloom_filter_fp_chance to 0.01 for tables with frequent random reads",
+          "Values up to 0.1 are acceptable for append-heavy or time-series workloads with few point lookups",
+          "Values above 0.1 are not recommended and indicate misconfiguration",
+          "After changing, run nodetool upgradesstables to rebuild bloom filters (or contact your managed service provider if nodetool is not directly accessible)",
+          "Note: LeveledCompactionStrategy defaults to 0.1 — only tables exceeding 0.1 are flagged here"
+        ]
+      },
+      {
+        "expression": "data.get('high_bloom_fp_count', 0) > 0 and data.get('high_bloom_fp_count', 0) <= 5",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "{data.get('high_bloom_fp_count')} table(s) have bloom_filter_fp_chance > 0.1. A high false positive rate causes unnecessary disk reads, increasing read latency and I/O load.",
+        "recommendations": [
+          "Set bloom_filter_fp_chance to 0.01 for tables with frequent random reads",
+          "Values up to 0.1 are acceptable for append-heavy or time-series workloads with few point lookups",
+          "Values above 0.1 are not recommended and indicate misconfiguration",
+          "After changing, run nodetool upgradesstables to rebuild bloom filters (or contact your managed service provider if nodetool is not directly accessible)",
+          "Note: LeveledCompactionStrategy defaults to 0.1 — only tables exceeding 0.1 are flagged here"
+        ]
+      }
+    ]
+  },
+  "cdc_enabled_tables": {
+    "metric_keywords": ["check_table_statistics"],
+    "data_conditions": [
+      { "key": "cdc_enabled_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('cdc_enabled_count', 0) > 0",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "{data.get('cdc_enabled_count')} table(s) have CDC (Change Data Capture) enabled. CDC writes a copy of every mutation to a CDC log directory, increasing disk I/O, storage consumption, and write amplification.",
+        "recommendations": [
+          "Verify CDC is intentionally enabled on these tables — it should only be active for tables where change streaming is required",
+          "Monitor CDC log directory disk usage — it can grow rapidly under heavy write loads",
+          "Ensure the CDC log consumer is processing events promptly; an idle consumer causes log buildup",
+          "Disable CDC on tables where it is no longer needed: ALTER TABLE ... WITH cdc = false"
+        ]
+      }
+    ]
+  },
+  "low_index_intervals": {
+    "metric_keywords": ["check_table_statistics"],
+    "data_conditions": [
+      { "key": "low_index_interval_count", "exists": true }
+    ],
+    "rules": [
+      {
+        "expression": "data.get('low_index_interval_count', 0) > 0",
+        "level": "medium",
+        "score": 4,
+        "reasoning": "{data.get('low_index_interval_count')} table(s) have min_index_interval < 64 or max_index_interval < 512. Cassandra defaults are 128 and 2048 respectively. Values significantly below these indicate aggressive manual configuration that increases the number of index summary entries kept in heap memory.",
+        "recommendations": [
+          "Review whether tables with low index intervals require this configuration for their read patterns",
+          "Restore defaults (min: 128, max: 2048) on tables where the reduction is not deliberate",
+          "After changing, run nodetool upgradesstables to rebuild index summaries (or contact your managed service provider if nodetool is not directly accessible)",
+          "Only reduce index intervals if benchmarking confirms a benefit for high-cardinality key lookups"
+        ]
+      }
+    ]
+  }
+}
