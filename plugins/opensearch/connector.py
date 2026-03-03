@@ -419,6 +419,7 @@ class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin, CVECheckMixin):
         Supported operations:
         - cluster_health: Get cluster health status
         - cluster_stats: Get cluster statistics
+        - cluster_state: Get cluster state (metadata, routing, etc.)
         - cat_nodes: List all nodes
         - cat_indices: List all indices
         - node_stats: Get node statistics
@@ -461,6 +462,13 @@ class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin, CVECheckMixin):
 
             elif operation == 'cluster_stats':
                 return self.client.cluster.stats()
+
+            elif operation == 'cluster_state':
+                metric = query_dict.get('metric', '_all')
+                index = query_dict.get('index')
+                if index is not None:
+                    return self.client.cluster.state(metric=metric, index=index)
+                return self.client.cluster.state(metric=metric)
 
             elif operation == 'cat_nodes':
                 return self.client.cat.nodes(
@@ -738,21 +746,30 @@ class OpenSearchConnector(SSHSupportMixin, AWSSupportMixin, CVECheckMixin):
 
             elif operation == 'security_users':
                 try:
-                    response = self.client.transport.perform_request('GET', '/_security/user')
+                    # OpenSearch Security plugin (not Elasticsearch _security)
+                    response = self.client.transport.perform_request(
+                        'GET', '/_plugins/_security/api/internalusers'
+                    )
                     return response
                 except Exception as e:
                     return {"error": f"Security users unavailable: {e}"}
 
             elif operation == 'security_roles':
                 try:
-                    response = self.client.transport.perform_request('GET', '/_security/role')
+                    # OpenSearch Security plugin
+                    response = self.client.transport.perform_request(
+                        'GET', '/_plugins/_security/api/roles'
+                    )
                     return response
                 except Exception as e:
                     return {"error": f"Security roles unavailable: {e}"}
 
             elif operation == 'security_role_mappings':
                 try:
-                    response = self.client.transport.perform_request('GET', '/_security/role_mapping')
+                    # OpenSearch Security plugin
+                    response = self.client.transport.perform_request(
+                        'GET', '/_plugins/_security/api/rolesmapping'
+                    )
                     return response
                 except Exception as e:
                     return {"error": f"Security role mappings unavailable: {e}"}

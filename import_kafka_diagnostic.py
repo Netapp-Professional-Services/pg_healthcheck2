@@ -28,7 +28,6 @@ import yaml
 import sys
 import json
 import re
-import logging
 import argparse
 import getpass
 import socket
@@ -39,6 +38,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.json_utils import UniversalJSONEncoder
+from utils.logging_config import configure_logging
 from utils.dynamic_prompt_generator import generate_dynamic_prompt
 from utils.run_recommendation import run_recommendation
 from utils.report_builder import ReportBuilder
@@ -413,11 +413,7 @@ Examples:
 
     args = parser.parse_args()
 
-    # Configure logging
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
+    configure_logging(verbose=args.verbose)
 
     # Validate diagnostic path
     diagnostic_path = Path(args.diagnostic)

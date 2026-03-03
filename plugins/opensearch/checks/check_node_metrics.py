@@ -166,6 +166,7 @@ def _extract_node_metrics(node_id, node_data):
     os_data = node_data.get('os', {})
     process = node_data.get('process', {})
     fs = node_data.get('fs', {})
+    indices = node_data.get('indices', {})
 
     # Calculate heap usage percentage
     heap_used = mem.get('heap_used_in_bytes', 0)

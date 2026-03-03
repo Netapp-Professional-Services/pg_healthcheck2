@@ -15,6 +15,21 @@ def get_weight():
     """Returns the importance score for this check."""
     return 7
 
+def deep_merge(dict1, dict2):
+    """
+    Merges two dictionaries, including nested dictionaries, recursively.
+    Values in dict2 will overwrite values in dict1 upon conflict.
+    """
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            # If both values for a key are dicts, merge them recursively
+            result[key] = deep_merge(result[key], value)
+        else:
+            # Otherwise, use the value from dict2 (overwrites dict1's value)
+            result[key] = value
+    return result
+
 
 def run_check_cluster_settings(connector, settings):
     """
@@ -152,6 +167,25 @@ def run_check_cluster_settings(connector, settings):
 
         builder.table(readiness_items)
 
+        # Check 6: Search
+        cluster_settings = connector.execute_query({"operation": "cluster_settings"})
+        persistent = cluster_settings.get('persistent')
+        transient = cluster_settings.get('transient')
+        cluster_settings = cluster_settings.get('defaults')
+        cluster_settings = deep_merge(cluster_settings, transient)
+        cluster_settings = deep_merge(cluster_settings, persistent)
+        allow_expensive_queries = cluster_settings.get('search', {}).get('allow_expensive_queries', None)
+
+        search_data = [
+            {"Setting": "Allow expensive queries", "Value": allow_expensive_queries},
+        ]
+        builder.table(search_data)
+
+        if allow_expensive_queries:
+            issues["warnings"].append(
+                f"Cluster settings allow running expensive queries. Consider diabling it"
+            )
+
         # Display issues
         if issues["critical"]:
             builder.h4("🔴 Critical Configuration Issues")
@@ -207,6 +241,7 @@ def run_check_cluster_settings(connector, settings):
                 "single_data_node": data_node_count < 2,
                 "high_shard_count": shards_per_node > 1000,
                 "elevated_shard_count": shards_per_node > 600,
+                "allow_expensive_queries": allow_expensive_queries,
             }
         }
 

@@ -13,7 +13,6 @@ from plugins.common.check_helpers import CheckContentBuilder
 
 logger = logging.getLogger(__name__)
 
-
 def get_weight():
     """Returns the importance score for this check."""
     return 9  # High priority - index health is critical
@@ -54,6 +53,7 @@ def run_check_index_health(connector, settings):
         green_indices = []
         large_indices = []
         unassigned_shards_by_index = {}
+        indices_with_refresh_interval = {}
 
         # Process each index
         for index in indices if isinstance(indices, list) else []:
@@ -93,6 +93,17 @@ def run_check_index_health(connector, settings):
                     index_name = shard.get('index', 'Unknown')
                     unassigned_shards_by_index[index_name] = unassigned_shards_by_index.get(index_name, 0) + 1
 
+        indices_metadata = {}
+        cluster_state = connector.execute_query({"operation": "cluster_state"})
+        if cluster_state and isinstance(cluster_state, dict) and "error" not in cluster_state:
+            indices_metadata = cluster_state.get("metadata", {}).get("indices", {})
+
+        logger.debug(f"indices count {len(indices)}")
+        for index_name, index in indices_metadata.items():
+            logger.debug(f"index {index_name} refresh {index.get('settings', {}).get('index', {}).get('refresh_interval', None)}")
+            if index.get('settings', {}).get('index', {}).get('refresh_interval', None) is not None:
+                indices_with_refresh_interval[index_name] = index.get('settings', {}).get('index', {}).get('refresh_interval', None)
+
         # 4. Display critical issues first
         if red_indices:
             builder.h4("🔴 Critical: Red Indices")
@@ -130,6 +141,19 @@ def run_check_index_health(connector, settings):
             _build_index_table(builder, yellow_indices[:10])  # Show top 10
             if len(yellow_indices) > 10:
                 builder.para(f"...and {len(yellow_indices) - 10} more yellow indices")
+            builder.blank()
+
+        if indices_with_refresh_interval:
+            builder.h4("⚠️ Indices With Non-Default Refresh Intervals")
+            builder.warning(
+                f"**{len(indices_with_refresh_interval)} index(ices) have non-default refresh intervals**\n\n"
+                "Explicitly set the refresh interval only during heavy ingestion or reindexing"
+            )
+            refresh_interval_table = [
+                {"Index": idx, "Refresh Interval": val}
+                for idx, val in sorted(indices_with_refresh_interval.items(), key=lambda x: x[1], reverse=True)[:10]
+            ]
+            builder.table(refresh_interval_table)
             builder.blank()
 
         # 5. Summary statistics
