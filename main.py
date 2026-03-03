@@ -21,6 +21,7 @@ import pkgutil
 import socket
 import getpass
 from utils.json_utils import UniversalJSONEncoder
+from utils.logging_config import configure_logging
 from utils.dynamic_prompt_generator import generate_dynamic_prompt
 from utils.run_recommendation import run_recommendation
 from utils.report_builder import ReportBuilder
@@ -223,6 +224,7 @@ class HealthCheck:
 
 def main():
     """Parses command line arguments and runs the health check."""
+    configure_logging()
     parser = argparse.ArgumentParser(description='Database Health Check Tool')
     parser.add_argument('--config', default='config/config.yaml', help='Path to configuration file')
     parser.add_argument('--report-config', help='Path to a custom report configuration file.')

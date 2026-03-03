@@ -34,6 +34,11 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_security_mappings',
                 'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_default_user_accounts',
+                'function': 'run'
             }
         ]
     },
@@ -64,6 +69,11 @@ REPORT_SECTIONS = [
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_cluster_settings',
                 'function': 'run_check_cluster_settings'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_non_default_cluster_settings',
+                'function': 'run'
             },
             {
                 'type': 'module',
@@ -98,6 +108,11 @@ REPORT_SECTIONS = [
             {
                 'type': 'module',
                 'module': 'plugins.opensearch.checks.check_mapping_health',
+                'function': 'run'
+            },
+            {
+                'type': 'module',
+                'module': 'plugins.opensearch.checks.check_default_mapping',
                 'function': 'run'
             },
             {
