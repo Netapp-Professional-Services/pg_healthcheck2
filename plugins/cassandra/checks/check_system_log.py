@@ -269,6 +269,16 @@ def run_check_system_log(connector, settings):
                 builder.blank()
                 break
 
+        # Recent warnings (from first node with warnings)
+        if total_warnings > 0:
+            for analysis in all_analyses:
+                if analysis['recent_warnings']:
+                    builder.h4("Recent Warnings (Sample)")
+                    for warn in analysis['recent_warnings'][:5]:
+                        builder.text(f"- `{warn['timestamp']}`: {warn['message'][:100]}...")
+                    builder.blank()
+                    break
+
         # Recommendations
         recommendations = []
         if 'Out of memory' in all_error_patterns:

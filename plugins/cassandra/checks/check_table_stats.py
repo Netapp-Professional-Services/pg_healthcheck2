@@ -382,9 +382,20 @@ def run_check_table_stats(connector, settings):
 
             builder.text("*Immediate Actions:*")
             builder.blank()
+            builder.text("First, check compaction strategy for affected tables:")
             for t in tombstone_issues[:3]:
                 ks, tbl = t['table'].split('.') if '.' in t['table'] else ('keyspace', t['table'])
-                builder.text(f"1. Force compaction: `nodetool compact {ks} {tbl}`")
+                builder.text(f"   `nodetool describetable {ks} {tbl}`")
+            builder.blank()
+            builder.text("Then, if using **STCS**, force compaction with `-s` flag:")
+            for t in tombstone_issues[:3]:
+                ks, tbl = t['table'].split('.') if '.' in t['table'] else ('keyspace', t['table'])
+                builder.text(f"   `nodetool compact -s {ks} {tbl}`")
+            builder.blank()
+            builder.note(
+                "The `-s` flag performs a \"split\" compaction, preventing creation of one huge SSTable. "
+                "Only use `nodetool compact` for STCS tables — for LCS/TWCS, compaction runs automatically."
+            )
             builder.blank()
 
             builder.text("*Root Cause Investigation:*")
@@ -398,7 +409,7 @@ def run_check_table_stats(connector, settings):
             builder.blank()
             builder.text("- Avoid single-partition deletes in bulk; use range tombstones instead")
             builder.text("- For time-series: set appropriate TTL and use TWCS")
-            builder.text("- Schedule regular `nodetool compact` during low-traffic periods")
+            builder.text("- Schedule regular maintenance during low-traffic periods (STCS tables only)")
             builder.blank()
 
         # Show latency issues
@@ -421,11 +432,12 @@ def run_check_table_stats(connector, settings):
 
             builder.text("*Common Causes & Fixes:*")
             builder.blank()
-            builder.text("1. **Too many SSTables** → Run `nodetool compact <keyspace> <table>`")
+            builder.text("1. **Too many SSTables (STCS only)** → `nodetool compact -s <keyspace> <table>`")
             builder.text("2. **Large partitions** → Check with `nodetool tablehistograms <keyspace> <table>`")
             builder.text("3. **Disk I/O bottleneck** → Check `iostat -x 1` for high %util")
             builder.text("4. **Tombstones** → See tombstone section above")
             builder.text("5. **Bloom filter issues** → Increase `bloom_filter_fp_chance` or rebuild")
+            builder.text("6. **Check compaction strategy** → `nodetool describetable <keyspace> <table>`")
             builder.blank()
 
             builder.text("*Diagnostic Commands:*")
@@ -448,30 +460,63 @@ def run_check_table_stats(connector, settings):
             builder.table(sst_table)
             builder.blank()
 
-            builder.text("*Why This Matters:*")
+            builder.text("*Important Context:*")
             builder.blank()
-            builder.text("High SSTable counts indicate compaction is falling behind or an inefficient compaction strategy.")
+            builder.note(
+                "High SSTable counts are **not always a problem**. The significance depends on "
+                "compaction strategy:\n\n"
+                "• **LCS (LeveledCompactionStrategy)**: Naturally maintains more SSTables (one per level). "
+                "Counts of 50-100+ can be normal for active tables.\n"
+                "• **UCS (UnifiedCompactionStrategy)**: With LCS-like settings, also maintains higher counts.\n"
+                "• **STCS (SizeTieredCompactionStrategy)**: High counts indicate compaction backlog.\n"
+                "• **TWCS (TimeWindowCompactionStrategy)**: High counts may indicate blocked tombstone cleanup.\n\n"
+                "**Check compaction strategy first:** `nodetool describetable <keyspace> <table>`"
+            )
+            builder.blank()
+
+            builder.text("*Why High SSTable Counts Can Matter (for STCS):*")
+            builder.blank()
+            builder.text("When using SizeTieredCompactionStrategy, high SSTable counts indicate compaction is falling behind.")
             builder.text("Each read must check multiple SSTables, increasing latency and I/O.")
             builder.blank()
 
-            builder.text("*Immediate Actions:*")
+            builder.text("*Diagnostic Steps:*")
             builder.blank()
+            builder.text("1. **Check compaction strategy for each table:**")
             for s in sstable_issues[:3]:
                 ks, tbl = s['table'].split('.') if '.' in s['table'] else ('keyspace', s['table'])
-                builder.text(f"- Force major compaction: `nodetool compact {ks} {tbl}`")
+                builder.text(f"   `nodetool describetable {ks} {tbl}` — look for `compaction = {{'class': '...'}}`")
             builder.blank()
 
-            builder.text("*Long-term Fixes:*")
+            builder.text("2. **If using STCS and compaction is behind:**")
+            builder.text("   Force compaction with `-s` flag to avoid creating one huge SSTable:")
+            for s in sstable_issues[:3]:
+                ks, tbl = s['table'].split('.') if '.' in s['table'] else ('keyspace', s['table'])
+                builder.text(f"   `nodetool compact -s {ks} {tbl}`")
             builder.blank()
-            builder.text("1. **Review compaction strategy:**")
-            builder.text("   - STCS (default): Good for write-heavy, but SSTables can accumulate")
-            builder.text("   - LCS: Better for read-heavy workloads, keeps fewer SSTables")
-            builder.text("   - TWCS: Best for time-series data with TTL")
-            builder.text("2. **Increase compaction throughput:**")
+
+            builder.text("3. **If using TWCS with high SSTable count:**")
+            builder.text("   This may indicate SSTables are \"blocked\" from being dropped due to:")
+            builder.text("   • Active (non-expired) data mixed into older time-window files")
+            builder.text("   • Long-lived tombstones preventing SSTable cleanup")
+            builder.text("   • Rows updated after initial write, spreading data across time windows")
+            builder.blank()
+            builder.text("   **Resolution for TWCS:**")
+            builder.text("   • Review TTL settings and ensure consistent TTL across all columns")
+            builder.text("   • Avoid updates/deletes on time-series data (write-once pattern)")
+            builder.text("   • Consider `unsafe_aggressive_sstable_expiration: true` (use with caution)")
+            builder.blank()
+
+            builder.text("*Long-term Fixes (if compaction is actually behind):*")
+            builder.blank()
+            builder.text("1. **Increase compaction throughput:**")
             builder.text("   - `nodetool setcompactionthroughput 64` (MB/s, temporary)")
             builder.text("   - Permanent: Set `compaction_throughput_mb_per_sec: 64` in cassandra.yaml")
-            builder.text("3. **Increase concurrent compactors:**")
+            builder.text("2. **Increase concurrent compactors:**")
             builder.text("   - `nodetool setconcurrentcompactors 4`")
+            builder.text("3. **Consider changing compaction strategy if workload pattern changed:**")
+            builder.text("   - STCS → LCS: For read-heavy workloads (more I/O during compaction)")
+            builder.text("   - STCS → TWCS: For time-series data with TTL")
             builder.blank()
 
         # Structured data
