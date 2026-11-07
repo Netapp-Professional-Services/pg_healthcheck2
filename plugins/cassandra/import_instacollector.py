@@ -239,7 +239,7 @@ def resolve_diagnostic_path(path_str, quiet=False):
         # (contains IP-named subdirectories with nodetool files)
         ip_pattern = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
         has_node_dirs = any(
-            ip_pattern.match(item.name) and item.is_dir()
+            ( ip_pattern.match(item.name) OR item.name.startswith("InstaCollection") ) and item.is_dir()
             for item in path.iterdir()
         )
         if has_node_dirs:
@@ -249,7 +249,7 @@ def resolve_diagnostic_path(path_str, quiet=False):
         for subdir in path.iterdir():
             if subdir.is_dir():
                 has_node_dirs = any(
-                    ip_pattern.match(item.name) and item.is_dir()
+                    ( ip_pattern.match(item.name) OR item.name.startswith("InstaCollection") ) and item.is_dir()
                     for item in subdir.iterdir()
                 )
                 if has_node_dirs:
