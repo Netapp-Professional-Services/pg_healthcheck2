@@ -141,7 +141,7 @@ class InstacollectorLoader:
             else:
                 logger.error(f"Path does not exist: {self.source_path}")
                 return False
-
+           # self.data_dir = True
             if not self.data_dir:
                 logger.error("Could not find valid Instacollector data")
                 return False
@@ -278,6 +278,9 @@ class InstacollectorLoader:
                 if ip_pattern.match(item.name):
                     if self._is_node_directory(item):
                         node_dirs.append(item)
+                if item.name.startswith("InstaCollection"):
+                    node_dirs.append(item)
+
 
         return node_dirs
 
@@ -751,10 +754,11 @@ def find_most_recent_collection(directory: Path) -> Optional[Path]:
         if item.is_dir():
             # Check if this directory contains IP-named subdirs
             has_ip_subdirs = any(
-                ip_pattern.match(subdir.name)
+                ( ip_pattern.match(subdir.name) or subdir.name.startswith("InstaCollection") ) and item.is_dir()
                 for subdir in item.iterdir()
                 if subdir.is_dir()
             )
+            print(f" In instacollector loader has subdir {has_ip_subdirs}")
             if has_ip_subdirs:
                 mtime = item.stat().st_mtime
                 candidates.append((mtime, item))
