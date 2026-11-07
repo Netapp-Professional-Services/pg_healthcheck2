@@ -9,7 +9,7 @@ Analyzes gc.log files to detect:
 
 Works with both live SSH and Instacollector imported data.
 """
-
+from plugins.clickhouse.utils.qrylib.qry_configuration import get_critical_settings_query
 from plugins.common.check_helpers import require_ssh, CheckContentBuilder
 import logging
 import re
@@ -42,6 +42,7 @@ def parse_gc_log(gc_log_content, max_events=100):
     full_gc_events = []
     pause_times = []
     full_gc_pauses = []
+    humongous_allocations = []
 
     lines = gc_log_content.strip().split('\n')
 
@@ -67,6 +68,9 @@ def parse_gc_log(gc_log_content, max_events=100):
             else:
                 gc_events.append(event)
 
+            if event.get('is_hum_alloc', False):
+                humongous_allocations.append(event)
+
             if len(gc_events) + len(full_gc_events) >= max_events:
                 break
 
@@ -79,6 +83,9 @@ def parse_gc_log(gc_log_content, max_events=100):
         'max_pause_ms': max(pause_times) if pause_times else 0,
         'avg_full_gc_pause_ms': sum(full_gc_pauses) / len(full_gc_pauses) if full_gc_pauses else 0,
         'max_full_gc_pause_ms': max(full_gc_pauses) if full_gc_pauses else 0,
+        'hum_alloc_events':humongous_allocations,
+        'hum_alloc_count':len(humongous_allocations),
+        'gc_event_count': len(gc_events)
     }
 
 
@@ -128,6 +135,9 @@ def parse_unified_gc_line(line):
     timestamp_match = re.search(r'\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})', line)
     if timestamp_match:
         event['timestamp'] = timestamp_match.group(1)
+
+    # Determine if humongous allocation
+    event['is_hum_alloc']= 'Humongous Allocation' in line
 
     # Extract cause
     cause_match = re.search(r'Pause (?:Full|Young|Mixed) \(([^)]+)\)', line)
@@ -195,6 +205,7 @@ def run_check_gc_analysis(connector, settings):
         pause_critical_ms = settings.get('gc_pause_critical_ms', 1000)
         full_gc_warning = settings.get('gc_full_gc_warning_count', 5)
         full_gc_critical = settings.get('gc_full_gc_critical_count', 20)
+        humongous_allocation_warn = settings.get('gc_humongous_allocation_pct', 5)
 
         all_gc_stats = []
         critical_nodes = []
@@ -222,10 +233,21 @@ def run_check_gc_analysis(connector, settings):
             elif gc_stats['max_pause_ms'] >= pause_warning_ms:
                 has_warning = True
 
+
             if gc_stats['full_gc_count'] >= full_gc_critical:
                 has_critical = True
             elif gc_stats['full_gc_count'] >= full_gc_warning:
                 has_warning = True
+
+            if has_critical:
+                critical_nodes.append(node_ip)
+            elif has_warning:
+                warning_nodes.append(node_ip)
+
+            if gc_stats['gc_event_count'] != 0:
+                hum_pct = (gc_stats['hum_alloc_count'] / gc_stats['gc_event_count']) * 100
+                if hum_pct > humongous_allocation_warn:
+                     warning_nodes.append(node_ip)
 
             if has_critical:
                 critical_nodes.append(node_ip)
@@ -240,6 +262,8 @@ def run_check_gc_analysis(connector, settings):
         total_full_gcs = sum(s['full_gc_count'] for s in all_gc_stats)
         max_pause = max(s['max_pause_ms'] for s in all_gc_stats)
 
+        total_hum_allocs = sum(s['hum_alloc_count'] for s in all_gc_stats)
+
         if critical_nodes:
             builder.critical(f"**{len(critical_nodes)} node(s) with critical GC issues**")
             builder.text(f"Total Full GCs detected: {total_full_gcs}")
@@ -252,6 +276,7 @@ def run_check_gc_analysis(connector, settings):
         else:
             builder.success("GC performance is healthy. No Full GC events detected.")
         builder.blank()
+
 
         # GC Summary table
         builder.h4("GC Statistics by Node")
@@ -317,6 +342,7 @@ def run_check_gc_analysis(connector, settings):
                 builder.table(fgc_table)
                 builder.blank()
 
+
             # Comprehensive recommendations based on findings
             builder.h4("Recommended Actions")
 
@@ -374,6 +400,20 @@ def run_check_gc_analysis(connector, settings):
                 builder.text("- Check for large in-memory caches (row cache, key cache)")
                 builder.text("- Consider disabling row cache: `ALTER TABLE ... WITH caching = {{'keys': 'ALL', 'rows_per_partition': 'NONE'}}`")
                 builder.blank()
+
+        all_hum_alloc_gcs = []
+        for status in all_gc_stats:
+            for event in stats['hum_alloc']:
+                event['node'] = stats['node']
+                all_hum_alloc_gcs.append(event)
+
+        if all_hum_alloc_gcs:
+            builder.h4("Humongous Allocation Events")
+            builder.warning(f"**{len(all_hum_alloc_gcs)} Humongous Allocation event(s) detected**")
+            builder.blank()
+            builder.text("Humongous Allocation are object greater than or equal to 1/2 region size.")
+            builder.text("Humongous Allocations can trigger full gcs.")
+            builder.blank()
 
         # Structured data
         structured_data = {
